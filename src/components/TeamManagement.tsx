@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Users, UserPlus, ChevronLeft, Search, MoreVertical,
-  Shield, CheckCircle2, XCircle, Loader2, AlertCircle,
-  Mail, User, Building2, ChevronDown,
+  Users, UserPlus, ChevronLeft, Search,
+  Shield, CheckCircle2, Loader2, AlertCircle,
+  Mail, User, Building2, ChevronDown, Lock,
 } from 'lucide-react';
 import {
   listTeamMembers,
@@ -18,6 +18,7 @@ import {
   assignableRoles,
   getRoleGroup,
   type AppRole,
+  type RoleGroup,
 } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,35 +26,85 @@ interface TeamManagementProps {
   onBack: () => void;
 }
 
-const ROLE_GROUP_COLORS: Record<string, string> = {
+const ROLE_GROUP_COLORS: Record<RoleGroup, string> = {
   acce:   'bg-primary/10 text-primary border-primary/20',
   school: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   de:     'bg-violet-50 text-violet-700 border-violet-200',
 };
 
-const ROLE_GROUP_DOT: Record<string, string> = {
+const ROLE_GROUP_DOT: Record<RoleGroup, string> = {
   acce:   'bg-primary',
   school: 'bg-emerald-500',
   de:     'bg-violet-500',
 };
 
+// ── Per-role UI config ────────────────────────────────────────────────────────
+
+interface RoleConfig {
+  title:          string;
+  subtitle:       string;
+  showGroupChips: boolean;
+  showGroupCol:   boolean;
+  showSchoolCol:  boolean;
+}
+
+function getRoleConfig(role: AppRole): RoleConfig {
+  switch (role) {
+    case 'acce_admin':
+      return {
+        title:          'Team Management',
+        subtitle:       'Manage all ACCE, School, and DE users across the platform.',
+        showGroupChips: true,
+        showGroupCol:   true,
+        showSchoolCol:  true,
+      };
+    case 'school_admin':
+      return {
+        title:          'My School Team',
+        subtitle:       'Manage staff accounts for your school.',
+        showGroupChips: false,
+        showGroupCol:   false,
+        showSchoolCol:  false,
+      };
+    case 'de_admin':
+      return {
+        title:          'DE Team',
+        subtitle:       'Manage Department of Education user accounts.',
+        showGroupChips: false,
+        showGroupCol:   false,
+        showSchoolCol:  false,
+      };
+    default:
+      return {
+        title:          'Team',
+        subtitle:       '',
+        showGroupChips: false,
+        showGroupCol:   false,
+        showSchoolCol:  false,
+      };
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function TeamManagement({ onBack }: TeamManagementProps) {
-  const { userRole } = useAuth();
+  const { userRole, schoolId: mySchoolId } = useAuth();
   const myAssignableRoles = userRole ? assignableRoles(userRole) : [];
+  const cfg = userRole ? getRoleConfig(userRole) : getRoleConfig('acce_admin');
 
-  const [members, setMembers]         = useState<TeamMember[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
-  const [search, setSearch]           = useState('');
-  const [filterGroup, setFilterGroup] = useState<string>('all');
-  const [filterActive, setFilterActive] = useState<string>('active');
+  const [members,       setMembers]       = useState<TeamMember[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState<string | null>(null);
+  const [search,        setSearch]        = useState('');
+  const [filterGroup,   setFilterGroup]   = useState<string>('all');
+  const [filterActive,  setFilterActive]  = useState<string>('active');
 
-  // Invite modal state
+  // Add user modal
   const [showInvite,     setShowInvite]     = useState(false);
   const [inviteEmail,    setInviteEmail]    = useState('');
   const [inviteName,     setInviteName]     = useState('');
   const [inviteRole,     setInviteRole]     = useState<AppRole>(myAssignableRoles[0] ?? 'acce_staff');
-  const [inviteSchoolId, setInviteSchoolId] = useState('');
+  const [inviteSchoolId, setInviteSchoolId] = useState(mySchoolId ?? '');
   const [inviteLoading,  setInviteLoading]  = useState(false);
   const [inviteError,    setInviteError]    = useState<string | null>(null);
 
@@ -66,8 +117,7 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
     setLoading(true);
     setError(null);
     try {
-      const data = await listTeamMembers();
-      setMembers(data);
+      setMembers(await listTeamMembers());
     } catch (e: any) {
       setError(e.message ?? 'Failed to load team members.');
     } finally {
@@ -77,25 +127,47 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
 
   useEffect(() => { void load(); }, [load]);
 
-  // ── Filters ──────────────────────────────────────────────────────────────
+  // ── Scope filter — narrows data to what this admin is allowed to see ─────
 
-  const filtered = members.filter(m => {
+  const scoped = members.filter(m => {
+    if (userRole === 'school_admin') {
+      return getRoleGroup(m.role) === 'school' && m.school_id === mySchoolId;
+    }
+    if (userRole === 'de_admin') {
+      return getRoleGroup(m.role) === 'de';
+    }
+    return true; // acce_admin sees all
+  });
+
+  // ── UI filters (search, group chip, active toggle) ───────────────────────
+
+  const filtered = scoped.filter(m => {
     const q = search.toLowerCase();
     const matchesSearch = !q ||
       (m.display_name ?? '').toLowerCase().includes(q) ||
       m.email.toLowerCase().includes(q) ||
       ROLE_LABELS[m.role].toLowerCase().includes(q);
-    const group = getRoleGroup(m.role);
-    const matchesGroup = filterGroup === 'all' || group === filterGroup;
-    const matchesActive = filterActive === 'all' ||
-      (filterActive === 'active' && m.is_active) ||
+    const matchesGroup = filterGroup === 'all' || getRoleGroup(m.role) === filterGroup;
+    const matchesActive =
+      filterActive === 'all' ||
+      (filterActive === 'active'   && m.is_active) ||
       (filterActive === 'inactive' && !m.is_active);
     return matchesSearch && matchesGroup && matchesActive;
   });
 
-  const totalActive = members.filter(m => m.is_active).length;
+  const totalActive = scoped.filter(m => m.is_active).length;
 
-  // ── Invite ────────────────────────────────────────────────────────────────
+  // ── Add user ─────────────────────────────────────────────────────────────
+
+  function openInvite() {
+    setInviteEmail('');
+    setInviteName('');
+    setInviteRole(myAssignableRoles[0] ?? 'acce_staff');
+    // school_admin: pre-fill + lock school_id to their own school
+    setInviteSchoolId(userRole === 'school_admin' ? (mySchoolId ?? '') : '');
+    setInviteError(null);
+    setShowInvite(true);
+  }
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -110,9 +182,6 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
         needsSchool && inviteSchoolId.trim() ? inviteSchoolId.trim() : undefined,
       );
       setShowInvite(false);
-      setInviteEmail('');
-      setInviteName('');
-      setInviteSchoolId('');
       await load();
     } catch (e: any) {
       setInviteError(e.message ?? 'Failed to add user.');
@@ -121,7 +190,7 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
     }
   }
 
-  // ── Role update ───────────────────────────────────────────────────────────
+  // ── Role update ──────────────────────────────────────────────────────────
 
   async function handleRoleUpdate(id: string) {
     setEditLoading(true);
@@ -136,8 +205,6 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
     }
   }
 
-  // ── Toggle active ─────────────────────────────────────────────────────────
-
   async function handleToggleActive(id: string, current: boolean) {
     try {
       await toggleTeamMemberActive(id, !current);
@@ -149,8 +216,12 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const showSchoolIdFieldInModal = userRole === 'acce_admin' && getRoleGroup(inviteRole) === 'school';
+  const showSchoolIdLockedInModal = userRole === 'school_admin';
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-50 overflow-hidden">
+
       {/* Header */}
       <div className="shrink-0 bg-white border-b border-slate-100 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -164,7 +235,12 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
           <span className="text-slate-300">|</span>
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-primary" />
-            <span className="text-sm font-bold text-slate-900">Team Management</span>
+            <div>
+              <span className="text-sm font-bold text-slate-900">{cfg.title}</span>
+              {cfg.subtitle && (
+                <span className="ml-2 text-xs text-slate-400">{cfg.subtitle}</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -173,7 +249,7 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
           </span>
           {myAssignableRoles.length > 0 && (
             <button
-              onClick={() => setShowInvite(true)}
+              onClick={openInvite}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
             >
               <UserPlus className="w-4 h-4" />
@@ -193,8 +269,10 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-5">
+          {/* Search */}
           <div className="relative flex-1 min-w-48 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
@@ -205,14 +283,22 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
               className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
             />
           </div>
-          <FilterChip label="All groups" value="all" current={filterGroup} onChange={setFilterGroup} />
-          <FilterChip label="ACCE" value="acce" current={filterGroup} onChange={setFilterGroup} />
-          <FilterChip label="School" value="school" current={filterGroup} onChange={setFilterGroup} />
-          <FilterChip label="DE" value="de" current={filterGroup} onChange={setFilterGroup} />
+
+          {/* Group chips — acce_admin only */}
+          {cfg.showGroupChips && (
+            <>
+              <FilterChip label="All groups" value="all"    current={filterGroup} onChange={setFilterGroup} />
+              <FilterChip label="ACCE"       value="acce"   current={filterGroup} onChange={setFilterGroup} />
+              <FilterChip label="School"     value="school" current={filterGroup} onChange={setFilterGroup} />
+              <FilterChip label="DE"         value="de"     current={filterGroup} onChange={setFilterGroup} />
+            </>
+          )}
+
+          {/* Active status chips — always shown */}
           <div className="ml-auto flex gap-2">
-            <FilterChip label="Active" value="active" current={filterActive} onChange={setFilterActive} />
+            <FilterChip label="Active"   value="active"   current={filterActive} onChange={setFilterActive} />
             <FilterChip label="Inactive" value="inactive" current={filterActive} onChange={setFilterActive} />
-            <FilterChip label="All" value="all" current={filterActive} onChange={setFilterActive} />
+            <FilterChip label="All"      value="all"      current={filterActive} onChange={setFilterActive} />
           </div>
         </div>
 
@@ -234,10 +320,10 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                 <tr className="border-b border-slate-100 text-left">
                   <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
                   <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Group</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">School ID</th>
+                  {cfg.showGroupCol  && <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Group</th>}
+                  {cfg.showSchoolCol && <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">School ID</th>}
                   <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Joined</th>
+                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Added</th>
                   {myAssignableRoles.length > 0 && (
                     <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                   )}
@@ -245,10 +331,11 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.map(member => {
-                  const group = getRoleGroup(member.role);
+                  const group     = getRoleGroup(member.role);
                   const isEditing = editingId === member.id;
                   return (
                     <tr key={member.id} className={`hover:bg-slate-50/50 transition-colors ${!member.is_active ? 'opacity-50' : ''}`}>
+
                       {/* User */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
@@ -261,7 +348,8 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                           </div>
                         </div>
                       </td>
-                      {/* Role */}
+
+                      {/* Role — inline editor for admins */}
                       <td className="px-5 py-3.5">
                         {isEditing ? (
                           <div className="flex items-center gap-2">
@@ -297,14 +385,21 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                           </span>
                         )}
                       </td>
-                      {/* Group */}
-                      <td className="px-5 py-3.5 text-xs text-slate-500">
-                        {ROLE_GROUP_LABELS[group]}
-                      </td>
-                      {/* School ID */}
-                      <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">
-                        {member.school_id ?? <span className="text-slate-300">—</span>}
-                      </td>
+
+                      {/* Group — acce_admin only */}
+                      {cfg.showGroupCol && (
+                        <td className="px-5 py-3.5 text-xs text-slate-500">
+                          {ROLE_GROUP_LABELS[group]}
+                        </td>
+                      )}
+
+                      {/* School ID — acce_admin only */}
+                      {cfg.showSchoolCol && (
+                        <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">
+                          {member.school_id ?? <span className="text-slate-300">—</span>}
+                        </td>
+                      )}
+
                       {/* Status */}
                       <td className="px-5 py-3.5">
                         {member.user_id ? (
@@ -319,10 +414,12 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                           </span>
                         )}
                       </td>
-                      {/* Joined */}
+
+                      {/* Added date */}
                       <td className="px-5 py-3.5 text-xs text-slate-400">
                         {new Date(member.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </td>
+
                       {/* Actions */}
                       {myAssignableRoles.length > 0 && (
                         <td className="px-5 py-3.5">
@@ -376,13 +473,16 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                   <UserPlus className="w-5 h-5 text-primary" />
                   <h2 className="text-base font-bold text-slate-900">Add team member</h2>
                 </div>
+
                 {inviteError && (
                   <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-4">
                     <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-red-700">{inviteError}</p>
                   </div>
                 )}
+
                 <form onSubmit={handleInvite} className="space-y-4">
+                  {/* Email */}
                   <FormField label="Email address" required>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -396,6 +496,8 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                       />
                     </div>
                   </FormField>
+
+                  {/* Display name */}
                   <FormField label="Display name">
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -408,6 +510,8 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                       />
                     </div>
                   </FormField>
+
+                  {/* Role — options scoped to admin type */}
                   <FormField label="Role" required>
                     <div className="relative">
                       <select
@@ -417,13 +521,18 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                         required
                       >
                         {myAssignableRoles.map(r => (
-                          <option key={r} value={r}>{ROLE_LABELS[r]} — {ROLE_GROUP_LABELS[getRoleGroup(r)]}</option>
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                            {userRole === 'acce_admin' ? ` — ${ROLE_GROUP_LABELS[getRoleGroup(r)]}` : ''}
+                          </option>
                         ))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
                   </FormField>
-                  {getRoleGroup(inviteRole) === 'school' && (
+
+                  {/* School ID — editable for acce_admin assigning school roles, locked for school_admin */}
+                  {showSchoolIdFieldInModal && (
                     <FormField label="School ID" required>
                       <div className="relative">
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -438,6 +547,22 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                       </div>
                     </FormField>
                   )}
+
+                  {showSchoolIdLockedInModal && (
+                    <FormField label="School ID">
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={mySchoolId ?? ''}
+                          readOnly
+                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-sm font-mono text-slate-400 cursor-not-allowed"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Locked to your school — users you add will be scoped to this school.</p>
+                    </FormField>
+                  )}
+
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
