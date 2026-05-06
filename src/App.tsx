@@ -239,7 +239,7 @@ function AppInner() {
 
   // ── Team management ───────────────────────────────────────────────────────
   if (page === 'team') {
-    return <TeamManagement onBack={() => goTo('network')} />;
+    return <TeamManagement onBack={() => goTo('network')} schools={schools} />;
   }
 
   // ── Network overview ──────────────────────────────────────────────────────

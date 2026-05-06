@@ -5,7 +5,24 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## [Unreleased] — 2026-05-06 (latest)
+## [Unreleased] — 2026-05-07 (latest)
+
+### Changed: Add team member modal — Type selector and school name dropdown
+
+- Added **Type** dropdown to the Add team member modal (ACCE / School / Department of Education), visible for `acce_admin` only.
+- Role dropdown now filters to only show roles belonging to the selected type (e.g. selecting "School" shows only School Admin / School Staff).
+- Replaced the raw GUID text field for school assignment with a **school name dropdown** populated from the loaded Dataverse school list. Falls back to a text input if schools haven't loaded.
+- For `school_admin`, the school field now shows the school name (not raw ID) and remains locked to their own school.
+- `App.tsx` passes the loaded `schools` list to `TeamManagement` so the dropdown is populated without an extra fetch.
+
+### Fixed: Dataverse 400 errors on schools and students fetch
+
+- Removed `new_studenttypemultiselect` and `cr89a_prioritycohort` from the students `$select` — these fields use a different Dataverse solution publisher prefix (`new_`) and do not exist on all instances, causing `0x80060888`.
+- Added explicit `SCHOOL_SELECT` to `fetchSchools` — without it Dataverse attempted to return non-queryable metadata columns and returned 400.
+
+---
+
+## [Unreleased] — 2026-05-06
 
 ### Added: Role-Based Access Control (RBAC), Team Management UI, and Multi-Auth
 

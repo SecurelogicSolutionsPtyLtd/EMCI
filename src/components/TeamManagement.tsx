@@ -22,8 +22,14 @@ import {
 } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
 
+interface SchoolOption {
+  id:   string;
+  name: string;
+}
+
 interface TeamManagementProps {
-  onBack: () => void;
+  onBack:    () => void;
+  schools?:  SchoolOption[];
 }
 
 const ROLE_GROUP_COLORS: Record<RoleGroup, string> = {
@@ -87,10 +93,15 @@ function getRoleConfig(role: AppRole): RoleConfig {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function TeamManagement({ onBack }: TeamManagementProps) {
+export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
   const { userRole, schoolId: mySchoolId } = useAuth();
   const myAssignableRoles = userRole ? assignableRoles(userRole) : [];
   const cfg = userRole ? getRoleConfig(userRole) : getRoleConfig('acce_admin');
+
+  // Derive the initial type group for the current admin
+  const defaultInviteType: RoleGroup =
+    userRole === 'school_admin' ? 'school' :
+    userRole === 'de_admin'     ? 'de'     : 'acce';
 
   const [members,       setMembers]       = useState<TeamMember[]>([]);
   const [loading,       setLoading]       = useState(true);
@@ -103,6 +114,7 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
   const [showInvite,     setShowInvite]     = useState(false);
   const [inviteEmail,    setInviteEmail]    = useState('');
   const [inviteName,     setInviteName]     = useState('');
+  const [inviteType,     setInviteType]     = useState<RoleGroup>(defaultInviteType);
   const [inviteRole,     setInviteRole]     = useState<AppRole>(myAssignableRoles[0] ?? 'acce_staff');
   const [inviteSchoolId, setInviteSchoolId] = useState(mySchoolId ?? '');
   const [inviteLoading,  setInviteLoading]  = useState(false);
@@ -157,16 +169,30 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
 
   const totalActive = scoped.filter(m => m.is_active).length;
 
+  // ── Roles filtered by the currently selected invite type ────────────────
+  const typeFilteredRoles = myAssignableRoles.filter(r => getRoleGroup(r) === inviteType);
+
   // ── Add user ─────────────────────────────────────────────────────────────
 
   function openInvite() {
+    const startType: RoleGroup = defaultInviteType;
+    const startRole = myAssignableRoles.find(r => getRoleGroup(r) === startType) ?? myAssignableRoles[0] ?? 'acce_staff';
     setInviteEmail('');
     setInviteName('');
-    setInviteRole(myAssignableRoles[0] ?? 'acce_staff');
+    setInviteType(startType);
+    setInviteRole(startRole);
     // school_admin: pre-fill + lock school_id to their own school
     setInviteSchoolId(userRole === 'school_admin' ? (mySchoolId ?? '') : '');
     setInviteError(null);
     setShowInvite(true);
+  }
+
+  // When type changes: reset role to first valid for that type and clear school
+  function handleInviteTypeChange(type: RoleGroup) {
+    setInviteType(type);
+    const firstRole = myAssignableRoles.find(r => getRoleGroup(r) === type);
+    if (firstRole) setInviteRole(firstRole);
+    setInviteSchoolId('');
   }
 
   async function handleInvite(e: React.FormEvent) {
@@ -216,7 +242,7 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const showSchoolIdFieldInModal = userRole === 'acce_admin' && getRoleGroup(inviteRole) === 'school';
+  const showSchoolIdFieldInModal  = userRole === 'acce_admin' && inviteType === 'school';
   const showSchoolIdLockedInModal = userRole === 'school_admin';
 
   return (
@@ -511,7 +537,26 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                     </div>
                   </FormField>
 
-                  {/* Role — options scoped to admin type */}
+                  {/* Type — shown only for acce_admin; scoped admins have a fixed type */}
+                  {userRole === 'acce_admin' && (
+                    <FormField label="Type" required>
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <select
+                          value={inviteType}
+                          onChange={e => handleInviteTypeChange(e.target.value as RoleGroup)}
+                          className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition appearance-none bg-white"
+                        >
+                          <option value="acce">ACCE</option>
+                          <option value="school">School</option>
+                          <option value="de">Department of Education</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      </div>
+                    </FormField>
+                  )}
+
+                  {/* Role — filtered by selected type */}
                   <FormField label="Role" required>
                     <div className="relative">
                       <select
@@ -520,43 +565,61 @@ export function TeamManagement({ onBack }: TeamManagementProps) {
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition appearance-none bg-white"
                         required
                       >
-                        {myAssignableRoles.map(r => (
-                          <option key={r} value={r}>
-                            {ROLE_LABELS[r]}
-                            {userRole === 'acce_admin' ? ` — ${ROLE_GROUP_LABELS[getRoleGroup(r)]}` : ''}
-                          </option>
+                        {(userRole === 'acce_admin' ? typeFilteredRoles : myAssignableRoles).map(r => (
+                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                         ))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
                   </FormField>
 
-                  {/* School ID — editable for acce_admin assigning school roles, locked for school_admin */}
+                  {/* School — dropdown for acce_admin assigning school roles */}
                   {showSchoolIdFieldInModal && (
-                    <FormField label="School ID" required>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={inviteSchoolId}
-                          onChange={e => setInviteSchoolId(e.target.value)}
-                          placeholder="Dataverse school GUID"
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                          required
-                        />
-                      </div>
+                    <FormField label="School" required>
+                      {schools.length > 0 ? (
+                        <div className="relative">
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                          <select
+                            value={inviteSchoolId}
+                            onChange={e => setInviteSchoolId(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition appearance-none bg-white"
+                            required
+                          >
+                            <option value="">Select a school…</option>
+                            {schools.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={inviteSchoolId}
+                            onChange={e => setInviteSchoolId(e.target.value)}
+                            placeholder="School ID (GUID)"
+                            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                            required
+                          />
+                        </div>
+                      )}
                     </FormField>
                   )}
 
+                  {/* School locked — school_admin can only add within their own school */}
                   {showSchoolIdLockedInModal && (
-                    <FormField label="School ID">
+                    <FormField label="School">
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
                         <input
                           type="text"
-                          value={mySchoolId ?? ''}
+                          value={
+                            schools.find(s => s.id === mySchoolId)?.name ?? mySchoolId ?? ''
+                          }
                           readOnly
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-sm font-mono text-slate-400 cursor-not-allowed"
+                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-sm text-slate-400 cursor-not-allowed"
                         />
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1">Locked to your school — users you add will be scoped to this school.</p>
