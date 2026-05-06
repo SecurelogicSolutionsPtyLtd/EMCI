@@ -122,40 +122,17 @@ export interface UserRoleRecord {
 }
 
 /**
- * Fetches the role for the current user from emci_user_roles.
- * If a row exists with matching email but no user_id (pending invite),
- * it is claimed by updating the user_id.
+ * Resolves the role for the current user via a SECURITY DEFINER RPC that
+ * bypasses RLS. Handles both the normal lookup (by user_id) and the
+ * first-login invite claim (by email when user_id is still null).
  */
 export async function getUserRole(userId: string, email: string): Promise<UserRoleRecord | null> {
-  // Try by user_id first
-  const { data: byId } = await supabase
-    .from('emci_user_roles')
-    .select('role, school_id, display_name, email')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (byId) return byId as UserRoleRecord;
-
-  // Claim a pending invite matched by email
-  const { data: byEmail } = await supabase
-    .from('emci_user_roles')
-    .select('role, school_id, display_name, email')
-    .eq('email', email)
-    .is('user_id', null)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (byEmail) {
-    await supabase
-      .from('emci_user_roles')
-      .update({ user_id: userId })
-      .eq('email', email)
-      .is('user_id', null);
-    return byEmail as UserRoleRecord;
-  }
-
-  return null;
+  const { data, error } = await supabase.rpc('emci_resolve_user_role', {
+    p_user_id: userId,
+    p_email:   email,
+  });
+  if (error || !data) return null;
+  return data as UserRoleRecord;
 }
 
 // ── Team management helpers ────────────────────────────────────────────────────
