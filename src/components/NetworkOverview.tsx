@@ -3,18 +3,23 @@ import { motion } from 'motion/react';
 import {
   LayoutDashboard, Building2, Users, UserCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, Network, FlaskConical,
-  AlertTriangle, BookOpen, MoreVertical,
+  AlertTriangle, BookOpen, MoreVertical, UsersRound,
 } from 'lucide-react';
 import type { School } from '../data/networkData';
 import type { Student } from '../data/studentsData';
+import type { AppRole } from '../types/roles';
+import { canAccessPage, canSeeStudentNames, isAdminRole, getRoleGroup, ROLE_LABELS } from '../types/roles';
+import { useAuth } from '../context/AuthContext';
 
 interface NetworkOverviewProps {
   students: Student[];
   schools: School[];
+  userRole: AppRole;
   onSelectSchool: (school: School) => void;
   onSelectStudent: (student: Student) => void;
   onGoToCounsellors: () => void;
   onGoToDevLab: () => void;
+  onGoToTeam: () => void;
 }
 
 const PAGE_SIZE = 10;
@@ -54,9 +59,15 @@ function getInitials(student: Student) {
 type View = 'schools' | 'students';
 
 export function NetworkOverview({
-  students, schools, onSelectSchool, onSelectStudent,
-  onGoToCounsellors, onGoToDevLab,
+  students, schools, userRole, onSelectSchool, onSelectStudent,
+  onGoToCounsellors, onGoToDevLab, onGoToTeam,
 }: NetworkOverviewProps) {
+  const { authUser } = useAuth();
+  const showStudentNames = canSeeStudentNames(userRole);
+  const showCounsellors  = canAccessPage(userRole, 'counsellors');
+  const showDevLab       = canAccessPage(userRole, 'devlab');
+  const showStudentJourney = canAccessPage(userRole, 'student');
+  const showTeam         = isAdminRole(userRole);
   // ── view switcher ─────────────────────────────────────────────
   const [view, setView] = useState<View>('schools');
 
@@ -130,14 +141,13 @@ export function NetworkOverview({
     { label: 'Counsellors',     value: totalCounsellors,                    highlight: false },
   ];
 
-  // ── nav items (dynamic active) ────────────────────────────────
+  // ── nav items (role-filtered) ─────────────────────────────────
   const NAV_ITEMS = [
-    { label: 'Dashboard',   icon: LayoutDashboard, viewKey: null       as View | null },
-    { label: 'Schools',     icon: Building2,       viewKey: 'schools'  as View | null },
-    { label: 'Students',    icon: Users,           viewKey: 'students' as View | null },
-    { label: 'Counsellors', icon: UserCheck,       viewKey: null       as View | null },
-    { label: 'Settings',    icon: Settings,        viewKey: null       as View | null },
-  ];
+    { label: 'Dashboard',   icon: LayoutDashboard, viewKey: null       as View | null, always: true },
+    { label: 'Schools',     icon: Building2,       viewKey: 'schools'  as View | null, always: true },
+    { label: 'Students',    icon: Users,           viewKey: 'students' as View | null, always: true },
+    { label: 'Counsellors', icon: UserCheck,       viewKey: null       as View | null, always: false, show: showCounsellors },
+  ].filter(item => item.always || item.show);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -177,25 +187,38 @@ export function NetworkOverview({
             );
           })}
 
-          {/* Dev Lab */}
-          <button
-            onClick={onGoToDevLab}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          >
-            <FlaskConical className="w-5 h-5 shrink-0" />
-            Dataverse Lab
-          </button>
+          {/* Dataverse Lab — ACCE only */}
+          {showDevLab && (
+            <button
+              onClick={onGoToDevLab}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <FlaskConical className="w-5 h-5 shrink-0" />
+              Dataverse Lab
+            </button>
+          )}
+
+          {/* Team Management — admins only */}
+          {showTeam && (
+            <button
+              onClick={onGoToTeam}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <UsersRound className="w-5 h-5 shrink-0" />
+              Team Management
+            </button>
+          )}
         </nav>
 
         {/* User */}
         <div className="p-4 border-t border-slate-200">
           <div className="flex items-center gap-3 px-3">
-            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
-              <img src="https://picsum.photos/seed/counsellor/100/100" alt="User" className="w-full h-full object-cover" />
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 text-white text-xs font-bold">
+              {(authUser?.firstName ?? authUser?.email ?? 'U').slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-800 truncate">EMCI Admin</p>
-              <p className="text-xs text-slate-500">Admin</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{authUser?.displayName ?? authUser?.email ?? '—'}</p>
+              <p className="text-xs text-slate-500">{ROLE_LABELS[userRole]}</p>
             </div>
           </div>
         </div>
@@ -464,32 +487,32 @@ export function NetworkOverview({
                               initial={{ opacity: 0, x: -4 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ duration: 0.12, delay: idx * 0.02 }}
-                              className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
-                              onClick={() => onSelectStudent(student)}
+                              className={`transition-colors group ${showStudentJourney ? 'hover:bg-slate-50/70 cursor-pointer' : ''}`}
+                              onClick={showStudentJourney ? () => onSelectStudent(student) : undefined}
                             >
                               {/* Name */}
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                   <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                                    {initials}
+                                    {showStudentNames ? initials : '—'}
                                   </div>
                                   <div className="flex flex-col min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
-                                        {student.firstName} {student.lastName}
+                                      <span className={`font-bold text-slate-900 ${showStudentJourney ? 'group-hover:text-primary transition-colors' : ''}`}>
+                                        {showStudentNames ? `${student.firstName} ${student.lastName}` : '— Redacted —'}
                                       </span>
                                       {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                                     </div>
                                     {atRisk
                                       ? <span className="text-xs text-red-500/80 font-medium">At Risk</span>
-                                      : <span className="text-xs text-slate-400 font-mono">{student.morrisbyId}</span>
+                                      : <span className="text-xs text-slate-400 font-mono">{showStudentNames ? student.morrisbyId : '—'}</span>
                                     }
                                   </div>
                                 </div>
                               </td>
 
                               {/* Year */}
-                              <td className="px-4 py-4 text-sm text-slate-700">{student.yearLevel}</td>
+                              <td className="px-4 py-4 text-sm text-slate-700">{showStudentNames ? student.yearLevel : '—'}</td>
 
                               {/* School */}
                               <td className="px-6 py-4">
@@ -497,7 +520,7 @@ export function NetworkOverview({
                               </td>
 
                               {/* Counsellor */}
-                              <td className="px-6 py-4 text-sm text-slate-600">{student.counsellor ?? '—'}</td>
+                              <td className="px-6 py-4 text-sm text-slate-600">{showStudentNames ? (student.counsellor ?? '—') : '—'}</td>
 
                               {/* Stage */}
                               <td className="px-6 py-4">
@@ -529,12 +552,14 @@ export function NetworkOverview({
 
                               {/* Actions */}
                               <td className="px-6 py-4 text-right">
-                                <button
-                                  onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
-                                  className="text-slate-400 hover:text-primary transition-colors"
-                                >
-                                  <MoreVertical className="w-5 h-5" />
-                                </button>
+                                {showStudentJourney && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
+                                    className="text-slate-400 hover:text-primary transition-colors"
+                                  >
+                                    <MoreVertical className="w-5 h-5" />
+                                  </button>
+                                )}
                               </td>
                             </motion.tr>
                           );

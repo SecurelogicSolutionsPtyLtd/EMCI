@@ -13,7 +13,7 @@ import type { School } from '../data/networkData';
 interface SchoolDashboardProps {
   students: Student[];
   school: School | null;
-  onSelectStudent: (student: Student) => void;
+  onSelectStudent?: (student: Student) => void;
   onBack: () => void;
 }
 
@@ -339,8 +339,8 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
                           initial={{ opacity: 0, x: -4 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ duration: 0.15, delay: idx * 0.025 }}
-                          className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
-                          onClick={() => onSelectStudent(student)}
+                          className={`transition-colors group ${onSelectStudent ? 'hover:bg-slate-50/70 cursor-pointer' : ''}`}
+                          onClick={onSelectStudent ? () => onSelectStudent(student) : undefined}
                         >
                           {/* Name */}
                           <td className="px-6 py-4">
@@ -395,12 +395,14 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
 
                           {/* Actions */}
                           <td className="px-6 py-4 text-right">
-                            <button
-                              onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
-                              className="text-slate-400 hover:text-primary transition-colors"
-                            >
-                              <MoreVertical className="w-5 h-5" />
-                            </button>
+                            {onSelectStudent && (
+                              <button
+                                onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
+                                className="text-slate-400 hover:text-primary transition-colors"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                            )}
                           </td>
                         </motion.tr>
                       );

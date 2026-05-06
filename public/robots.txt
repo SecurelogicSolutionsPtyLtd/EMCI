@@ -1,0 +1,5 @@
+# EMCI Student Intelligence Interface
+# Private authenticated platform — search engine indexing is disabled.
+
+User-agent: *
+Disallow: /

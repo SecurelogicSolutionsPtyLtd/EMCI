@@ -11,6 +11,8 @@ import { DataverseLab } from './components/DataverseLab';
 import { SurveySearch } from './components/SurveySearch';
 import { StudentSearch } from './components/StudentSearch';
 import { LoginPage } from './components/LoginPage';
+import { TeamManagement } from './components/TeamManagement';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import type { Student } from './data/studentsData';
 import type { School } from './data/networkData';
 import {
@@ -33,24 +35,18 @@ import {
   type RawEndOfPilotSurvey2026,
   type RawMidPilotStudentSurvey,
 } from './services/dataverse';
-import { supabase, mapUser, type AppUser } from './services/supabase';
+import { canAccessPage, getRoleGroup } from './types/roles';
+import type { Page } from './types/roles';
 import { ChevronLeft, FileDown, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-
-// Navigation hierarchy:
-// network → school → student → pdf
-//         → counsellors
-//         → devlab → surveysearch
-//                  → studentsearch
-type Page = 'network' | 'school' | 'student' | 'pdf' | 'counsellors' | 'devlab' | 'surveysearch' | 'studentsearch';
 
 const TOKEN_URL = '/devtoken';
 
-export default function App() {
-  // ── SSO auth state ───────────────────────────────────────────
-  const [authUser, setAuthUser]     = useState<AppUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+// ── Inner app (inside AuthProvider) ──────────────────────────────────────────
 
-  // ── Auth + data state ────────────────────────────────────────
+function AppInner() {
+  const { authUser, userRole, schoolId, stage } = useAuth();
+
+  // ── Auth + data state ────────────────────────────────────────────────────
   const [token, setToken]               = useState('');
   const [tokenLoading, setTokenLoading] = useState(true);
   const [students, setStudents]         = useState<Student[]>([]);
@@ -59,16 +55,15 @@ export default function App() {
   const [dataError, setDataError]       = useState<string | null>(null);
   const refreshTimerRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Pre-computed per-student timeline events (keyed by student.id)
   const [studentEventsMap, setStudentEventsMap] = useState<Record<string, TimelineEvent[]>>({});
 
-  // ── Navigation state ─────────────────────────────────────────
+  // ── Navigation state ─────────────────────────────────────────────────────
   const [page, setPage]                       = useState<Page>('network');
   const [selectedSchool, setSelectedSchool]   = useState<School | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedEvent, setSelectedEvent]     = useState<any | null>(null);
 
-  // ── Token fetch (server-side via Vite /devtoken middleware) ──
+  // ── Token fetch ───────────────────────────────────────────────────────────
   const fetchToken = useCallback(async (): Promise<string> => {
     const res  = await fetch(TOKEN_URL, { method: 'POST' });
     const data = await res.json();
@@ -77,36 +72,25 @@ export default function App() {
     }
     const newToken = data.access_token as string;
     setToken(newToken);
-
-    // Auto-refresh 5 min before expiry
     const expiresInSec = (data.expires_in ?? 3600) as number;
     const refreshIn    = Math.max((expiresInSec - 300) * 1000, 30_000);
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => fetchToken(), refreshIn);
-
     return newToken;
   }, []);
 
-  // ── Fetch live students + schools + all related tables ───────
+  // ── Load all Dataverse data ───────────────────────────────────────────────
   const loadData = useCallback(async (tok: string) => {
     setDataLoading(true);
     setDataError(null);
     try {
-      // Core tables — required; throw on failure
       const [fetchedStudents, fetchedSchools] = await Promise.all([
         fetchStudents(tok),
         fetchSchools(tok),
       ]);
-
-      // Related tables — optional; don't block if they fail
       const [
-        sessionsRes,
-        absencesRes,
-        initSurveysRes,
-        initSurveys2026Res,
-        endSurveysLegacyRes,
-        endSurveys2026Res,
-        midStudentSurveysRes,
+        sessionsRes, absencesRes, initSurveysRes, initSurveys2026Res,
+        endSurveysLegacyRes, endSurveys2026Res, midStudentSurveysRes,
       ] = await Promise.allSettled([
         fetchSessions(tok),
         fetchAbsences(tok),
@@ -117,23 +101,17 @@ export default function App() {
         fetchMidPilotStudentSurveys(tok),
       ]);
 
-      const sessions          = sessionsRes.status           === 'fulfilled' ? sessionsRes.value           : [] as RawSession[];
-      const absences          = absencesRes.status           === 'fulfilled' ? absencesRes.value           : [];
-      const initSurveys       = initSurveysRes.status        === 'fulfilled' ? initSurveysRes.value        : [] as RawInitialSurvey[];
-      const initSurveys2026   = initSurveys2026Res.status    === 'fulfilled' ? initSurveys2026Res.value    : [] as RawInitialSurvey2026[];
-      const endSurveysLegacy  = endSurveysLegacyRes.status   === 'fulfilled' ? endSurveysLegacyRes.value   : [] as RawEndOfPilotSurveyLegacy[];
-      const endSurveys2026    = endSurveys2026Res.status     === 'fulfilled' ? endSurveys2026Res.value     : [] as RawEndOfPilotSurvey2026[];
-      const midStudentSurveys = midStudentSurveysRes.status  === 'fulfilled' ? midStudentSurveysRes.value  : [] as RawMidPilotStudentSurvey[];
+      const sessions          = sessionsRes.status          === 'fulfilled' ? sessionsRes.value          : [] as RawSession[];
+      const absences          = absencesRes.status          === 'fulfilled' ? absencesRes.value          : [];
+      const initSurveys       = initSurveysRes.status       === 'fulfilled' ? initSurveysRes.value       : [] as RawInitialSurvey[];
+      const initSurveys2026   = initSurveys2026Res.status   === 'fulfilled' ? initSurveys2026Res.value   : [] as RawInitialSurvey2026[];
+      const endSurveysLegacy  = endSurveysLegacyRes.status  === 'fulfilled' ? endSurveysLegacyRes.value  : [] as RawEndOfPilotSurveyLegacy[];
+      const endSurveys2026    = endSurveys2026Res.status    === 'fulfilled' ? endSurveys2026Res.value    : [] as RawEndOfPilotSurvey2026[];
+      const midStudentSurveys = midStudentSurveysRes.status === 'fulfilled' ? midStudentSurveysRes.value : [] as RawMidPilotStudentSurvey[];
 
-      // Enrich students with counsellor, riskLevel, lastActivity
       const enriched = enrichStudents(fetchedStudents, [], sessions, absences);
 
-      // Pre-build per-student event maps
       const eventsMap: Record<string, TimelineEvent[]> = {};
-
-      // Helper: match an activity record to a student.
-      // Checks both the standard Activity "Regarding" field and common custom
-      // EMCI student lookup fields, guarding against GUID case differences.
       const matchesStudent = (record: { [key: string]: unknown }, sid: string): boolean => {
         const normalize = (v: unknown) => typeof v === 'string' ? v.toLowerCase() : null;
         const target = sid.toLowerCase();
@@ -144,7 +122,6 @@ export default function App() {
           normalize(record['cr89a_wlpcstudentid'])        === target
         );
       };
-
       for (const student of enriched) {
         const sid = student.id;
         eventsMap[sid] = deriveStudentEvents(
@@ -168,8 +145,9 @@ export default function App() {
     }
   }, []);
 
-  // ── Bootstrap: fetch token then data on mount ────────────────
+  // ── Bootstrap on mount (only when authenticated) ──────────────────────────
   useEffect(() => {
+    if (stage !== 'ready') return;
     (async () => {
       setTokenLoading(true);
       try {
@@ -181,28 +159,21 @@ export default function App() {
         setTokenLoading(false);
       }
     })();
-
-    return () => {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    };
+    return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stage]);
 
-  // ── Supabase SSO — check session + listen for changes ────────
+  // ── Set landing page based on role ────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setAuthUser(data.session?.user ? mapUser(data.session.user) : null);
-      setAuthLoading(false);
-    });
+    if (stage !== 'ready' || !userRole) return;
+    const group = getRoleGroup(userRole);
+    if (group === 'school' && schoolId) {
+      const school = schools.find(s => s.id === schoolId);
+      if (school) { setSelectedSchool(school); setPage('school'); }
+    }
+  }, [stage, userRole, schoolId, schools]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthUser(session?.user ? mapUser(session.user) : null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // ── Helpers ───────────────────────────────────────────────────
+  // ── Navigation helpers ────────────────────────────────────────────────────
   function handleSelectSchool(school: School) {
     setSelectedSchool(school);
     setSelectedStudent(null);
@@ -211,35 +182,36 @@ export default function App() {
   }
 
   function handleSelectStudent(student: Student) {
+    if (!userRole || !canAccessPage(userRole, 'student')) return;
     setSelectedStudent(student);
     setSelectedEvent(null);
     setPage('student');
   }
 
   function goTo(p: Page) {
+    if (!userRole || !canAccessPage(userRole, p)) return;
     setSelectedEvent(null);
     setPage(p);
   }
 
-  // School name for the selected student (look up from schools list)
   const studentSchoolName = selectedStudent
     ? (schools.find(s => s.id === (selectedStudent as any).schoolId)?.name ?? selectedSchool?.name ?? undefined)
     : undefined;
 
-  // ── SSO gate — show login until authenticated ─────────────────
-  if (authLoading) {
+  // ── Auth gates ────────────────────────────────────────────────────────────
+  if (stage === 'loading') {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
 
-  if (!authUser) {
+  if (stage === 'unauthenticated' || stage === 'mfa_required' || stage === 'mfa_enroll' || stage === 'no_role') {
     return <LoginPage />;
   }
 
-  // ── Loading screen ────────────────────────────────────────────
+  // ── Data loading screen ───────────────────────────────────────────────────
   if (tokenLoading || (dataLoading && students.length === 0)) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
@@ -251,7 +223,6 @@ export default function App() {
     );
   }
 
-  // ── Error banner helper (inline, shows on each page) ─────────
   const ErrorBanner = dataError ? (
     <div className="shrink-0 bg-red-50 border-b border-red-200 px-6 py-2 flex items-center gap-3">
       <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
@@ -266,7 +237,12 @@ export default function App() {
     </div>
   ) : null;
 
-  // ── Network overview ─────────────────────────────────────────
+  // ── Team management ───────────────────────────────────────────────────────
+  if (page === 'team') {
+    return <TeamManagement onBack={() => goTo('network')} />;
+  }
+
+  // ── Network overview ──────────────────────────────────────────────────────
   if (page === 'network') {
     return (
       <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -274,16 +250,18 @@ export default function App() {
         <NetworkOverview
           students={students}
           schools={schools}
+          userRole={userRole!}
           onSelectSchool={handleSelectSchool}
           onSelectStudent={handleSelectStudent}
           onGoToCounsellors={() => goTo('counsellors')}
           onGoToDevLab={() => goTo('devlab')}
+          onGoToTeam={() => goTo('team')}
         />
       </div>
     );
   }
 
-  // ── Counsellor view ──────────────────────────────────────────
+  // ── Counsellor view ───────────────────────────────────────────────────────
   if (page === 'counsellors') {
     return (
       <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -293,12 +271,11 @@ export default function App() {
     );
   }
 
-  // ── Dataverse Lab ────────────────────────────────────────────
+  // ── Dataverse lab ─────────────────────────────────────────────────────────
   if (page === 'devlab') {
     return <DataverseLab onBack={() => goTo('network')} onGoToSurveySearch={() => goTo('surveysearch')} onGoToStudentSearch={() => goTo('studentsearch')} />;
   }
 
-  // ── Survey Search ─────────────────────────────────────────────
   if (page === 'surveysearch') {
     return (
       <SurveySearch
@@ -309,7 +286,6 @@ export default function App() {
     );
   }
 
-  // ── Student Search ────────────────────────────────────────────
   if (page === 'studentsearch') {
     return (
       <StudentSearch
@@ -320,7 +296,7 @@ export default function App() {
     );
   }
 
-  // ── School dashboard ─────────────────────────────────────────
+  // ── School dashboard ──────────────────────────────────────────────────────
   if (page === 'school') {
     return (
       <div className="flex flex-col h-screen w-screen overflow-hidden">
@@ -328,14 +304,14 @@ export default function App() {
         <SchoolDashboard
           students={students}
           school={selectedSchool}
-          onSelectStudent={handleSelectStudent}
+          onSelectStudent={userRole && canAccessPage(userRole, 'student') ? handleSelectStudent : undefined}
           onBack={() => goTo('network')}
         />
       </div>
     );
   }
 
-  // ── PDF preview ──────────────────────────────────────────────
+  // ── PDF preview ───────────────────────────────────────────────────────────
   if (page === 'pdf') {
     return (
       <PdfPreview
@@ -352,10 +328,9 @@ export default function App() {
     );
   }
 
-  // ── Student journey view ─────────────────────────────────────
+  // ── Student journey ───────────────────────────────────────────────────────
   return (
     <div className="h-screen w-screen flex flex-col bg-emci-bg text-emci-primary overflow-hidden">
-      {/* Breadcrumb + Export */}
       <div className="shrink-0 bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <button onClick={() => goTo('network')}
@@ -373,17 +348,17 @@ export default function App() {
             {selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : 'Student Journey'}
           </span>
         </div>
-        <button
-          onClick={() => goTo('pdf')}
-          className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-lg shadow-sm"
-        >
-          <FileDown className="w-4 h-4" />
-          Export to PDF
-        </button>
+        {userRole && canAccessPage(userRole, 'pdf') && (
+          <button
+            onClick={() => goTo('pdf')}
+            className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-lg shadow-sm"
+          >
+            <FileDown className="w-4 h-4" />
+            Export to PDF
+          </button>
+        )}
       </div>
-
       {ErrorBanner}
-
       <div className="flex-1 flex flex-row overflow-hidden">
         <div className="w-72 shrink-0 border-r border-slate-200 flex flex-col">
           <ProfileSnapshot student={selectedStudent} schoolName={studentSchoolName} />
@@ -396,5 +371,15 @@ export default function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Root export (wraps inner with AuthProvider) ───────────────────────────────
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }

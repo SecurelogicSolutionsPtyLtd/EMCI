@@ -1,5 +1,6 @@
 {
-  "name": "react-example",
+  "name": "emci-student-intelligence-interface",
+  "description": "EMCI Student Intelligence Interface — Early and Meaningful Career Intelligence platform by SecureLogic Solutions.",
   "private": true,
   "version": "0.0.0",
   "type": "module",

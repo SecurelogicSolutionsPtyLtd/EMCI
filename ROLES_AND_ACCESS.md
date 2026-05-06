@@ -1,177 +1,126 @@
 # EMCI — Roles & Access Levels
 
-This document defines every user role in the EMCI Student Intelligence Interface, the access level assigned to each role, what they can see and do within the platform, and the data they interact with.
+This document defines every user role in the EMCI Student Intelligence Interface, the authentication method, the access level assigned to each role, what they can see and do within the platform, and the data they interact with.
 
 ---
 
 ## Overview
 
-EMCI operates across a multi-stakeholder ecosystem. Roles are organised into three tiers:
+EMCI operates across a multi-stakeholder ecosystem. Access is split across three role groups, each with its own authentication method and data visibility rules:
 
-| Tier | Description |
-|------|-------------|
-| **Tier 1 — Operational** | Day-to-day users who interact directly with student data |
-| **Tier 2 — Administrative** | Users who manage cohorts, schools, or counsellors |
-| **Tier 3 — Oversight** | Government, departmental, or executive users with read-only programme visibility |
+| Tier | Role Group | Authentication |
+|------|------------|----------------|
+| **Tier 1 — Internal** | ACCE Users | Microsoft SSO (Azure AD) |
+| **Tier 2 — School-Scoped** | School Administrators / Principals | Username + Password + MFA |
+| **Tier 3 — External Oversight** | Department of Education / DE External Users | Username + Password + MFA |
+
+> **Authentication summary:** Internal ACCE staff sign in via Microsoft SSO (single sign-on through Azure AD). All external users (School Administrators / Principals and Department of Education) authenticate with a username and password protected by mandatory multi-factor authentication (MFA). MFA enrolment is enforced on first login — external users cannot access the platform until MFA is configured.
 
 ---
 
 ## Role Definitions
 
-### 1. EMCI Counsellor
-**Tier:** Operational  
-**Access Level:** Standard Read / Write (scoped to assigned students)
+### 1. ACCE Users
+**Tier:** Internal  
+**Authentication:** Microsoft SSO (Azure AD)  
+**Access Level:** Full Read / Write — network-wide, no restrictions
 
-EMCI Counsellors are the primary users of the platform. They are contracted or employed to deliver career guidance to students across one or more assigned schools.
-
-#### What They Can Do
-- View their own student roster (students assigned to them)
-- View and update a student's stage progress (Referral & Consent → Career Guidance → Complete)
-- Log new counselling sessions, referrals, consent records, and survey events on the student timeline
-- View the student's full activity feed and event history
-- Open the detailed event modal and add notes
-- Generate and preview a student's PDF journey report
-- View their own counsellor dashboard (KPI chips, completion rate, stage breakdown)
-- View basic school information for their assigned schools
-
-#### What They Cannot Do
-- View students assigned to other counsellors
-- View or manage students at schools they are not assigned to
-- Add or remove schools from the network
-- Access the Dataverse Developer Lab
-- Modify programme-level configuration or system settings
-- View other counsellors' workloads or performance data
-
-#### Data Scope
-| Data | Access |
-|------|--------|
-| Own student profiles | Read / Write |
-| Other counsellors' students | No Access |
-| School information (assigned schools) | Read Only |
-| Network-wide statistics | Aggregated / Anonymised |
-| PDF export | Own students only |
-
----
-
-### 2. School Counsellor / Guidance Officer
-**Tier:** Operational  
-**Access Level:** Read Only (scoped to their school)
-
-School Counsellors and Guidance Officers are employed by the school and work alongside EMCI Counsellors. They support the referral process and pastoral care but do not deliver the EMCI programme directly.
+ACCE Users are internal staff of the ACCE / EMCI organisation. This single role covers all internal staff who deliver, manage, oversee, or technically support the EMCI programme — including counsellors, programme managers, executives, and system administrators. ACCE Users have unrestricted access to the platform.
 
 #### What They Can Do
-- View a read-only list of their school's students enrolled in EMCI
-- View a student's current stage and overall progress
-- View the activity feed for students at their school
-- View the school-level dashboard stats (Total, Active, In Progress, Completed)
-- Filter and search students by name, stage, year level, or Morrisby ID
-
-#### What They Cannot Do
-- Edit student records or log counselling events
-- Progress a student through stages
-- View or generate PDF reports
-- View students at other schools
-- Access the Counsellor View or Network Overview
-- Access the Dataverse Developer Lab
-
-#### Data Scope
-| Data | Access |
-|------|--------|
-| School's student profiles | Read Only |
-| Student journey events | Read Only |
-| Stage progress | Read Only |
-| PDF export | No Access |
-| Network-level data | No Access |
-
----
-
-### 3. School Administrator / Principal
-**Tier:** Administrative  
-**Access Level:** Read (full school scope) + Limited Write (school details)
-
-School Administrators and Principals are responsible for their school's participation in the EMCI programme. They oversee enrolment into the programme and monitor progress at a school level.
-
-#### What They Can Do
-- View the full School Dashboard for their school
-- View all students enrolled in EMCI at their school
-- View programme completion rates and stage breakdowns
-- Filter and search the student list
-- View high-level counsellor assignment information (which counsellor is assigned to which student)
-- Update school contact details and principal information
-- Receive programme summary exports for their school
-
-#### What They Cannot Do
-- Edit student journey data or log events
-- View other schools' data
-- Manage counsellor assignments across schools
-- Access the Counsellor View
-- Access the Dataverse Developer Lab or Network Overview
-
-#### Data Scope
-| Data | Access |
-|------|--------|
-| Own school's student list | Read Only |
-| Programme completion stats | Read Only |
-| Counsellor assignments (own school) | Read Only |
-| Other schools | No Access |
-| Network-wide data | No Access |
-
----
-
-### 4. EMCI Programme Manager
-**Tier:** Administrative  
-**Access Level:** Full Read + Write (network-wide)
-
-The EMCI Programme Manager oversees the delivery of the EMCI programme across all schools in the network. They manage counsellor assignments, school onboarding, and programme-level reporting.
-
-#### What They Can Do
-- Access the full Network Overview (all schools, all KPI cards)
-- Drill into any School Dashboard
-- View any student's journey regardless of assigned counsellor
-- Access the full Counsellor View with workload and performance data for all counsellors
+- View the full Network Overview (all KPI cards, all school cards, all regional breakdowns)
+- View, drill into, and manage every School Dashboard
+- View any student's full journey, profile, and event history regardless of school or counsellor
+- Log new counselling sessions, referrals, consent records, and survey events on any student timeline
+- Progress students through stages (Referral & Consent → Career Guidance → Complete)
+- Generate, preview, and export PDF journey reports for any student
+- Access the full Counsellor View, including workload and performance data for all counsellors
 - Assign and reassign counsellors to students or schools
-- Onboard new schools and manage their status (Active / Onboarding / Inactive)
-- Generate PDF reports for any student
-- Filter network data by region, status, school, counsellor, or stage
-- Access the Dataverse Developer Lab for data troubleshooting
-- Export programme-wide summary reports
+- Onboard new schools and manage school status (Active / Onboarding / Inactive)
+- Access the Dataverse Developer Lab for API testing, query building, and connection management
+- Configure system settings, environment variables, and Azure AD app registrations
+- Export programme-wide and executive summary reports
+- View and manage all programme configuration and platform infrastructure
 
 #### What They Cannot Do
-- Access system-level infrastructure or Dataverse configuration beyond the Developer Lab
-- Modify Department of Education data or system records directly
-- Create or delete user accounts (managed via Azure AD)
+- (No role-level restrictions — ACCE Users see everything)
+- Bypass audit logging for production data access (audited at the platform layer, not blocked by role)
 
 #### Data Scope
 | Data | Access |
 |------|--------|
 | All schools | Read / Write |
-| All students | Read / Write |
-| All counsellor data | Read / Write |
-| Network statistics | Full Access |
+| All students (including names, IDs, year levels, Morrisby IDs) | Read / Write |
+| All counsellor data and performance | Read / Write |
+| Network statistics and regional summaries | Full Access |
 | PDF export | All students |
 | Dataverse Developer Lab | Full Access |
+| System configuration | Full Access |
 
 ---
 
-### 5. Department of Education (DoE) User
-**Tier:** Oversight  
-**Access Level:** Aggregated Read Only (network-wide, anonymised where required)
+### 2. School Administrators / Principals
+**Tier:** School-Scoped  
+**Authentication:** Username + Password + MFA  
+**Access Level:** Read Only — scoped strictly to their own school
 
-Department of Education users are government stakeholders who monitor the EMCI programme at a policy and outcomes level. They do not interact with individual student records.
+School Administrators and Principals are responsible for their school's participation in the EMCI programme. They monitor enrolment and progress at a school level. Their access is **restricted to their own school's students only** — they cannot see any data belonging to another school.
 
 #### What They Can Do
-- View aggregated Network Overview statistics (total students, completion rates, schools active, programme coverage)
-- View per-school programme completion percentages and stage distributions
-- Filter the network by region
-- View high-level counsellor coverage (count of counsellors active, not individual data)
-- Access summary programme health reports
-- Export anonymised network-level data
+- Sign in with username + password protected by mandatory MFA (MFA enrolment is required and enforced on first login — access is blocked until MFA is configured)
+- View the full School Dashboard for **their own school only**
+- View all students enrolled in EMCI at their school, including student names, year levels, and stage progress
+- View programme completion rates and stage breakdowns for their school
+- Filter and search the student list within their school
+- View counsellor assignment information (which counsellor is assigned to which student at their school)
+- View the activity feed and event history for students at their school
+- Receive programme summary exports for their school
 
 #### What They Cannot Do
-- View individual student names, IDs, or journey details
-- Access the School Dashboard student table
-- Access the Student Journey view (any student)
-- Access the Counsellor View with individual counsellor performance
+- View or access any other school's data, students, or dashboard
+- View students that do not belong to their school
+- Edit student journey data, log counselling events, or progress students through stages
+- Generate or export PDF student reports
+- Access the Network Overview, Counsellor View, or Dataverse Developer Lab
+- Modify system or programme configuration
+- Manage counsellor assignments
+
+#### Data Scope
+| Data | Access |
+|------|--------|
+| Own school's student list (names visible) | Read Only |
+| Own school's stage progress and completion stats | Read Only |
+| Own school's counsellor assignments | Read Only |
+| Own school's activity feed | Read Only |
+| Other schools (any data) | No Access |
+| Network-wide data | No Access |
+| PDF export | No Access |
+| Dataverse / system data | No Access |
+
+---
+
+### 3. Department of Education / DE External Users
+**Tier:** External Oversight  
+**Authentication:** Username + Password + MFA  
+**Access Level:** Aggregated Read Only — student names and identifiers are never visible
+
+Department of Education (DE) External Users are government stakeholders who monitor the EMCI programme at a policy and outcomes level. They authenticate as external users and see only aggregated, de-identified data. **DE users must never see student names, student IDs, or any other individual student identifier anywhere in the platform.**
+
+#### What They Can Do
+- Sign in with username + password protected by mandatory MFA (MFA enrolment is required and enforced on first login — access is blocked until MFA is configured)
+- View aggregated Network Overview statistics (total students enrolled, completion rates, schools active, programme coverage)
+- View per-school programme completion percentages and stage distributions
+- Filter the network by region
+- View high-level counsellor coverage (count of active counsellors, not individual records)
+- Access summary programme health reports
+- Export anonymised, aggregated network-level data
+
+#### What They Cannot Do
+- **View any student's name, Morrisby ID, year level, email, or other personal identifier — anywhere in the platform**
+- View any individual student record, profile, journey, or event history
+- Open the School Dashboard student table or any list that surfaces student names
+- Open the Student Journey view for any student
+- View individual counsellor performance or workload detail
 - Access the Dataverse Developer Lab
 - Modify any data in the system
 
@@ -180,65 +129,11 @@ Department of Education users are government stakeholders who monitor the EMCI p
 |------|--------|
 | Network KPI totals | Read Only (aggregated) |
 | Per-school completion stats | Read Only (aggregated) |
-| Individual student records | No Access |
+| Regional breakdowns | Read Only (aggregated) |
+| Individual student records (names, IDs, year levels, Morrisby IDs) | **No Access** |
 | Counsellor performance detail | No Access |
 | Dataverse / system data | No Access |
-
----
-
-### 6. EMCI Executive / Executive Sponsor
-**Tier:** Oversight  
-**Access Level:** Aggregated Read Only (programme-level summary)
-
-Executive sponsors and EMCI leadership have strategic oversight of the programme. They receive high-level visibility of programme performance without granular student or counsellor detail.
-
-#### What They Can Do
-- View the Network Overview landing page (all KPI cards, school cards with completion bars)
-- View programme trends (total students enrolled, stages completed, active schools)
-- View high-level regional breakdowns
-- Access executive summary PDF exports
-
-#### What They Cannot Do
-- Drill into individual schools or students
-- View counsellor performance data
-- Edit any programme data
-- Access the Dataverse Developer Lab
-
-#### Data Scope
-| Data | Access |
-|------|--------|
-| Network-level KPIs | Read Only |
-| Regional summaries | Read Only |
-| School / student / counsellor detail | No Access |
-| System or Dataverse data | No Access |
-
----
-
-### 7. System Administrator / Developer
-**Tier:** Administrative (Technical)  
-**Access Level:** Full System Access
-
-System Administrators and Developers are responsible for the technical operation of the EMCI platform, including the Dataverse integration, Azure AD configuration, and platform deployment.
-
-#### What They Can Do
-- Full access to all views and components
-- Access the Dataverse Developer Lab for API testing, query building, and connection management
-- Configure the Vite proxy, OAuth2 client-credentials flow, and token refresh settings
-- Manage environment variables and Azure AD app registrations
-- Review API responses, headers, and request history
-- Deploy updates and manage the build pipeline
-
-#### What They Cannot Do
-- Modify student or counsellor records outside of approved data management processes
-- Bypass audit logging for production data access
-
-#### Data Scope
-| Data | Access |
-|------|--------|
-| All views and pages | Full Access |
-| Dataverse Developer Lab | Full Access |
-| System configuration | Full Access |
-| Raw API responses & headers | Full Access |
+| PDF export | No Access |
 
 ---
 
@@ -246,48 +141,45 @@ System Administrators and Developers are responsible for the technical operation
 
 The table below summarises which pages and features are accessible per role.
 
-| Feature / View | Counsellor | School Counsellor | School Admin | Programme Manager | DoE User | Executive | Sys Admin |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Network Overview (KPI cards) | — | — | — | ✅ | ✅ (agg.) | ✅ (agg.) | ✅ |
-| Network Overview (school cards) | — | — | — | ✅ | ✅ (agg.) | ✅ (agg.) | ✅ |
-| School Dashboard (own school) | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
-| School Dashboard (other schools) | — | — | — | ✅ | — | — | ✅ |
-| Student Journey (assigned students) | ✅ | ✅ (read) | ✅ (read) | ✅ | — | — | ✅ |
-| Student Journey (all students) | — | — | — | ✅ | — | — | ✅ |
-| Log / Edit Timeline Events | ✅ | — | — | ✅ | — | — | ✅ |
-| Progress Student Stage | ✅ | — | — | ✅ | — | — | ✅ |
-| PDF Export (own students) | ✅ | — | — | ✅ | — | — | ✅ |
-| PDF Export (any student) | — | — | — | ✅ | — | — | ✅ |
-| Counsellor View (own data) | ✅ | — | — | ✅ | — | — | ✅ |
-| Counsellor View (all counsellors) | — | — | — | ✅ | — | — | ✅ |
-| School onboarding / management | — | — | ✅ (own) | ✅ | — | — | ✅ |
-| Dataverse Developer Lab | — | — | — | ✅ | — | — | ✅ |
-| System configuration | — | — | — | — | — | — | ✅ |
+| Feature / View | ACCE Users | School Admin / Principal | DE External Users |
+|---|:---:|:---:|:---:|
+| Network Overview (KPI cards) | ✅ | — | ✅ (agg.) |
+| Network Overview (school cards) | ✅ | — | ✅ (agg.) |
+| School Dashboard (own school) | ✅ | ✅ (read) | — |
+| School Dashboard (other schools) | ✅ | — | — |
+| Student Journey (any student) | ✅ | — | — |
+| Student names / IDs visible | ✅ | ✅ (own school) | — |
+| Log / Edit Timeline Events | ✅ | — | — |
+| Progress Student Stage | ✅ | — | — |
+| PDF Export (any student) | ✅ | — | — |
+| Counsellor View (all counsellors) | ✅ | — | — |
+| School onboarding / management | ✅ | — | — |
+| Dataverse Developer Lab | ✅ | — | — |
+| System configuration | ✅ | — | — |
+| Aggregated programme reports | ✅ | ✅ (own school) | ✅ (anonymised) |
 
-> **Legend:** ✅ = Accessible, — = No Access, (agg.) = Aggregated data only, (read) = Read only, (own) = Own school only
+> **Legend:** ✅ = Accessible, — = No Access, (agg.) = Aggregated data only, (read) = Read only, (own school) = Own school only, (anonymised) = No personal identifiers
 
 ---
 
 ## Role Assignment
 
-Roles are managed through **Azure Active Directory (Azure AD)** security groups. When a user authenticates via the OAuth2 client-credentials flow, their role is derived from their AAD group membership and embedded in the bearer token claims.
+Roles are managed through **Azure Active Directory (Azure AD)** security groups. ACCE Users authenticate via Microsoft SSO (single sign-on through Azure AD) and their role is derived from their AAD group membership. School Administrators / Principals and DE External Users authenticate with a username + password protected by mandatory multi-factor authentication (MFA), and are assigned to the corresponding external-user AAD group.
 
-| Role | AAD Group (suggested) |
-|------|-----------------------|
-| EMCI Counsellor | `EMCI-Counsellors` |
-| School Counsellor / Guidance Officer | `EMCI-SchoolCounsellors` |
-| School Administrator / Principal | `EMCI-SchoolAdmins` |
-| EMCI Programme Manager | `EMCI-ProgrammeManagers` |
-| Department of Education User | `EMCI-DoE` |
-| EMCI Executive | `EMCI-Executive` |
-| System Administrator / Developer | `EMCI-SysAdmins` |
+| Role | AAD Group (suggested) | Authentication Method |
+|------|-----------------------|-----------------------|
+| ACCE Users | `EMCI-ACCEUsers` | Microsoft SSO (Azure AD) |
+| School Administrators / Principals | `EMCI-SchoolAdmins` | Username + Password + MFA |
+| Department of Education / DE External Users | `EMCI-DoE` | Username + Password + MFA |
 
 ---
 
 ## Data Privacy & Compliance Considerations
 
-- **Student PII** (names, Morrisby IDs, emails, year levels) is restricted to Tier 1 and Tier 2 roles with a legitimate operational need.
-- **DoE and Executive users** receive only aggregated, non-identifiable statistics.
+- **Student PII** (names, Morrisby IDs, emails, year levels) is restricted to **ACCE Users** (full access) and **School Administrators / Principals** (own school only). DE External Users must never see any of these fields anywhere in the platform.
+- **DE External Users** receive only aggregated, non-identifiable statistics. The user interface must hide all student identifiers from this role at the data and presentation layers.
+- **MFA** is mandatory for all username + password sign-ins (School Administrators / Principals and DE External Users). MFA enrolment is enforced on first login — the platform must block access until the user has completed MFA setup. MFA cannot be bypassed or deferred. MFA session tokens expire in less than 24 hours — users must re-authenticate with MFA on each new session.
+- **ACCE Users** authenticate exclusively via Microsoft SSO; password-based sign-in is not available to this role.
 - All data access is mediated through the Dataverse API layer. No direct database access is permitted for any user-facing role.
 - The EMCI platform stores no student data locally — all student records reside in the connected **Microsoft Dataverse** environment (`mcicrm.crm6.dynamics.com`).
 - Access logs are maintained by Azure AD and Dataverse audit trails.

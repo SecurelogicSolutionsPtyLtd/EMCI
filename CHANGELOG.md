@@ -5,7 +5,117 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## [Unreleased] — 2026-03-24 (latest)
+## [Unreleased] — 2026-05-06 (latest)
+
+### Added: Role-Based Access Control (RBAC), Team Management UI, and Multi-Auth
+
+Implemented a full six-role RBAC system across three role groups. Each group has an Admin and a Staff sub-role. Added a Team Management page, email/password login with enforced MFA for external users, and role-scoped page/data visibility.
+
+#### Added: Supabase — `emci_user_roles` table and helpers
+- New `emci_role` PostgreSQL enum: `acce_admin`, `acce_staff`, `school_admin`, `school_staff`, `de_admin`, `de_staff`.
+- `emci_user_roles` table: stores user_id, email, display_name, role, school_id, is_active, created_at, created_by.
+- Supports email-based invite flow — rows with `user_id = null` are claimed on first login by matching email.
+- RLS policies: users always read their own row; `acce_admin` full CRUD; `acce_staff` reads all; `school_admin/staff` scoped to their school; `de_admin/staff` scoped to DE roles.
+- Helper functions: `emci_get_my_role()` and `emci_get_my_school_id()` (SECURITY DEFINER, used by RLS without recursion).
+
+#### Added: `src/types/roles.ts`
+- `AppRole` type, `RoleGroup` type, `Page` type (moved here from App.tsx).
+- Helpers: `getRoleGroup`, `isAdminRole`, `canAccessPage`, `canSeeStudentNames`, `canWrite`, `canManageTeam`, `assignableRoles`.
+- `ROLE_LABELS` and `ROLE_GROUP_LABELS` display maps.
+
+#### Added: `src/context/AuthContext.tsx`
+- `AuthProvider` wraps the app and exposes `authUser`, `userRole`, `schoolId`, `stage`, and `refresh`.
+- Auth stages: `loading`, `unauthenticated`, `mfa_required`, `mfa_enroll`, `no_role`, `ready`.
+- ACCE users (SSO) are not subject to MFA checks. External users must reach `aal2` before `stage = 'ready'`.
+- New users with no role row see a "Access pending" screen until an admin assigns their role.
+
+#### Updated: `src/services/supabase.ts`
+- Added `signInWithEmail(email, password)` for external user login.
+- Added `getMfaFactors`, `isMfaVerified`, `enrollMfa`, `challengeMfa`, `verifyMfa`, `unenrollMfa` for full Supabase TOTP MFA flow.
+- Added `getUserRole(userId, email)` — fetches role record, claims pending email-only invites by updating user_id.
+- Added `listTeamMembers`, `addTeamMember`, `updateTeamMemberRole`, `toggleTeamMemberActive` for team management.
+
+#### Updated: `src/components/LoginPage.tsx`
+- Split into two tabs: **ACCE Staff** (Microsoft SSO) and **School / DE Login** (email + password).
+- MFA enrolment screen: shown on first external login — displays TOTP QR code and manual secret, prompts for 6-digit code.
+- MFA verification screen: shown on subsequent external logins when session is AAL1 only.
+- "Access pending" screen: shown when role is not yet assigned.
+- All screens share a consistent `AuthShell` layout.
+
+#### Added: `src/components/TeamManagement.tsx`
+- Full team management UI accessible to `acce_admin`, `school_admin`, and `de_admin`.
+- Searchable, filterable table of all users (by role group, active status, name/email).
+- Inline role editor: change a user's role with a dropdown and save button.
+- Activate/deactivate toggle per user.
+- "Add user" modal: enter email, optional display name, role, and school ID (required for school roles).
+- Scoped by admin type: `school_admin` can only assign school roles; `de_admin` can only assign DE roles; `acce_admin` can assign any role.
+
+#### Updated: `src/App.tsx`
+- Wrapped `AppInner` in `AuthProvider`.
+- Auth gate uses `stage` from `AuthContext` instead of bare `authUser` check.
+- All `goTo(page)` calls pass through `canAccessPage(userRole, page)` guard.
+- `SchoolDashboard.onSelectStudent` is `undefined` for school/DE roles (read-only mode).
+- School users land directly on their school dashboard on login (matched by `school_id`).
+- DE users land on the Network Overview (aggregated stats only).
+- PDF export button hidden for roles without `canAccessPage(role, 'pdf')`.
+- Team Management page wired at `page === 'team'`.
+
+#### Updated: `src/components/NetworkOverview.tsx`
+- Accepts `userRole: AppRole`, `onGoToTeam` props.
+- Counsellors nav item hidden for non-ACCE roles.
+- Dataverse Lab nav item hidden for non-ACCE roles.
+- Team Management nav item shown for admin roles only.
+- Sidebar user display shows real `authUser.displayName` and `ROLE_LABELS[userRole]` instead of hardcoded "EMCI Admin".
+- Student roster: names, year level, Morrisby ID, and counsellor columns redacted for DE users (`showStudentNames = false`).
+- Student rows are not clickable for roles without `canAccessPage(role, 'student')`.
+
+#### Updated: `src/components/SchoolDashboard.tsx`
+- `onSelectStudent` prop is now optional (`?`). When absent, rows are not clickable and the Actions column is hidden.
+
+---
+
+### Changed: SEO and App Identity
+
+Updated `index.html`, `package.json`, and added `public/robots.txt` to correctly identify the platform.
+
+#### Updated: `index.html`
+- `<title>` changed from "My Google AI Studio App" to "EMCI — Student Intelligence Interface".
+- Added `<meta name="description">` with EMCI product description and SecureLogic Solutions attribution.
+- Added `<meta name="application-name">` (`EMCI`) and `<meta name="author">` (`SecureLogic Solutions`).
+- Added Open Graph tags: `og:type`, `og:title`, `og:description`, `og:site_name`.
+- Added `<meta name="theme-color">` (`#0f172a`).
+- Added `<link rel="icon">` pointing to `/favicon.ico`.
+- Added `<meta name="robots" content="noindex, nofollow">` — private authenticated platform, not for public indexing.
+
+#### Added: `public/robots.txt`
+- Disallows all crawler access (`User-agent: * / Disallow: /`). Private app — no public content to index.
+
+#### Updated: `package.json`
+- `name` changed from `react-example` to `emci-student-intelligence-interface`.
+- Added `description` field.
+
+---
+
+### Changed: Roles & Access Restructure
+
+Replaced the previous seven-role structure in [`ROLES_AND_ACCESS.md`](./ROLES_AND_ACCESS.md) with a streamlined three-role model and documented the authentication method for each role.
+
+- **ACCE Users** — internal ACCE / EMCI staff. Authenticate via **Microsoft SSO (Azure AD)**. Full read/write access across the entire platform; can view all schools, all students (including names and identifiers), counsellor data, dashboards, PDF exports, the Dataverse Developer Lab, and system configuration.
+- **School Administrators / Principals** — authenticate via **username + password + mandatory MFA**. Read-only access scoped strictly to their own school. Can view their school's student names, stage progress, counsellor assignments, and dashboard. Cannot see any data from other schools.
+- **Department of Education / DE External Users** — authenticate via **username + password + mandatory MFA**. Aggregated read-only access only. **Must never see student names, IDs, year levels, Morrisby IDs, or any other individual student identifier anywhere in the platform.** Limited to network-level KPIs, per-school completion percentages, regional breakdowns, and anonymised exports.
+
+#### Updated: `ROLES_AND_ACCESS.md`
+- Tier table rewritten to map the three role groups to their authentication methods.
+- Role Definitions section consolidated from seven roles to three, each with explicit authentication, "What They Can Do", "What They Cannot Do", and Data Scope.
+- Access Matrix reduced from seven columns to three; access values updated to match the new model.
+- Role Assignment table now includes an Authentication Method column alongside the suggested AAD groups (`EMCI-ACCEUsers`, `EMCI-SchoolAdmins`, `EMCI-DoE`).
+- Data Privacy & Compliance section reinforced — DE External Users are explicitly prohibited from viewing any student PII at both the data and presentation layers; MFA is mandatory for all non-SSO sign-ins.
+- MFA enrolment enforced on first login for all username + password roles — access is blocked until MFA setup is complete; MFA cannot be bypassed or deferred.
+- MFA session tokens expire in less than 24 hours — users must re-authenticate with MFA on each new session.
+
+---
+
+## [Unreleased] — 2026-03-24
 
 ### Vercel Deployment Support
 
