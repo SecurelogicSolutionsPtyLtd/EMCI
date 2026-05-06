@@ -317,6 +317,10 @@ async function fetchActivity<T extends RawActivity>(
 }
 
 // ── Fetch all students ─────────────────────────────────────────────
+// new_studenttypemultiselect and cr89a_prioritycohort were removed — they use
+// a different Dataverse solution publisher prefix (new_) or don't exist on all
+// instances and cause 0x80060888 (unsupported query parameter) on $select.
+// The mapper defaults gracefully: studentType falls back to 'Standard'.
 const STUDENT_SELECT = [
   'cr89a_wlpcstudentid',
   'cr89a_firstname',
@@ -336,8 +340,6 @@ const STUDENT_SELECT = [
   'cr89a_consentobtained',
   'cr89a_guidanceinprogress',
   'cr89a_guidancecomplete',
-  'new_studenttypemultiselect',
-  'cr89a_prioritycohort',
   'modifiedon',
   'createdon',
 ].join(',');
@@ -353,9 +355,24 @@ export async function fetchStudents(token: string): Promise<(Student & { schoolI
   return (data.value ?? []).map(mapStudent);
 }
 
+// Explicit $select avoids 0x80060888 caused by Dataverse trying to include
+// non-queryable metadata columns when no $select is provided.
+const SCHOOL_SELECT = [
+  'cr89a_wlpcschoolid',
+  'cr89a_name',
+  'cr89a_schoolname',
+  'cr89a_wlpcschoolname',
+  'cr89a_region',
+  'cr89a_principalcontact',
+  'cr89a_morrisbyid',
+  'statecode',
+  'statuscode',
+  'createdon',
+].join(',');
+
 // ── Fetch all schools ──────────────────────────────────────────────
 export async function fetchSchools(token: string): Promise<School[]> {
-  const url = `${BASE_URL}/cr89a_wlpcschools`;
+  const url = `${BASE_URL}/cr89a_wlpcschools?$select=${SCHOOL_SELECT}`;
   const res  = await fetch(url, { headers: dvHeaders(token) });
   if (!res.ok) {
     const text = await res.text();
