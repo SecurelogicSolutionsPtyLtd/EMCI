@@ -7,6 +7,13 @@ Entries are ordered newest-first within each release.
 
 ## [Unreleased] — 2026-05-07 (latest)
 
+### Fixed: Production Dataverse proxy — strip injected `path` query param
+
+- The Vercel rewrite for `/dataverse/:path*` injects a `path=...` query parameter, which the proxy was forwarding to Dataverse along with the original `$select`/`$filter` params.
+- Dataverse rejected the unknown `path` param with HTTP 400 `0x80060888` ("The query parameter [path] is not supported"), causing all student and school fetches in production to fail.
+- The proxy now strips the `path` parameter from the forwarded query string, preserving literal `$select` etc. (regex-based to avoid URL re-encoding).
+- Localhost was unaffected because the Vite dev server uses a different proxy mechanism that doesn't inject `path`.
+
 ### Fixed: Access control audit — DE student identifier leaks closed
 
 - **DE roles no longer see the Students roster tab** in Network Overview — the spec requires DE access to be aggregated only, no per-student rows.

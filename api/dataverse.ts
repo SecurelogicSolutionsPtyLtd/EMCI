@@ -15,11 +15,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Build the upstream path from the dynamic segment + query string
+  // Build the upstream path from the dynamic segment + query string.
+  // The Vercel rewrite (vercel.json) injects a `path=...` query param that
+  // must be stripped before forwarding to Dataverse — otherwise Dataverse
+  // returns 400 0x80060888 ("query parameter 'path' is not supported").
+  // Use a regex strip rather than URLSearchParams to preserve literal `$`
+  // in OData params (URLSearchParams would re-encode `$select` to `%24select`).
   const pathSegments = Array.isArray(req.query.path) ? req.query.path : [req.query.path ?? ''];
   const upstreamPath = pathSegments.join('/');
+
   const rawQuery = req.url?.split('?')[1] ?? '';
-  const targetUrl = `${DATAVERSE_BASE}/${upstreamPath}${rawQuery ? `?${rawQuery}` : ''}`;
+  const upstreamQuery = rawQuery
+    .replace(/(^|&)path=[^&]*/g, '')
+    .replace(/^&+/, '');
+
+  const targetUrl = `${DATAVERSE_BASE}/${upstreamPath}${upstreamQuery ? `?${upstreamQuery}` : ''}`;
 
   const headers: Record<string, string> = {
     'Content-Type':    'application/json',
