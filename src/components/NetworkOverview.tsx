@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import {
   LayoutDashboard, Building2, Users, UserCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, Network, FlaskConical,
-  AlertTriangle, BookOpen, MoreVertical, UsersRound,
+  AlertTriangle, BookOpen, MoreVertical, UsersRound, EyeOff,
 } from 'lucide-react';
 import type { School } from '../data/networkData';
 import type { Student } from '../data/studentsData';
@@ -152,10 +152,18 @@ export function NetworkOverview({
   ];
 
   // ── nav items (role-filtered) ─────────────────────────────────
+  // DE roles never see the per-student roster — aggregated views only.
+  const showStudentRoster = showStudentNames;
+
+  // If a preview/role change drops roster access while it's the active view, snap back to schools.
+  if (view === 'students' && !showStudentRoster) {
+    setView('schools');
+  }
+
   const NAV_ITEMS = [
-    { label: 'Dashboard',   icon: LayoutDashboard, viewKey: null       as View | null, always: true },
-    { label: 'Schools',     icon: Building2,       viewKey: 'schools'  as View | null, always: true },
-    { label: 'Students',    icon: Users,           viewKey: 'students' as View | null, always: true },
+    { label: 'Dashboard',   icon: LayoutDashboard, viewKey: null       as View | null, always: true,  show: true },
+    { label: 'Schools',     icon: Building2,       viewKey: 'schools'  as View | null, always: true,  show: true },
+    { label: 'Students',    icon: Users,           viewKey: 'students' as View | null, always: false, show: showStudentRoster },
     { label: 'Counsellors', icon: UserCheck,       viewKey: null       as View | null, always: false, show: showCounsellors },
   ].filter(item => item.always || item.show);
 
@@ -463,20 +471,28 @@ export function NetworkOverview({
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</th>
-                        <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Year</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          {showStudentNames ? 'Name' : 'Student'}
+                        </th>
+                        {showStudentNames && (
+                          <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Year</th>
+                        )}
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">School</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Counsellor</th>
+                        {showStudentNames && (
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Counsellor</th>
+                        )}
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Stage</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Progress</th>
                         <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                        {showStudentJourney && (
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {rosterSlice.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-16 text-center">
+                          <td colSpan={5 + (showStudentNames ? 2 : 0) + (showStudentJourney ? 1 : 0)} className="py-16 text-center">
                             <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
                             <p className="text-sm text-slate-400">No students match your search.</p>
                           </td>
@@ -504,7 +520,7 @@ export function NetworkOverview({
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                   <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                                    {showStudentNames ? initials : '—'}
+                                    {showStudentNames ? initials : <EyeOff className="w-4 h-4" />}
                                   </div>
                                   <div className="flex flex-col min-w-0">
                                     <div className="flex items-center gap-2">
@@ -521,16 +537,20 @@ export function NetworkOverview({
                                 </div>
                               </td>
 
-                              {/* Year */}
-                              <td className="px-4 py-4 text-sm text-slate-700">{showStudentNames ? student.yearLevel : '—'}</td>
+                              {/* Year — student-level identifier; hidden for DE */}
+                              {showStudentNames && (
+                                <td className="px-4 py-4 text-sm text-slate-700">{student.yearLevel}</td>
+                              )}
 
                               {/* School */}
                               <td className="px-6 py-4">
                                 <span className="text-sm text-slate-600 truncate max-w-[140px] block">{schoolName}</span>
                               </td>
 
-                              {/* Counsellor */}
-                              <td className="px-6 py-4 text-sm text-slate-600">{showStudentNames ? (student.counsellor ?? '—') : '—'}</td>
+                              {/* Counsellor — staff identifier; hidden for DE */}
+                              {showStudentNames && (
+                                <td className="px-6 py-4 text-sm text-slate-600">{student.counsellor ?? '—'}</td>
+                              )}
 
                               {/* Stage */}
                               <td className="px-6 py-4">
@@ -560,17 +580,17 @@ export function NetworkOverview({
                                 </span>
                               </td>
 
-                              {/* Actions */}
-                              <td className="px-6 py-4 text-right">
-                                {showStudentJourney && (
+                              {/* Actions — only when role can open student journey */}
+                              {showStudentJourney && (
+                                <td className="px-6 py-4 text-right">
                                   <button
                                     onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
                                     className="text-slate-400 hover:text-primary transition-colors"
                                   >
                                     <MoreVertical className="w-5 h-5" />
                                   </button>
-                                )}
-                              </td>
+                                </td>
+                              )}
                             </motion.tr>
                           );
                         })

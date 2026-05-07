@@ -7,6 +7,14 @@ Entries are ordered newest-first within each release.
 
 ## [Unreleased] — 2026-05-07 (latest)
 
+### Fixed: Access control audit — DE student identifier leaks closed
+
+- **DE roles no longer see the Students roster tab** in Network Overview — the spec requires DE access to be aggregated only, no per-student rows.
+- **DE roles no longer see student-identifying columns** (Name, Year, Counsellor) if the roster is reached via a future code path. The Name column is replaced with a generic "Student" column showing an `EyeOff` icon and a redacted label as defence-in-depth.
+- **Column headers stay aligned with cells**: when `showStudentNames === false`, the Name/Year/Counsellor `<th>` headers are hidden in lockstep with their `<td>` cells (previously headers showed but cells displayed `—`, breaking layout intent).
+- **Actions column** is now gated on `showStudentJourney` for both header and cells, keeping column counts balanced across all three role tiers (DE: 5 cols, School: 7 cols, ACCE: 8 cols).
+- If an `acce_admin` previews as a DE role while sitting on the Students view, the view auto-switches back to Schools so no roster data flashes.
+
 ### Added: Role impersonation / Preview As
 
 - `acce_admin` can now preview the UI as any role directly from the Team Management page.
