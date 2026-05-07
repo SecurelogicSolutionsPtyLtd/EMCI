@@ -155,10 +155,9 @@ export function NetworkOverview({
   // DE roles never see the per-student roster — aggregated views only.
   const showStudentRoster = showStudentNames;
 
-  // If a preview/role change drops roster access while it's the active view, snap back to schools.
-  if (view === 'students' && !showStudentRoster) {
-    setView('schools');
-  }
+  // Clamp the active view if the role can't see the roster (e.g. impersonating DE).
+  // Using a derived value avoids a setState-during-render loop.
+  const effectiveView: View = view === 'students' && !showStudentRoster ? 'schools' : view;
 
   const NAV_ITEMS = [
     { label: 'Dashboard',   icon: LayoutDashboard, viewKey: null       as View | null, always: true,  show: true },
@@ -187,7 +186,7 @@ export function NetworkOverview({
         {/* Nav */}
         <nav className="flex-1 px-4 space-y-1 mt-2">
           {NAV_ITEMS.map(item => {
-            const isActive = item.viewKey === view || (view === 'schools' && item.label === 'Dashboard');
+            const isActive = item.viewKey === effectiveView || (effectiveView === 'schools' && item.label === 'Dashboard');
             const handleClick =
               item.label === 'Counsellors' ? onGoToCounsellors
               : item.viewKey              ? () => setView(item.viewKey as View)
@@ -248,7 +247,7 @@ export function NetworkOverview({
         {/* ════════════════════════════════════════════════════════
             SCHOOLS VIEW
             ════════════════════════════════════════════════════ */}
-        {view === 'schools' && (
+        {effectiveView === 'schools' && (
           <>
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
@@ -411,7 +410,7 @@ export function NetworkOverview({
         {/* ════════════════════════════════════════════════════════
             STUDENT ROSTER VIEW
             ════════════════════════════════════════════════════ */}
-        {view === 'students' && (
+        {effectiveView === 'students' && (
           <>
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
