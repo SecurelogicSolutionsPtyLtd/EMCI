@@ -62,12 +62,22 @@ export function NetworkOverview({
   students, schools, userRole, onSelectSchool, onSelectStudent,
   onGoToCounsellors, onGoToDevLab, onGoToTeam,
 }: NetworkOverviewProps) {
-  const { authUser } = useAuth();
-  const showStudentNames = canSeeStudentNames(userRole);
-  const showCounsellors  = canAccessPage(userRole, 'counsellors');
-  const showDevLab       = canAccessPage(userRole, 'devlab');
+  const { authUser, schoolId } = useAuth();
+  const showStudentNames   = canSeeStudentNames(userRole);
+  const showCounsellors    = canAccessPage(userRole, 'counsellors');
+  const showDevLab         = canAccessPage(userRole, 'devlab');
   const showStudentJourney = canAccessPage(userRole, 'student');
-  const showTeam         = isAdminRole(userRole);
+  const showTeam           = isAdminRole(userRole);
+
+  // School roles only see their own school and its students
+  const isSchoolRole = getRoleGroup(userRole) === 'school';
+  const visibleSchools  = isSchoolRole && schoolId
+    ? schools.filter(s => s.id === schoolId)
+    : schools;
+  const visibleStudents = isSchoolRole && schoolId
+    ? students.filter(s => (s as any).schoolId === schoolId)
+    : students;
+
   // ── view switcher ─────────────────────────────────────────────
   const [view, setView] = useState<View>('schools');
 
@@ -82,18 +92,18 @@ export function NetworkOverview({
   const [rosterPage,   setRosterPage]       = useState(1);
 
   // ── KPI values ───────────────────────────────────────────────
-  const totalSchools    = schools.length;
-  const totalStudents   = students.length;
-  const totalActive     = students.filter(s => s.status === 'Active').length;
-  const totalInProgress = students.filter(s => s.stageProgress > 0 && s.currentStage !== 'complete').length;
-  const totalCompleted  = students.filter(s => s.currentStage === 'complete').length;
-  const completedPct    = totalStudents > 0 ? Math.round((totalCompleted / totalStudents) * 100) : 0;
-  const totalCounsellors = Array.from(new Set(students.map(s => s.counsellor).filter(Boolean))).length;
+  const totalSchools     = visibleSchools.length;
+  const totalStudents    = visibleStudents.length;
+  const totalActive      = visibleStudents.filter(s => s.status === 'Active').length;
+  const totalInProgress  = visibleStudents.filter(s => s.stageProgress > 0 && s.currentStage !== 'complete').length;
+  const totalCompleted   = visibleStudents.filter(s => s.currentStage === 'complete').length;
+  const completedPct     = totalStudents > 0 ? Math.round((totalCompleted / totalStudents) * 100) : 0;
+  const totalCounsellors = Array.from(new Set(visibleStudents.map(s => s.counsellor).filter(Boolean))).length;
 
-  const regions = ['all', ...Array.from(new Set(schools.map(s => s.region))).sort()];
+  const regions = ['all', ...Array.from(new Set(visibleSchools.map(s => s.region))).sort()];
 
   // ── schools filter ────────────────────────────────────────────
-  const filteredSchools = schools.filter(s => {
+  const filteredSchools = visibleSchools.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
                         s.morrisbyId.toLowerCase().includes(search.toLowerCase());
     const matchRegion = regionFilter === 'all' || s.region === regionFilter;
@@ -108,7 +118,7 @@ export function NetworkOverview({
   const handleRegion = (v: string) => { setRegionFilter(prev => prev === v ? 'all' : v); setPage(1); };
 
   // ── student roster filter ─────────────────────────────────────
-  const filteredRoster = students.filter(s => {
+  const filteredRoster = visibleStudents.filter(s => {
     const name    = `${s.firstName} ${s.lastName} ${s.preferredName ?? ''}`.toLowerCase();
     const matchSearch = name.includes(rosterSearch.toLowerCase()) ||
                         s.morrisbyId.toLowerCase().includes(rosterSearch.toLowerCase()) ||
@@ -419,7 +429,7 @@ export function NetworkOverview({
                   className="text-sm rounded-lg bg-slate-100 border-none py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-primary/40 text-slate-700 cursor-pointer min-w-[180px]"
                 >
                   <option value="all">All Schools</option>
-                  {schools.map(s => (
+                  {visibleSchools.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
@@ -437,7 +447,7 @@ export function NetworkOverview({
 
                 {/* Selected school info strip */}
                 {rosterSchool !== 'all' && (() => {
-                  const s = schools.find(sc => sc.id === rosterSchool);
+                  const s = visibleSchools.find(sc => sc.id === rosterSchool);
                   return s ? (
                     <div className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-3">
                       <Building2 className="w-4 h-4 text-primary shrink-0" />
@@ -479,7 +489,7 @@ export function NetworkOverview({
                           const barColor   = student.currentStage === 'complete' ? 'bg-emerald-500' : atRisk ? 'bg-red-400' : 'bg-primary';
                           const stagePill  = student.currentStage ? (STAGE_PILL[student.currentStage] ?? 'bg-slate-100 text-slate-500') : 'bg-slate-100 text-slate-500';
                           const stageLabel = student.currentStage ? (STAGE_LABELS[student.currentStage] ?? student.currentStage) : 'Not started';
-                          const schoolName = schools.find(sc => sc.id === (student as any).schoolId)?.name ?? '—';
+                          const schoolName = visibleSchools.find(sc => sc.id === (student as any).schoolId)?.name ?? '—';
 
                           return (
                             <motion.tr
