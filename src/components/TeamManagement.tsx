@@ -21,6 +21,7 @@ import {
   type RoleGroup,
 } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
+import { Eye, RotateCcw } from 'lucide-react';
 
 interface SchoolOption {
   id:   string;
@@ -94,7 +95,7 @@ function getRoleConfig(role: AppRole): RoleConfig {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
-  const { userRole, schoolId: mySchoolId } = useAuth();
+  const { userRole, actualRole, schoolId: mySchoolId, isImpersonating, setImpersonation, clearImpersonation } = useAuth();
   const myAssignableRoles = userRole ? assignableRoles(userRole) : [];
   const cfg = userRole ? getRoleConfig(userRole) : getRoleConfig('acce_admin');
 
@@ -124,6 +125,19 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
   const [editingId,   setEditingId]   = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<AppRole>('acce_staff');
   const [editLoading, setEditLoading] = useState(false);
+
+  // Preview-as-role picker (acce_admin only, UI-only, no DB changes)
+  const [previewPickType,     setPreviewPickType]     = useState<RoleGroup>('acce');
+  const [previewPickRole,     setPreviewPickRole]     = useState<AppRole>('acce_staff');
+  const [previewPickSchoolId, setPreviewPickSchoolId] = useState<string>('');
+
+  function handlePreviewTypeChange(type: RoleGroup) {
+    setPreviewPickType(type);
+    const first = (['acce_admin','acce_staff','school_admin','school_staff','de_admin','de_staff'] as AppRole[])
+      .find(r => getRoleGroup(r) === type);
+    if (first) setPreviewPickRole(first);
+    setPreviewPickSchoolId('');
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -295,6 +309,108 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
+
+        {/* Preview As Role — acce_admin only */}
+        {actualRole === 'acce_admin' && (
+          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Eye className="w-4 h-4 text-amber-600" />
+              <span className="text-sm font-bold text-amber-800">Preview as role</span>
+              <span className="text-xs text-amber-600 font-medium">— UI only, no data or permissions change</span>
+            </div>
+
+            {isImpersonating ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-amber-800 font-semibold">
+                  Currently previewing as: <span className="text-amber-900">{ROLE_LABELS[userRole!]}</span>
+                </span>
+                <button
+                  onClick={clearImpersonation}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900/15 hover:bg-amber-900/25 text-amber-900 text-xs font-bold transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Restore my access
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-end gap-3">
+                {/* Type */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">Type</label>
+                  <div className="relative">
+                    <select
+                      value={previewPickType}
+                      onChange={e => handlePreviewTypeChange(e.target.value as RoleGroup)}
+                      className="pl-3 pr-7 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 appearance-none"
+                    >
+                      <option value="acce">ACCE</option>
+                      <option value="school">School</option>
+                      <option value="de">Department of Education</option>
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Role */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">Role</label>
+                  <div className="relative">
+                    <select
+                      value={previewPickRole}
+                      onChange={e => setPreviewPickRole(e.target.value as AppRole)}
+                      className="pl-3 pr-7 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 appearance-none"
+                    >
+                      {(['acce_admin','acce_staff','school_admin','school_staff','de_admin','de_staff'] as AppRole[])
+                        .filter(r => getRoleGroup(r) === previewPickType)
+                        .map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)
+                      }
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* School — only when type is school */}
+                {previewPickType === 'school' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">School</label>
+                    <div className="relative">
+                      {schools.length > 0 ? (
+                        <>
+                          <select
+                            value={previewPickSchoolId}
+                            onChange={e => setPreviewPickSchoolId(e.target.value)}
+                            className="pl-3 pr-7 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 appearance-none min-w-[200px]"
+                          >
+                            <option value="">Select a school…</option>
+                            {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400 pointer-events-none" />
+                        </>
+                      ) : (
+                        <input
+                          type="text"
+                          value={previewPickSchoolId}
+                          onChange={e => setPreviewPickSchoolId(e.target.value)}
+                          placeholder="School ID"
+                          className="pl-3 pr-4 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-48 font-mono"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setImpersonation(previewPickRole, previewPickType === 'school' ? (previewPickSchoolId || null) : null)}
+                  disabled={previewPickType === 'school' && !previewPickSchoolId}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white text-sm font-bold transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Preview
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-5">

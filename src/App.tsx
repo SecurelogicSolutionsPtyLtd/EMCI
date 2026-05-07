@@ -35,16 +35,16 @@ import {
   type RawEndOfPilotSurvey2026,
   type RawMidPilotStudentSurvey,
 } from './services/dataverse';
-import { canAccessPage, getRoleGroup } from './types/roles';
+import { canAccessPage, getRoleGroup, ROLE_LABELS } from './types/roles';
 import type { Page } from './types/roles';
-import { ChevronLeft, FileDown, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { ChevronLeft, FileDown, ChevronRight, Loader2, AlertCircle, RefreshCw, Eye, RotateCcw } from 'lucide-react';
 
 const TOKEN_URL = '/devtoken';
 
 // ── Inner app (inside AuthProvider) ──────────────────────────────────────────
 
 function AppInner() {
-  const { authUser, userRole, schoolId, stage } = useAuth();
+  const { authUser, userRole, schoolId, stage, isImpersonating, clearImpersonation } = useAuth();
 
   // ── Auth + data state ────────────────────────────────────────────────────
   const [token, setToken]               = useState('');
@@ -212,14 +212,35 @@ function AppInner() {
   }
 
   // ── Data loading screen ───────────────────────────────────────────────────
+  // ── Impersonation banner — fixed overlay, visible on every page ─────────
+  const ImpersonationBanner = isImpersonating ? (
+    <div className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-between gap-3 bg-amber-400 px-4 py-1.5 shadow-md">
+      <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
+        <Eye className="w-3.5 h-3.5 shrink-0" />
+        Previewing as: <span className="font-bold">{userRole ? ROLE_LABELS[userRole] : ''}</span>
+        <span className="opacity-60">— UI only, no data or permissions are changed</span>
+      </div>
+      <button
+        onClick={clearImpersonation}
+        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-900/15 hover:bg-amber-900/25 text-amber-900 text-xs font-bold transition-colors shrink-0"
+      >
+        <RotateCcw className="w-3 h-3" />
+        Restore my access
+      </button>
+    </div>
+  ) : null;
+
   if (tokenLoading || (dataLoading && students.length === 0)) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">
-          {tokenLoading ? 'Connecting to Dataverse…' : 'Loading programme data…'}
-        </p>
-      </div>
+      <>
+        {ImpersonationBanner}
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
+          <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">
+            {tokenLoading ? 'Connecting to Dataverse…' : 'Loading programme data…'}
+          </p>
+        </div>
+      </>
     );
   }
 
@@ -239,13 +260,21 @@ function AppInner() {
 
   // ── Team management ───────────────────────────────────────────────────────
   if (page === 'team') {
-    return <TeamManagement onBack={() => goTo('network')} schools={schools} />;
+    return (
+      <>
+        {ImpersonationBanner}
+        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
+          <TeamManagement onBack={() => goTo('network')} schools={schools} />
+        </div>
+      </>
+    );
   }
 
   // ── Network overview ──────────────────────────────────────────────────────
   if (page === 'network') {
     return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden">
+      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
+        {ImpersonationBanner}
         {ErrorBanner}
         <NetworkOverview
           students={students}
@@ -264,7 +293,8 @@ function AppInner() {
   // ── Counsellor view ───────────────────────────────────────────────────────
   if (page === 'counsellors') {
     return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden">
+      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
+        {ImpersonationBanner}
         {ErrorBanner}
         <CounsellorView students={students} schools={schools} onBack={() => goTo('network')} />
       </div>
@@ -273,33 +303,43 @@ function AppInner() {
 
   // ── Dataverse lab ─────────────────────────────────────────────────────────
   if (page === 'devlab') {
-    return <DataverseLab onBack={() => goTo('network')} onGoToSurveySearch={() => goTo('surveysearch')} onGoToStudentSearch={() => goTo('studentsearch')} />;
+    return (
+      <>
+        {ImpersonationBanner}
+        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
+          <DataverseLab onBack={() => goTo('network')} onGoToSurveySearch={() => goTo('surveysearch')} onGoToStudentSearch={() => goTo('studentsearch')} />
+        </div>
+      </>
+    );
   }
 
   if (page === 'surveysearch') {
     return (
-      <SurveySearch
-        students={students}
-        studentEventsMap={studentEventsMap}
-        onBack={() => goTo('devlab')}
-      />
+      <>
+        {ImpersonationBanner}
+        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
+          <SurveySearch students={students} studentEventsMap={studentEventsMap} onBack={() => goTo('devlab')} />
+        </div>
+      </>
     );
   }
 
   if (page === 'studentsearch') {
     return (
-      <StudentSearch
-        students={students}
-        schools={schools}
-        onBack={() => goTo('devlab')}
-      />
+      <>
+        {ImpersonationBanner}
+        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
+          <StudentSearch students={students} schools={schools} onBack={() => goTo('devlab')} />
+        </div>
+      </>
     );
   }
 
   // ── School dashboard ──────────────────────────────────────────────────────
   if (page === 'school') {
     return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden">
+      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
+        {ImpersonationBanner}
         {ErrorBanner}
         <SchoolDashboard
           students={students}
@@ -314,23 +354,29 @@ function AppInner() {
   // ── PDF preview ───────────────────────────────────────────────────────────
   if (page === 'pdf') {
     return (
-      <PdfPreview
-        studentName={selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : '—'}
-        morrisbyId={selectedStudent?.morrisbyId ?? '—'}
-        schoolName={studentSchoolName ?? selectedSchool?.name ?? '—'}
-        counsellor={selectedStudent?.counsellor ?? '—'}
-        yearLevel={selectedStudent?.yearLevel ?? 0}
-        currentStage={selectedStudent?.currentStage ?? null}
-        stageProgress={selectedStudent?.stageProgress ?? 0}
-        events={selectedStudent ? (studentEventsMap[selectedStudent.id] ?? []) : []}
-        onBack={() => goTo('student')}
-      />
+      <>
+        {ImpersonationBanner}
+        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
+          <PdfPreview
+            studentName={selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : '—'}
+            morrisbyId={selectedStudent?.morrisbyId ?? '—'}
+            schoolName={studentSchoolName ?? selectedSchool?.name ?? '—'}
+            counsellor={selectedStudent?.counsellor ?? '—'}
+            yearLevel={selectedStudent?.yearLevel ?? 0}
+            currentStage={selectedStudent?.currentStage ?? null}
+            stageProgress={selectedStudent?.stageProgress ?? 0}
+            events={selectedStudent ? (studentEventsMap[selectedStudent.id] ?? []) : []}
+            onBack={() => goTo('student')}
+          />
+        </div>
+      </>
     );
   }
 
   // ── Student journey ───────────────────────────────────────────────────────
   return (
-    <div className="h-screen w-screen flex flex-col bg-emci-bg text-emci-primary overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-emci-bg text-emci-primary overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
+      {ImpersonationBanner}
       <div className="shrink-0 bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <button onClick={() => goTo('network')}

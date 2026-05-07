@@ -7,6 +7,17 @@ Entries are ordered newest-first within each release.
 
 ## [Unreleased] — 2026-05-07 (latest)
 
+### Added: Role impersonation / Preview As
+
+- `acce_admin` can now preview the UI as any role directly from the Team Management page.
+- A "Preview as role" panel appears at the top of Team Management with Type, Role, and (when School is selected) a school name dropdown.
+- Clicking **Preview** overrides the effective role for all UI rendering — page visibility, data redaction, nav items, and permission gates all respond as if that role were logged in.
+- A persistent amber banner is shown on every page while a preview is active, showing the current preview role and a **Restore my access** button.
+- Impersonation is stored in `sessionStorage` so it survives page refreshes within the tab but is cleared when the tab closes or the user signs out.
+- No database changes are made — this is purely a UI state override.
+
+---
+
 ### Changed: Add team member modal — Type selector and school name dropdown
 
 - Added **Type** dropdown to the Add team member modal (ACCE / School / Department of Education), visible for `acce_admin` only.

@@ -15,9 +15,16 @@ type AuthStage =
 
 export interface AuthContextValue {
   authUser:   AppUser | null;
+  /** Effective role — preview role when impersonating, otherwise actual Supabase role. */
   userRole:   AppRole | null;
+  /** Always the real Supabase role, unaffected by impersonation. */
+  actualRole: AppRole | null;
+  /** Effective school ID — preview school when impersonating, otherwise actual. */
   schoolId:   string | null;
   stage:      AuthStage;
+  isImpersonating: boolean;
+  setImpersonation: (role: AppRole, schoolId: string | null) => void;
+  clearImpersonation: () => void;
   /** Re-checks role and MFA after external changes (e.g. admin grants a role). */
   refresh:    () => Promise<void>;
 }
@@ -32,11 +39,48 @@ export function useAuth(): AuthContextValue {
 
 // ── Provider ───────────────────────────────────────────────────────────────────
 
+const SESSION_KEY_ROLE     = 'emci_preview_role';
+const SESSION_KEY_SCHOOL   = 'emci_preview_school_id';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authUser, setAuthUser] = useState<AppUser | null>(null);
-  const [userRole, setUserRole] = useState<AppRole | null>(null);
-  const [schoolId, setSchoolId] = useState<string | null>(null);
-  const [stage,    setStage]    = useState<AuthStage>('loading');
+  const [authUser,       setAuthUser]       = useState<AppUser | null>(null);
+  const [actualRole,     setActualRole]     = useState<AppRole | null>(null);
+  const [actualSchoolId, setActualSchoolId] = useState<string | null>(null);
+  const [stage,          setStage]          = useState<AuthStage>('loading');
+
+  // Preview / impersonation — UI-only, never touches the database
+  const [previewRole,     setPreviewRole]     = useState<AppRole | null>(() => {
+    try { return sessionStorage.getItem(SESSION_KEY_ROLE) as AppRole | null; }
+    catch { return null; }
+  });
+  const [previewSchoolId, setPreviewSchoolId] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(SESSION_KEY_SCHOOL); }
+    catch { return null; }
+  });
+
+  // Derived effective values consumed by the rest of the app
+  const userRole = previewRole     ?? actualRole;
+  const schoolId = previewSchoolId ?? actualSchoolId;
+  const isImpersonating = previewRole !== null;
+
+  function setImpersonation(role: AppRole, sid: string | null) {
+    setPreviewRole(role);
+    setPreviewSchoolId(sid);
+    try {
+      sessionStorage.setItem(SESSION_KEY_ROLE, role);
+      if (sid) sessionStorage.setItem(SESSION_KEY_SCHOOL, sid);
+      else sessionStorage.removeItem(SESSION_KEY_SCHOOL);
+    } catch { /* private/incognito — ignore */ }
+  }
+
+  function clearImpersonation() {
+    setPreviewRole(null);
+    setPreviewSchoolId(null);
+    try {
+      sessionStorage.removeItem(SESSION_KEY_ROLE);
+      sessionStorage.removeItem(SESSION_KEY_SCHOOL);
+    } catch { /* ignore */ }
+  }
 
   const resolve = useCallback(async () => {
     setStage('loading');
@@ -44,8 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       setAuthUser(null);
-      setUserRole(null);
-      setSchoolId(null);
+      setActualRole(null);
+      setActualSchoolId(null);
+      clearImpersonation();
       setStage('unauthenticated');
       return;
     }
@@ -56,14 +101,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch the user's role record
     const roleRecord = await getUserRole(user.id, user.email);
     if (!roleRecord) {
-      setUserRole(null);
-      setSchoolId(null);
+      setActualRole(null);
+      setActualSchoolId(null);
       setStage('no_role');
       return;
     }
 
-    setUserRole(roleRecord.role);
-    setSchoolId(roleRecord.school_id);
+    setActualRole(roleRecord.role);
+    setActualSchoolId(roleRecord.school_id);
 
     // ACCE users authenticate via Microsoft SSO — no MFA requirement
     if (getRoleGroup(roleRecord.role) === 'acce') {
@@ -82,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: factors } = await supabase.auth.mfa.listFactors();
     const hasEnrolled = (factors?.totp ?? []).some((f: { status: string }) => f.status === 'verified');
     setStage(hasEnrolled ? 'mfa_required' : 'mfa_enroll');
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — clearImpersonation is stable
 
   // Bootstrap on mount
   useEffect(() => {
@@ -91,11 +136,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         setAuthUser(null);
-        setUserRole(null);
-        setSchoolId(null);
+        setActualRole(null);
+        setActualSchoolId(null);
+        clearImpersonation();
         setStage('unauthenticated');
       } else {
-        // Re-resolve when session changes (e.g. MFA verified, token refreshed)
         resolve();
       }
     });
@@ -104,7 +149,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [resolve]);
 
   return (
-    <AuthContext.Provider value={{ authUser, userRole, schoolId, stage, refresh: resolve }}>
+    <AuthContext.Provider value={{
+      authUser,
+      userRole,
+      actualRole,
+      schoolId,
+      stage,
+      isImpersonating,
+      setImpersonation,
+      clearImpersonation,
+      refresh: resolve,
+    }}>
       {children}
     </AuthContext.Provider>
   );
