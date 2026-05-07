@@ -7,6 +7,14 @@ Entries are ordered newest-first within each release.
 
 ## [Unreleased] — 2026-05-07 (latest)
 
+### Changed: School roles can now view student journeys (read-only)
+
+- `canAccessPage(role, 'student')` now allows the **school** role group as well as ACCE.
+- School Admin / School Staff can click into a student from either the Network Overview roster or their School Dashboard and view the full timeline / event history for their school's students.
+- PDF export remains ACCE-only (separate gate at `canAccessPage(role, 'pdf')`).
+- DE roles continue to be blocked from any student journey access.
+- Aligns the implementation with `ROLES_AND_ACCESS.md` lines 76 ("View the activity feed and event history for students at their school") which had previously contradicted the access matrix.
+
 ### Fixed: Production Dataverse proxy — strip injected `path` query param
 
 - The Vercel rewrite for `/dataverse/:path*` injects a `path=...` query parameter, which the proxy was forwarding to Dataverse along with the original `$select`/`$filter` params.

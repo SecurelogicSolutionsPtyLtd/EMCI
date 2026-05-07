@@ -58,7 +58,9 @@ export function canAccessPage(role: AppRole, page: Page): boolean {
   switch (page) {
     case 'network':       return true;
     case 'school':        return group === 'acce' || group === 'school';
-    case 'student':       return group === 'acce';
+    // School roles can VIEW the student journey for their own students (read-only).
+    // PDF export and write actions remain ACCE-only via separate gates.
+    case 'student':       return group === 'acce' || group === 'school';
     case 'pdf':           return group === 'acce';
     case 'counsellors':   return group === 'acce';
     case 'devlab':        return group === 'acce';
