@@ -355,24 +355,12 @@ export async function fetchStudents(token: string): Promise<(Student & { schoolI
   return (data.value ?? []).map(mapStudent);
 }
 
-// Explicit $select avoids 0x80060888 caused by Dataverse trying to include
-// non-queryable metadata columns when no $select is provided.
-const SCHOOL_SELECT = [
-  'cr89a_wlpcschoolid',
-  'cr89a_name',
-  'cr89a_schoolname',
-  'cr89a_wlpcschoolname',
-  'cr89a_region',
-  'cr89a_principalcontact',
-  'cr89a_morrisbyid',
-  'statecode',
-  'statuscode',
-  'createdon',
-].join(',');
-
 // ── Fetch all schools ──────────────────────────────────────────────
+// No $select — the school name field varies across Dataverse environments
+// (cr89a_schoolname vs cr89a_wlpcschoolname vs cr89a_name). The mapper
+// resolves whichever field is present. See DATAVERSE_CONNECTION_REFERENCE.md §Entity 2.
 export async function fetchSchools(token: string): Promise<School[]> {
-  const url = `${BASE_URL}/cr89a_wlpcschools?$select=${SCHOOL_SELECT}`;
+  const url = `${BASE_URL}/cr89a_wlpcschools`;
   const res  = await fetch(url, { headers: dvHeaders(token) });
   if (!res.ok) {
     const text = await res.text();
