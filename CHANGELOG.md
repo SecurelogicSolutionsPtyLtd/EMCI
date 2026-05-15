@@ -5,7 +5,7 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## [Unreleased] — 2026-05-07 (latest)
+## — 2026-05-07 (latest)
 
 ### Changed: Programme loading UX
 
