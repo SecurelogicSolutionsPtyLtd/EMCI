@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase, mapUser, getUserRole, isMfaVerified, type AppUser } from '../services/supabase';
+import { supabase, mapUser, getUserRole, isMfaVerified, signOut, type AppUser } from '../services/supabase';
 import type { AppRole } from '../types/roles';
 import { getRoleGroup } from '../types/roles';
 
@@ -27,6 +27,8 @@ export interface AuthContextValue {
   clearImpersonation: () => void;
   /** Re-checks role and MFA after external changes (e.g. admin grants a role). */
   refresh:    () => Promise<void>;
+  /** Ends the Supabase session and clears preview state. */
+  signOutUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -81,6 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem(SESSION_KEY_SCHOOL);
     } catch { /* ignore */ }
   }
+
+  const signOutUser = useCallback(async () => {
+    clearImpersonation();
+    await signOut();
+  }, []);
 
   const resolve = useCallback(async () => {
     setStage('loading');
@@ -159,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setImpersonation,
       clearImpersonation,
       refresh: resolve,
+      signOutUser,
     }}>
       {children}
     </AuthContext.Provider>

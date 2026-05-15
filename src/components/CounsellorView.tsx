@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Shield, ChevronLeft, Users, TrendingUp,
+  Users, TrendingUp,
   CheckCircle2, BookOpen, BarChart2, UserCheck, Building2,
   Star, Circle, ChevronDown, Search, X
 } from 'lucide-react';
@@ -11,7 +11,6 @@ import type { School } from '../data/networkData';
 interface CounsellorViewProps {
   students: Student[];
   schools: School[];
-  onBack: () => void;
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -71,7 +70,7 @@ function StatChip({ label, value, color }: { label: string; value: number; color
   );
 }
 
-export function CounsellorView({ students, schools, onBack }: CounsellorViewProps) {
+export function CounsellorView({ students, schools }: CounsellorViewProps) {
   // Derive unique counsellor list from students
   const counsellors: DerivedCounsellor[] = Array.from(
     new Set(students.map(s => s.counsellor).filter(Boolean))
@@ -129,19 +128,11 @@ export function CounsellorView({ students, schools, onBack }: CounsellorViewProp
 
   if (counsellors.length === 0) {
     return (
-      <div className="h-screen w-screen flex flex-col bg-slate-50 overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center gap-3 px-8 shrink-0">
-          <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-primary transition-colors font-medium group">
-            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            Network Overview
-          </button>
-          <div className="h-5 w-px bg-slate-200" />
-          <Shield className="w-4 h-4 text-primary" />
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900">Counsellor View</h1>
-        </header>
-        <div className="flex-1 flex items-center justify-center">
+      <div className="h-full min-h-0 w-full flex flex-col bg-slate-50 overflow-hidden">
+        <div className="flex-1 flex items-center justify-center min-h-0 p-8">
           <div className="text-center">
             <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-700 mb-1">Counsellor view</p>
             <p className="text-sm text-slate-400">No counsellors found in student data.</p>
           </div>
         </div>
@@ -150,26 +141,8 @@ export function CounsellorView({ students, schools, onBack }: CounsellorViewProp
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-50 overflow-hidden">
-
-      {/* ── Top Nav ──────────────────────────────────────────── */}
-      <header className="h-16 bg-white border-b border-slate-200 flex items-center gap-3 px-8 shrink-0">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-primary transition-colors font-medium group"
-        >
-          <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-          Network Overview
-        </button>
-        <div className="h-5 w-px bg-slate-200" />
-        <Shield className="w-4 h-4 text-primary" />
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900 leading-tight">Counsellor View</h1>
-          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium leading-tight">Performance & Student Overview</p>
-        </div>
-      </header>
-
-      <div className="flex-1 flex overflow-hidden">
+    <div className="h-full min-h-0 w-full flex flex-col bg-slate-50 overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
 
         {/* ── Counsellor sidebar ────────────────────────────── */}
         <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto">

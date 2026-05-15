@@ -13,6 +13,8 @@ export interface Student {
   currentStage: StageKey;
   stageProgress: number; // 0-4
   riskLevel: 'low' | 'medium' | 'high' | 'none';
+  /** Count of linked absence records (Dataverse); demo seeds align with risk tiers. */
+  absenceCount: number;
   counsellor: string;
   interviewed: boolean;
   hasProfile: boolean;
@@ -20,6 +22,12 @@ export interface Student {
   lastActivity: string;
   avatar?: string;
   schoolId?: string;
+  /** Dataverse choice value for deactivation reason (read-only in EMCI; maintained in Dataverse / automation). */
+  studentDeactivation?: number | null;
+  studentDeactivationLabel?: string | null;
+  studentDeactivationAt?: string | null;
+  /** Year group label captured at deactivation (flow-populated). */
+  studentDeactivationYearGroupSnapshot?: string | null;
 }
 
 export const schoolStudents: Student[] = [
@@ -35,6 +43,7 @@ export const schoolStudents: Student[] = [
     currentStage: 'complete',
     stageProgress: 4,
     riskLevel: 'none',
+    absenceCount: 0,
     counsellor: 'Dr. Aris Thorne',
     interviewed: true,
     hasProfile: true,
@@ -52,6 +61,7 @@ export const schoolStudents: Student[] = [
     currentStage: 'career_guidance',
     stageProgress: 3,
     riskLevel: 'medium',
+    absenceCount: 3,
     counsellor: 'Dr. Aris Thorne',
     interviewed: true,
     hasProfile: true,
@@ -70,6 +80,7 @@ export const schoolStudents: Student[] = [
     currentStage: 'consent',
     stageProgress: 2,
     riskLevel: 'low',
+    absenceCount: 1,
     counsellor: 'Dr. Aris Thorne',
     interviewed: false,
     hasProfile: false,
@@ -87,6 +98,7 @@ export const schoolStudents: Student[] = [
     currentStage: 'referral',
     stageProgress: 1,
     riskLevel: 'high',
+    absenceCount: 6,
     counsellor: 'Dr. Aris Thorne',
     interviewed: false,
     hasProfile: false,
@@ -104,6 +116,7 @@ export const schoolStudents: Student[] = [
     currentStage: 'career_guidance',
     stageProgress: 3,
     riskLevel: 'low',
+    absenceCount: 1,
     counsellor: 'Ms. Cleo Park',
     interviewed: true,
     hasProfile: true,
@@ -122,6 +135,7 @@ export const schoolStudents: Student[] = [
     currentStage: null,
     stageProgress: 0,
     riskLevel: 'none',
+    absenceCount: 0,
     counsellor: 'Ms. Cleo Park',
     interviewed: false,
     hasProfile: false,
@@ -139,6 +153,7 @@ export const schoolStudents: Student[] = [
     currentStage: 'complete',
     stageProgress: 4,
     riskLevel: 'none',
+    absenceCount: 0,
     counsellor: 'Ms. Cleo Park',
     interviewed: true,
     hasProfile: true,
@@ -156,6 +171,7 @@ export const schoolStudents: Student[] = [
     currentStage: null,
     stageProgress: 0,
     riskLevel: 'medium',
+    absenceCount: 3,
     counsellor: 'Dr. Aris Thorne',
     interviewed: false,
     hasProfile: false,

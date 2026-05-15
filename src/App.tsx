@@ -1,11 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Header } from './components/Header';
-import { ProfileSnapshot } from './components/ProfileSnapshot';
-import { TimelineCore } from './components/TimelineCore';
-import { ContextPanel } from './components/ContextPanel';
-import { SchoolDashboard } from './components/SchoolDashboard';
-import { PdfPreview } from './components/PdfPreview';
-import { NetworkOverview } from './components/NetworkOverview';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { CounsellorView } from './components/CounsellorView';
 import { DataverseLab } from './components/DataverseLab';
 import { SurveySearch } from './components/SurveySearch';
@@ -35,20 +29,32 @@ import {
   type RawEndOfPilotSurvey2026,
   type RawMidPilotStudentSurvey,
 } from './services/dataverse';
-import { canAccessPage, getRoleGroup, ROLE_LABELS } from './types/roles';
-import type { Page } from './types/roles';
-import { ChevronLeft, FileDown, ChevronRight, Loader2, AlertCircle, RefreshCw, Eye, RotateCcw } from 'lucide-react';
+import { getRoleGroup, ROLE_LABELS } from './types/roles';
+import { Eye, Loader2, RotateCcw } from 'lucide-react';
+import { ProgrammeDataSkeleton } from './components/skeletons/ProgrammeDataSkeleton';
+import { MainShell } from './routes/MainShell';
+import { OutletContextBridge } from './routes/OutletContextBridge';
+import { DashboardRoute } from './routes/DashboardRoute';
+import { SchoolsListRoute } from './routes/SchoolsListRoute';
+import { StudentsListRoute } from './routes/StudentsListRoute';
+import { SchoolRoute } from './routes/SchoolRoute';
+import { StudentJourneyRoute } from './routes/StudentJourneyRoute';
+import { PdfRoute } from './routes/PdfRoute';
+import { RequirePage } from './routes/RequirePage';
+import type { AppShellOutletContext } from './routes/shellContext';
 
 const TOKEN_URL = '/devtoken';
 
 // ── Inner app (inside AuthProvider) ──────────────────────────────────────────
 
 function AppInner() {
-  const { authUser, userRole, schoolId, stage, isImpersonating, clearImpersonation } = useAuth();
+  const { userRole, schoolId, stage, isImpersonating, clearImpersonation } = useAuth();
+  const navigate = useNavigate();
 
   // ── Auth + data state ────────────────────────────────────────────────────
   const [token, setToken]               = useState('');
-  const [tokenLoading, setTokenLoading] = useState(true);
+  /** True only during Dataverse token fetch after `stage === 'ready'` (EMCI connecting message). */
+  const [isConnectingToPlatform, setIsConnectingToPlatform] = useState(false);
   const [students, setStudents]         = useState<Student[]>([]);
   const [schools, setSchools]           = useState<School[]>([]);
   const [dataLoading, setDataLoading]   = useState(false);
@@ -57,11 +63,7 @@ function AppInner() {
 
   const [studentEventsMap, setStudentEventsMap] = useState<Record<string, TimelineEvent[]>>({});
 
-  // ── Navigation state ─────────────────────────────────────────────────────
-  const [page, setPage]                       = useState<Page>('network');
-  const [selectedSchool, setSelectedSchool]   = useState<School | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [selectedEvent, setSelectedEvent]     = useState<any | null>(null);
+  const schoolHomeAppliedRef = useRef<string | null>(null);
 
   // ── Token fetch ───────────────────────────────────────────────────────────
   const fetchToken = useCallback(async (): Promise<string> => {
@@ -80,7 +82,7 @@ function AppInner() {
   }, []);
 
   // ── Load all Dataverse data ───────────────────────────────────────────────
-  const loadData = useCallback(async (tok: string) => {
+  const loadData = useCallback(async (tok: string): Promise<Student[] | null> => {
     setDataLoading(true);
     setDataError(null);
     try {
@@ -138,65 +140,70 @@ function AppInner() {
       setStudents(enriched);
       setSchools(fetchedSchools);
       setStudentEventsMap(eventsMap);
+      return enriched;
     } catch (e: any) {
       setDataError(e.message ?? 'Failed to load data from Dataverse');
+      return null;
     } finally {
       setDataLoading(false);
     }
   }, []);
 
-  // ── Bootstrap on mount (only when authenticated) ──────────────────────────
-  useEffect(() => {
-    if (stage !== 'ready') return;
+  // ── Bootstrap when authenticated: token (EMCI copy) then programme data (skeleton overlay) ──
+  useLayoutEffect(() => {
+    if (stage !== 'ready') {
+      setIsConnectingToPlatform(false);
+      return;
+    }
+    let cancelled = false;
+    setIsConnectingToPlatform(true);
     (async () => {
-      setTokenLoading(true);
       try {
         const tok = await fetchToken();
+        if (cancelled) return;
+        setIsConnectingToPlatform(false);
         await loadData(tok);
       } catch (e: any) {
-        setDataError(e.message ?? 'Failed to initialise');
-      } finally {
-        setTokenLoading(false);
+        if (!cancelled) {
+          setIsConnectingToPlatform(false);
+          setDataError(e.message ?? 'Failed to initialise');
+        }
       }
     })();
-    return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); };
+    return () => {
+      cancelled = true;
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  // ── Set landing page based on role ────────────────────────────────────────
+  // ── School-role home: once per role+schoolId, navigate to canonical school URL ──
   useEffect(() => {
     if (stage !== 'ready' || !userRole) return;
-    const group = getRoleGroup(userRole);
-    if (group === 'school' && schoolId) {
-      const school = schools.find(s => s.id === schoolId);
-      if (school) { setSelectedSchool(school); setPage('school'); }
+    if (getRoleGroup(userRole) !== 'school' || !schoolId) {
+      schoolHomeAppliedRef.current = null;
+      return;
     }
-  }, [stage, userRole, schoolId, schools]);
+    const school = schools.find(s => s.id === schoolId);
+    if (!school) return;
+    const marker = `${userRole}:${schoolId}`;
+    if (schoolHomeAppliedRef.current === marker) return;
+    schoolHomeAppliedRef.current = marker;
+    navigate(`/school/${school.id}`, { replace: true });
+  }, [stage, userRole, schoolId, schools, navigate]);
 
-  // ── Navigation helpers ────────────────────────────────────────────────────
-  function handleSelectSchool(school: School) {
-    setSelectedSchool(school);
-    setSelectedStudent(null);
-    setSelectedEvent(null);
-    setPage('school');
-  }
-
-  function handleSelectStudent(student: Student) {
-    if (!userRole || !canAccessPage(userRole, 'student')) return;
-    setSelectedStudent(student);
-    setSelectedEvent(null);
-    setPage('student');
-  }
-
-  function goTo(p: Page) {
-    if (!userRole || !canAccessPage(userRole, p)) return;
-    setSelectedEvent(null);
-    setPage(p);
-  }
-
-  const studentSchoolName = selectedStudent
-    ? (schools.find(s => s.id === (selectedStudent as any).schoolId)?.name ?? selectedSchool?.name ?? undefined)
-    : undefined;
+  const shellOutletContext: AppShellOutletContext = useMemo(
+    () => ({
+      students,
+      schools,
+      userRole: userRole as NonNullable<typeof userRole>,
+      token,
+      loadData,
+      dataError,
+      studentEventsMap,
+    }),
+    [students, schools, userRole, token, loadData, dataError, studentEventsMap],
+  );
 
   // ── Auth gates ────────────────────────────────────────────────────────────
   if (stage === 'loading') {
@@ -211,8 +218,6 @@ function AppInner() {
     return <LoginPage />;
   }
 
-  // ── Data loading screen ───────────────────────────────────────────────────
-  // ── Impersonation banner — fixed overlay, visible on every page ─────────
   const ImpersonationBanner = isImpersonating ? (
     <div className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-between gap-3 bg-amber-400 px-4 py-1.5 shadow-md">
       <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
@@ -221,6 +226,7 @@ function AppInner() {
         <span className="opacity-60">— UI only, no data or permissions are changed</span>
       </div>
       <button
+        type="button"
         onClick={clearImpersonation}
         className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-900/15 hover:bg-amber-900/25 text-amber-900 text-xs font-bold transition-colors shrink-0"
       >
@@ -230,193 +236,119 @@ function AppInner() {
     </div>
   ) : null;
 
-  if (tokenLoading || (dataLoading && students.length === 0)) {
+  const impersonationPad = isImpersonating ? 34 : 0;
+
+  if (isConnectingToPlatform) {
     return (
       <>
         {ImpersonationBanner}
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
-          <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">
-            {tokenLoading ? 'Connecting to Dataverse…' : 'Loading programme data…'}
-          </p>
-        </div>
-      </>
-    );
-  }
-
-  const ErrorBanner = dataError ? (
-    <div className="shrink-0 bg-red-50 border-b border-red-200 px-6 py-2 flex items-center gap-3">
-      <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-      <p className="text-sm text-red-700 flex-1">{dataError}</p>
-      <button
-        onClick={() => token && loadData(token)}
-        className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-800 transition-colors"
-      >
-        <RefreshCw className="w-3.5 h-3.5" />
-        Retry
-      </button>
-    </div>
-  ) : null;
-
-  // ── Team management ───────────────────────────────────────────────────────
-  if (page === 'team') {
-    return (
-      <>
-        {ImpersonationBanner}
-        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
-          <TeamManagement onBack={() => goTo('network')} schools={schools} />
-        </div>
-      </>
-    );
-  }
-
-  // ── Network overview ──────────────────────────────────────────────────────
-  if (page === 'network') {
-    return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
-        {ImpersonationBanner}
-        {ErrorBanner}
-        <NetworkOverview
-          students={students}
-          schools={schools}
-          userRole={userRole!}
-          onSelectSchool={handleSelectSchool}
-          onSelectStudent={handleSelectStudent}
-          onGoToCounsellors={() => goTo('counsellors')}
-          onGoToDevLab={() => goTo('devlab')}
-          onGoToTeam={() => goTo('team')}
-        />
-      </div>
-    );
-  }
-
-  // ── Counsellor view ───────────────────────────────────────────────────────
-  if (page === 'counsellors') {
-    return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
-        {ImpersonationBanner}
-        {ErrorBanner}
-        <CounsellorView students={students} schools={schools} onBack={() => goTo('network')} />
-      </div>
-    );
-  }
-
-  // ── Dataverse lab ─────────────────────────────────────────────────────────
-  if (page === 'devlab') {
-    return (
-      <>
-        {ImpersonationBanner}
-        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
-          <DataverseLab onBack={() => goTo('network')} onGoToSurveySearch={() => goTo('surveysearch')} onGoToStudentSearch={() => goTo('studentsearch')} />
-        </div>
-      </>
-    );
-  }
-
-  if (page === 'surveysearch') {
-    return (
-      <>
-        {ImpersonationBanner}
-        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
-          <SurveySearch students={students} studentEventsMap={studentEventsMap} onBack={() => goTo('devlab')} />
-        </div>
-      </>
-    );
-  }
-
-  if (page === 'studentsearch') {
-    return (
-      <>
-        {ImpersonationBanner}
-        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
-          <StudentSearch students={students} schools={schools} onBack={() => goTo('devlab')} />
-        </div>
-      </>
-    );
-  }
-
-  // ── School dashboard ──────────────────────────────────────────────────────
-  if (page === 'school') {
-    return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
-        {ImpersonationBanner}
-        {ErrorBanner}
-        <SchoolDashboard
-          students={students}
-          school={selectedSchool}
-          onSelectStudent={userRole && canAccessPage(userRole, 'student') ? handleSelectStudent : undefined}
-          onBack={() => goTo('network')}
-        />
-      </div>
-    );
-  }
-
-  // ── PDF preview ───────────────────────────────────────────────────────────
-  if (page === 'pdf') {
-    return (
-      <>
-        {ImpersonationBanner}
-        <div style={{ paddingTop: isImpersonating ? 34 : 0 }} className="h-screen w-screen overflow-hidden">
-          <PdfPreview
-            studentName={selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : '—'}
-            morrisbyId={selectedStudent?.morrisbyId ?? '—'}
-            schoolName={studentSchoolName ?? selectedSchool?.name ?? '—'}
-            counsellor={selectedStudent?.counsellor ?? '—'}
-            yearLevel={selectedStudent?.yearLevel ?? 0}
-            currentStage={selectedStudent?.currentStage ?? null}
-            stageProgress={selectedStudent?.stageProgress ?? 0}
-            events={selectedStudent ? (studentEventsMap[selectedStudent.id] ?? []) : []}
-            onBack={() => goTo('student')}
-          />
-        </div>
-      </>
-    );
-  }
-
-  // ── Student journey ───────────────────────────────────────────────────────
-  return (
-    <div className="h-screen w-screen flex flex-col bg-emci-bg text-emci-primary overflow-hidden" style={{ paddingTop: isImpersonating ? 34 : 0 }}>
-      {ImpersonationBanner}
-      <div className="shrink-0 bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => goTo('network')}
-            className="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors font-medium group">
-            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            Network
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-          <button onClick={() => goTo('school')}
-            className="text-sm text-slate-500 hover:text-primary transition-colors font-medium">
-            {selectedSchool?.name ?? 'School'}
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-          <span className="text-sm text-slate-800 font-semibold">
-            {selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : 'Student Journey'}
-          </span>
-        </div>
-        {userRole && canAccessPage(userRole, 'pdf') && (
-          <button
-            onClick={() => goTo('pdf')}
-            className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-lg shadow-sm"
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50" style={{ paddingTop: impersonationPad }}>
+          <div
+            className="flex items-center gap-4 max-w-md px-6"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
           >
-            <FileDown className="w-4 h-4" />
-            Export to PDF
-          </button>
+            <Loader2 className="w-10 h-10 text-primary animate-spin shrink-0" aria-hidden />
+            <p className="text-base font-medium text-slate-600 leading-snug">
+              Connecting to EMCI Student Management Platform…
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {ImpersonationBanner}
+      <div className="h-screen w-screen overflow-hidden box-border relative" style={{ paddingTop: impersonationPad }}>
+        <div className="h-full w-full overflow-hidden">
+          <Routes>
+            <Route element={<OutletContextBridge context={shellOutletContext} />}>
+              <Route
+                path="/team"
+                element={(
+                  <RequirePage page="team">
+                    <div className="h-full w-full overflow-hidden">
+                      <TeamManagement onBack={() => navigate('/dashboard')} schools={schools} />
+                    </div>
+                  </RequirePage>
+                )}
+              />
+              <Route
+                path="/devlab/survey-search"
+                element={(
+                  <RequirePage page="surveysearch">
+                    <div className="h-full w-full overflow-hidden">
+                      <SurveySearch students={students} studentEventsMap={studentEventsMap} onBack={() => navigate('/devlab')} />
+                    </div>
+                  </RequirePage>
+                )}
+              />
+              <Route
+                path="/devlab/student-search"
+                element={(
+                  <RequirePage page="studentsearch">
+                    <div className="h-full w-full overflow-hidden">
+                      <StudentSearch students={students} schools={schools} onBack={() => navigate('/devlab')} />
+                    </div>
+                  </RequirePage>
+                )}
+              />
+              <Route
+                path="/devlab"
+                element={(
+                  <RequirePage page="devlab">
+                    <div className="h-full w-full overflow-hidden">
+                      <DataverseLab
+                        onBack={() => navigate('/dashboard')}
+                        onGoToSurveySearch={() => navigate('/devlab/survey-search')}
+                        onGoToStudentSearch={() => navigate('/devlab/student-search')}
+                      />
+                    </div>
+                  </RequirePage>
+                )}
+              />
+              <Route element={<MainShell context={shellOutletContext} />}>
+                <Route path="/dashboard" element={<DashboardRoute />} />
+                <Route path="/schools" element={<SchoolsListRoute />} />
+                <Route path="/students" element={<StudentsListRoute />} />
+                <Route path="/school/:schoolId" element={<SchoolRoute />} />
+                <Route
+                  path="/counsellors"
+                  element={(
+                    <RequirePage page="counsellors">
+                      <CounsellorView students={students} schools={schools} />
+                    </RequirePage>
+                  )}
+                />
+                <Route
+                  path="/student/:studentId/pdf"
+                  element={(
+                    <RequirePage page="pdf">
+                      <PdfRoute />
+                    </RequirePage>
+                  )}
+                />
+                <Route path="/student/:studentId" element={<StudentJourneyRoute />} />
+              </Route>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+          </Routes>
+        </div>
+        {dataLoading && (
+          <div
+            className="absolute inset-0 z-[120] bg-slate-50/95 backdrop-blur-[2px] overflow-hidden"
+            aria-busy="true"
+            aria-live="polite"
+          >
+            <ProgrammeDataSkeleton />
+          </div>
         )}
       </div>
-      {ErrorBanner}
-      <div className="flex-1 flex flex-row overflow-hidden">
-        <div className="w-72 shrink-0 border-r border-slate-200 flex flex-col">
-          <ProfileSnapshot student={selectedStudent} schoolName={studentSchoolName} />
-        </div>
-        <div className="flex-1 flex flex-col relative overflow-hidden">
-          <TimelineCore student={selectedStudent} events={selectedStudent ? (studentEventsMap[selectedStudent.id] ?? []) : []} onSelectEvent={setSelectedEvent} />
-        </div>
-        <div className="w-[380px] shrink-0 border-l border-slate-200 flex flex-col">
-          <ContextPanel student={selectedStudent} selectedEvent={selectedEvent} onClose={() => setSelectedEvent(null)} />
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
 

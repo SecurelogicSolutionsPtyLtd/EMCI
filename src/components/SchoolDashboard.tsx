@@ -3,8 +3,8 @@ import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
   Search, Users, CheckCircle2, Clock, Award,
-  Bell, Settings, ChevronRight, ArrowLeft,
-  MoreVertical, AlertTriangle, Building2,
+  ChevronRight, ArrowLeft,
+  MoreVertical, AlertTriangle,
   BookOpen,
 } from 'lucide-react';
 import type { Student } from '../data/studentsData';
@@ -100,68 +100,16 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
   const showingTo   = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-50 overflow-hidden">
-
-      {/* ── Top Navigation ───────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between bg-white border-b border-slate-200 px-6 lg:px-10 py-3">
-        <div className="flex items-center gap-8">
-          {/* Logo */}
-          <div className="flex items-center gap-3 text-primary">
-            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-primary" />
-            </div>
-            <span className="text-slate-900 text-lg font-bold leading-tight tracking-tight">EMCI Platform</span>
-          </div>
-          {/* Nav */}
-          <nav className="hidden md:flex items-center gap-6">
-            {['Dashboard', 'Schools', 'Students', 'Reports'].map(item => (
-              <span
-                key={item}
-                className={
-                  item === 'Schools'
-                    ? 'text-primary text-sm font-bold border-b-2 border-primary pb-1 cursor-default'
-                    : 'text-slate-500 text-sm font-medium cursor-default'
-                }
-              >
-                {item}
-              </span>
-            ))}
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="hidden sm:flex items-center h-10 min-w-40 max-w-64 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-            <div className="pl-3 text-slate-400">
-              <Search className="w-4 h-4" />
-            </div>
-            <input
-              className="flex-1 bg-slate-50 text-sm px-2 py-2 border-none outline-none placeholder:text-slate-400 text-slate-900"
-              placeholder="Global search..."
-            />
-          </div>
-          {/* Icon buttons */}
-          <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors">
-            <Bell className="w-5 h-5" />
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
-          {/* Avatar */}
-          <div className="w-10 h-10 rounded-full border-2 border-primary overflow-hidden">
-            <img src="https://picsum.photos/seed/admin/100/100" alt="User avatar" className="w-full h-full object-cover" />
-          </div>
-        </div>
-      </header>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-slate-50">
 
       {/* ── Scrollable content ──────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <main className="max-w-[1280px] mx-auto w-full px-6 py-6 flex flex-col gap-6">
 
           {/* ── Breadcrumb + Heading ─────────────────────────────── */}
           <div className="flex flex-col gap-4">
             <nav className="flex items-center gap-1.5 text-sm font-medium text-slate-500">
-              <button onClick={onBack} className="hover:text-primary transition-colors">Network</button>
+              <button onClick={onBack} className="hover:text-primary transition-colors">Dashboard</button>
               <ChevronRight className="w-4 h-4 text-slate-400" />
               <span className="text-slate-900">{school?.name ?? 'School'}</span>
             </nav>
@@ -183,7 +131,7 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
                 className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-300 transition-all"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back to Network
+                Back to dashboard
               </button>
             </div>
           </div>
@@ -348,13 +296,22 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
                               <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
                                 {initials}
                               </div>
-                              <div className="flex flex-col min-w-0">
+                              <div className="flex flex-col min-w-0 gap-0.5">
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
                                     {student.firstName} {student.lastName}
                                   </span>
                                   {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                                 </div>
+                                <p className="text-xs text-slate-500 tabular-nums">
+                                  <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
+                                  {atRisk && (
+                                    <>
+                                      <span className="text-slate-300 mx-1">·</span>
+                                      <span className="text-red-500/80 font-medium">At risk</span>
+                                    </>
+                                  )}
+                                </p>
                               </div>
                             </div>
                           </td>

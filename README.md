@@ -33,23 +33,49 @@ Each student moves through three stages:
 
 ## Navigation Structure
 
+URLs use **React Router** (`BrowserRouter` in [`src/main.tsx`](src/main.tsx)). School and student segments use **record ids** (Dataverse GUIDs in production), not names or Morrisby codes.
+
+| Path | Screen |
+|------|--------|
+| `/` | Redirects to `/dashboard` |
+| `/dashboard` | Programme **landing** (KPI summary + links to schools and students) |
+| `/schools` | All-schools directory (`NetworkOverview` schools view) |
+| `/students` | Network student roster (`NetworkOverview` students view) |
+| `/school/:schoolId` | School cohort dashboard |
+| `/student/:studentId` | Student journey |
+| `/student/:studentId/pdf` | PDF export preview (ACCE only) |
+| `/counsellors` | Counsellor analytics |
+| `/devlab` | Dataverse Lab |
+| `/devlab/survey-search` | Survey search (from Lab) |
+| `/devlab/student-search` | Student search (from Lab) |
+| `/team` | Team management (admins) |
+
+Logical flow:
+
 ```
-Network Overview
-├── School Dashboard  (select any school)
-│   └── Student Journey  (select any student)
-│       └── PDF Export Preview
-└── Counsellor View
+/dashboard              (programme home)
+/schools                (all schools)
+├── /school/{schoolId}  (school cohort)
+/students               (network roster)
+/student/{studentId}
+└── /student/{studentId}/pdf
 ```
 
-### Network Overview
-The landing page. Shows all schools in the network with:
+### Dashboard (`/dashboard`)
+Programme **home**: aggregate KPIs for your role scope and shortcuts to **`/schools`** and **`/students`** (students link hidden when the role cannot see names). Not the schools table or roster.
+
+### Schools directory (`/schools`)
+Browse **all schools** in the network with:
 - Global KPI cards (Total Schools, Total Students, Active Students, In Progress, Counsellors)
 - Per-school cards with programme completion bar, student counts, and region
 - Filter by status (Active / Onboarding / Inactive) and region
 - Text search across school name, region, and Morrisby ID
 
+### Student roster (`/students`)
+Network-wide student table (same component family as schools view) with search, school filter, and journey access where permitted.
+
 ### School Dashboard
-Shows the full student cohort for a selected school with:
+Shows the full student cohort for a selected school (`/school/:schoolId`) with:
 - Summary stat cards (Total, Active, In Progress, Completed)
 - Student table with stage badges and progress bars
 - Filter by stage, year level, and counsellor
@@ -85,6 +111,7 @@ Analytics page for programme administrators showing:
 | Layer | Technology |
 |-------|-----------|
 | Framework | React 19 + TypeScript |
+| Routing | React Router 6 |
 | Build tool | Vite 6 |
 | Styling | Tailwind CSS v4 |
 | Animation | Motion (Framer Motion) |
@@ -98,11 +125,29 @@ Analytics page for programme administrators showing:
 
 ```
 src/
+├── routes/                    # React Router screens + shell layout
+│   ├── MainShell.tsx
+│   ├── DashboardRoute.tsx
+│   ├── SchoolsListRoute.tsx
+│   ├── StudentsListRoute.tsx
+│   ├── SchoolRoute.tsx
+│   ├── StudentJourneyRoute.tsx
+│   ├── PdfRoute.tsx
+│   ├── RequirePage.tsx
+│   ├── OutletContextBridge.tsx
+│   └── shellContext.ts
+├── lib/
+│   ├── recordIdParam.ts            # URL id segment validation (GUID + safe fixture ids)
+│   └── networkProgrammeMetrics.ts  # Shared KPI scope for dashboard + NetworkOverview
 ├── components/
-│   ├── NetworkOverview.tsx    # All-schools landing page
+│   ├── layout/
+│   │   └── MainSidebar.tsx    # Shared nav + sign out for dashboard + school views
+│   ├── DashboardHome.tsx      # /dashboard programme landing (KPIs + shortcuts)
+│   ├── NetworkOverview.tsx    # /schools and /students main column (two modes)
+│   ├── skeletons/
+│   │   └── ProgrammeDataSkeleton.tsx  # Shown while programme data loads or refreshes
 │   ├── CounsellorView.tsx     # Counsellor analytics page
 │   ├── SchoolDashboard.tsx    # School-level student list
-│   ├── Header.tsx             # Student journey top bar
 │   ├── ProfileSnapshot.tsx    # Left-hand student profile panel
 │   ├── TimelineCore.tsx       # Stage tracker + activity feed + event modal
 │   ├── ContextPanel.tsx       # Right-hand event/student detail panel
@@ -111,7 +156,8 @@ src/
 │   ├── networkData.ts         # Schools, counsellors, and all network students
 │   ├── studentsData.ts        # Ashwood School student records
 │   └── timelineData.ts        # Student journey events and academic data
-└── App.tsx                    # Root component — navigation state machine
+├── main.tsx                   # React root + BrowserRouter
+└── App.tsx                    # Auth, data load, and route table
 ```
 
 ---
@@ -137,6 +183,10 @@ npm run lint
 # Build for production
 npm run build
 ```
+
+### Production hosting (SPA)
+
+Every path (for example `/school/…`, `/student/…`) must resolve to **`index.html`** so React Router can handle the route. Configure your host with an **SPA fallback** to `index.html` for paths that are not static files (Azure Static Web Apps `navigationFallback`, nginx `try_files`, IIS URL Rewrite, Vercel rewrites, and so on). If you cannot change server rules, switch **`BrowserRouter`** to **`HashRouter`** in [`src/main.tsx`](src/main.tsx) so URLs use a hash (`#/dashboard`, etc.).
 
 ---
 

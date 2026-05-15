@@ -80,6 +80,14 @@ Prefer:           odata.include-annotations="*"
 | `cr89a_prioritycohort` | Priority Cohort | String | — | Fetched but not currently displayed |
 | `modifiedon` | Last Updated | DateTime | `student.lastActivity` | ISO 8601 |
 | `createdon` | Date Created | DateTime | fallback for `lastActivity` | ISO 8601 |
+| `cr89a_studentdeactivation` | Student Deactivation | Choice (option set) | `student.studentDeactivation` | **Read-only in EMCI.** Integer code; updated only outside this app (e.g. Dataverse form, Power Automate). |
+| `cr89a_studentdeactivation@OData...FormattedValue` | Deactivation label | Annotation | `student.studentDeactivationLabel` | Human-readable reason |
+| `cr89a_studentdeactivationtimestamp` | Deactivation timestamp | DateTime | `student.studentDeactivationAt` | Typically **Power Automate** or other automation alongside deactivation |
+| `cr89a_studentdeactivationyeargroup` | Year group at deactivation | String | `student.studentDeactivationYearGroupSnapshot` | Typically automation — point-in-time year group text |
+
+### Student deactivation (Dataverse / automation)
+
+EMCI **does not write** deactivation fields. Your solution (e.g. **Power Automate**, plugins, or manual Dataverse updates) should own setting `cr89a_studentdeactivation`, `cr89a_studentdeactivationtimestamp`, `cr89a_studentdeactivationyeargroup`, and any **inactive** transition (`statecode` / `statuscode` / status reason) as required.
 
 ### Status Decode
 
@@ -443,6 +451,10 @@ Quick reference for the `Student` interface properties and their Dataverse sourc
 | `studentType` | `new_studenttypemultiselect@FormattedValue` | `new_studenttypemultiselect` raw → `'Standard'` |
 | `lastActivity` | `modifiedon` | `createdon` |
 | `schoolId` | `_cr89a_wlpcschool_value` | `''` |
+| `studentDeactivation` | `cr89a_studentdeactivation` | `null` |
+| `studentDeactivationLabel` | `cr89a_studentdeactivation@FormattedValue` | `null` |
+| `studentDeactivationAt` | `cr89a_studentdeactivationtimestamp` | `null` |
+| `studentDeactivationYearGroupSnapshot` | `cr89a_studentdeactivationyeargroup` | `null` |
 
 ---
 

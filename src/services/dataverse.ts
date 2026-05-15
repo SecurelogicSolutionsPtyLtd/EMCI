@@ -111,6 +111,10 @@ interface RawStudent {
   'new_studenttypemultiselect@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_studenttype: string | null;
   cr89a_prioritycohort: string | null;
+  cr89a_studentdeactivation: number | null;
+  'cr89a_studentdeactivation@OData.Community.Display.V1.FormattedValue'?: string | null;
+  cr89a_studentdeactivationtimestamp: string | null;
+  cr89a_studentdeactivationyeargroup: string | null;
   modifiedon: string | null;
   createdon: string | null;
 }
@@ -221,12 +225,18 @@ function mapStudent(raw: RawStudent): Student & { schoolId: string } {
     currentStage:  stage,
     stageProgress: deriveProgress(raw),
     riskLevel:     'none',
+    absenceCount:  0,
     counsellor:    raw['_ownerid_value@OData.Community.Display.V1.FormattedValue'] ?? '',
     interviewed:   raw.cr89a_studentinterviewed,
     hasProfile:    raw.cr89a_studenthasaprofile,
     studentType:   raw['new_studenttypemultiselect@OData.Community.Display.V1.FormattedValue'] ?? raw.new_studenttypemultiselect ?? 'Standard',
     lastActivity:  raw.modifiedon ?? raw.createdon ?? '',
     schoolId:      raw._cr89a_wlpcschool_value ?? '',
+    studentDeactivation: raw.cr89a_studentdeactivation ?? null,
+    studentDeactivationLabel:
+      raw['cr89a_studentdeactivation@OData.Community.Display.V1.FormattedValue'] ?? null,
+    studentDeactivationAt: raw.cr89a_studentdeactivationtimestamp ?? null,
+    studentDeactivationYearGroupSnapshot: raw.cr89a_studentdeactivationyeargroup ?? null,
   };
 }
 
@@ -342,6 +352,9 @@ const STUDENT_SELECT = [
   'cr89a_guidancecomplete',
   'modifiedon',
   'createdon',
+  'cr89a_studentdeactivation',
+  'cr89a_studentdeactivationtimestamp',
+  'cr89a_studentdeactivationyeargroup',
 ].join(',');
 
 export async function fetchStudents(token: string): Promise<(Student & { schoolId: string })[]> {
@@ -486,7 +499,7 @@ export function enrichStudents(
     dates.sort((a, b) => b.localeCompare(a));
     const lastActivity = dates[0] ?? student.lastActivity;
 
-    return { ...student, counsellor, riskLevel, lastActivity };
+    return { ...student, counsellor, riskLevel, absenceCount, lastActivity };
   });
 }
 

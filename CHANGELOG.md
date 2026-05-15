@@ -7,6 +7,78 @@ Entries are ordered newest-first within each release.
 
 ## [Unreleased] — 2026-05-07 (latest)
 
+### Changed: Programme loading UX
+
+- **Connecting to EMCI Student Management Platform…** (with spinner) is shown **only** while the Dataverse **token** is fetched immediately after sign-in (`stage === 'ready'`), not while schools/students/events are loading.
+- Programme **data load and refresh** use a full-view **[`ProgrammeDataSkeleton`](src/components/skeletons/ProgrammeDataSkeleton.tsx)** overlay (responsive pulse placeholders) instead of that copy.
+
+### Changed: Students programme list (`/students`)
+
+- **Student Roster** page heading renamed to **Students** in [`NetworkOverview`](src/components/NetworkOverview.tsx).
+- Removed the **Actions** column from the students table; roles that can open the student journey still do so by **clicking the row**.
+- Added compact roster **filters** (counsellor, current stage, year level, status) above the students table, combined with search and school scope.
+
+### Changed: Programme network headers
+
+- Removed the placeholder **notification bell** from the **Schools** and **Students** [`NetworkOverview`](src/components/NetworkOverview.tsx) headers (notifications deferred).
+
+### Changed: Main shell and programme navigation
+
+- **`/counsellors`**, **`/student/:studentId`**, and **`/student/:studentId/pdf`** now render inside **[`MainShell`](src/routes/MainShell.tsx)** with the same **[`MainSidebar`](src/components/layout/MainSidebar.tsx)** as the programme dashboard, schools list, students list, and school drill-in (shared data error banner above the outlet).
+- **Students** nav highlights for **`/students`** and any path under **`/student/`**; **Counsellors** highlights on **`/counsellors`**.
+- **[`CounsellorView`](src/components/CounsellorView.tsx)** uses **`h-full` / `min-h-0`** for the shell outlet and no longer shows a duplicate “back to dashboard” header.
+- **[`StudentJourneyRoute`](src/routes/StudentJourneyRoute.tsx)** removes the duplicate data-error strip and **Sign out** (handled in **`MainShell`** / sidebar); journey columns use **`min-h-0`** for reliable flex scrolling.
+
+### Added: Student absence count (risk context)
+
+- **`Student.absenceCount`** reflects linked **absence** records: set in **[`enrichStudents`](src/services/dataverse.ts)** (with **[`mapStudent`](src/services/dataverse.ts)** default `0`), aligned with demo **`riskLevel`** in seed data.
+- **[`NetworkOverview`](src/components/NetworkOverview.tsx)** and **[`SchoolDashboard`](src/components/SchoolDashboard.tsx)** show the count beside at-risk context; **[`ProfileSnapshot`](src/components/ProfileSnapshot.tsx)** shows **Absences** on the student journey.
+
+### Added: URL routing (React Router)
+
+- **`react-router-dom`** with **`BrowserRouter`** in [`src/main.tsx`](src/main.tsx). Authenticated app screens use **`Routes`** in [`src/App.tsx`](src/App.tsx) with opaque **Dataverse primary keys** in paths: **`/school/:schoolId`**, **`/student/:studentId`**, **`/student/:studentId/pdf`** (see [`src/lib/recordIdParam.ts`](src/lib/recordIdParam.ts) for param validation).
+- **Programme paths:** **`/dashboard`** (landing), **`/schools`** (all-schools directory), **`/students`** (network roster); **[`DashboardHome`](src/components/DashboardHome.tsx)** + **[`SchoolsListRoute`](src/routes/SchoolsListRoute.tsx)** / **[`StudentsListRoute`](src/routes/StudentsListRoute.tsx)**; shared KPI logic in [`src/lib/networkProgrammeMetrics.ts`](src/lib/networkProgrammeMetrics.ts).
+- **Nested dev lab paths:** **`/devlab/survey-search`**, **`/devlab/student-search`** under **`/devlab`**.
+- Shared data for route modules via **[`OutletContextBridge`](src/routes/OutletContextBridge.tsx)** + **`AppShellOutletContext`** ([`src/routes/shellContext.ts`](src/routes/shellContext.ts)); **[`MainShell`](src/routes/MainShell.tsx)** wraps the main programme shell (dashboard, schools, students, school drill-in, counsellors, student journey, PDF) with **`MainSidebar`**.
+- **School-role home** still runs once per role + school id but now **`navigate('/school/{id}', { replace: true })`** so the address bar matches the school view.
+
+### Changed: Shared shell for dashboard and school drill-in
+
+- **[`MainSidebar`](src/components/layout/MainSidebar.tsx)** includes an explicit **Dashboard** item and path-based active states: **`/dashboard`**, **`/schools`** / **`/school/...`**, **`/students`** / **`/student/...`**, **`/counsellors`** (where the role may see those items).
+- **[`NetworkOverview`](src/components/NetworkOverview.tsx)** is used only on **`/schools`** and **`/students`**; KPI scope matches [`getProgrammeVisibleScope`](src/lib/networkProgrammeMetrics.ts).
+- **[`SchoolDashboard`](src/components/SchoolDashboard.tsx)** sits in that shell with **`flex-1`** layout (no duplicate full-screen chrome header).
+
+### Fixed: Navigation edge cases
+
+- **School-role home redirect** runs **once per `userRole` + `schoolId`** (ref marker), not on every `schools` array identity change from `loadData`, so school users can stay on the **programme dashboard** after a refresh.
+- **School drill-in** remains gated with **`canAccessPage(role, 'school')`**; **school users** are redirected to their own **`/school/{id}`** if the path id does not match their assigned school.
+- Invalid or unknown **school** ids in the URL redirect to **`/schools`**; invalid **student** / forbidden cases redirect to **`/dashboard`**.
+
+### Added: Student deactivation display (Dataverse read-only)
+
+- Extended student `$select` and mapping for **`cr89a_studentdeactivation`**, **`cr89a_studentdeactivationtimestamp`**, and **`cr89a_studentdeactivationyeargroup`** (see `DATAVERSE_CONNECTION_REFERENCE.md`).
+- **Student journey** (`ProfileSnapshot`): when any of those fields are present, shows **read-only** reason, recorded time, and year group at exit. EMCI does **not** PATCH deactivation or load picklist metadata for editing.
+
+### Added: Sign out
+
+- **`signOutUser`** on `AuthContext` calls Supabase `signOut` and clears role preview state.
+- **Network Overview** sidebar footer and **student journey** header include **Sign out**.
+
+### Changed: Navigation shell and naming
+
+- Sidebar tagline **Network Management** → **Student Management**; removed redundant **Dashboard** nav row that duplicated **Schools** and caused a double-active highlight; main schools view title **Network Overview** → **Dashboard**.
+- **Counsellor View** and **School Dashboard** back links use **Dashboard** wording; school breadcrumb **Network** → **Dashboard**.
+- **School Dashboard** header: removed non-functional fake nav, bell/settings placeholders, and stock avatar; kept a single clear title and existing table search/filters.
+
+### Removed
+
+- Unused **`Header.tsx`** component (was imported but never rendered; used placeholder images).
+
+### Changed: Post-sign-in loading copy and layout
+
+- **Connecting to EMCI Student Management Platform…** appears only during the **token** step after login; programme data loading uses a skeleton overlay (see **Changed: Programme loading UX** above).
+- Spinner (`Loader2`) is shown inline beside the EMCI status text; `role="status"` and `aria-live="polite"` retained for that screen.
+
 ### Changed: School roles can now view student journeys (read-only)
 
 - `canAccessPage(role, 'student')` now allows the **school** role group as well as ACCE.

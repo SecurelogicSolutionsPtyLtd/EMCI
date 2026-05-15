@@ -1,25 +1,26 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Building2, Users, UserCheck, Settings,
-  Search, Bell, ChevronLeft, ChevronRight, Network, FlaskConical,
-  AlertTriangle, BookOpen, MoreVertical, UsersRound, EyeOff,
+  Building2,
+  Search, ChevronLeft, ChevronRight,
+  AlertTriangle, BookOpen, EyeOff,
 } from 'lucide-react';
 import type { School } from '../data/networkData';
 import type { Student } from '../data/studentsData';
 import type { AppRole } from '../types/roles';
-import { canAccessPage, canSeeStudentNames, isAdminRole, getRoleGroup, ROLE_LABELS } from '../types/roles';
+import { canAccessPage, canSeeStudentNames } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
+import type { NetworkMainTab } from './layout/MainSidebar';
+import { buildProgrammeKpiCards, getProgrammeVisibleScope } from '../lib/networkProgrammeMetrics';
 
 interface NetworkOverviewProps {
   students: Student[];
   schools: School[];
   userRole: AppRole;
+  networkTab: NetworkMainTab;
+  onNetworkTabChange: (tab: NetworkMainTab) => void;
   onSelectSchool: (school: School) => void;
   onSelectStudent: (student: Student) => void;
-  onGoToCounsellors: () => void;
-  onGoToDevLab: () => void;
-  onGoToTeam: () => void;
 }
 
 const PAGE_SIZE = 10;
@@ -56,30 +57,28 @@ function getInitials(student: Student) {
   return `${student.firstName[0] ?? ''}${student.lastName[0] ?? ''}`.toUpperCase();
 }
 
+function rosterStageFilterLabel(key: string) {
+  if (key === '__none__') return 'Not started';
+  return STAGE_LABELS[key] ?? key;
+}
+
 type View = 'schools' | 'students';
 
 export function NetworkOverview({
-  students, schools, userRole, onSelectSchool, onSelectStudent,
-  onGoToCounsellors, onGoToDevLab, onGoToTeam,
+  students, schools, userRole, networkTab, onNetworkTabChange,
+  onSelectSchool, onSelectStudent,
 }: NetworkOverviewProps) {
-  const { authUser, schoolId } = useAuth();
+  const { schoolId } = useAuth();
   const showStudentNames   = canSeeStudentNames(userRole);
-  const showCounsellors    = canAccessPage(userRole, 'counsellors');
-  const showDevLab         = canAccessPage(userRole, 'devlab');
   const showStudentJourney = canAccessPage(userRole, 'student');
-  const showTeam           = isAdminRole(userRole);
+  const canOpenSchoolDashboard = canAccessPage(userRole, 'school');
 
-  // School roles only see their own school and its students
-  const isSchoolRole = getRoleGroup(userRole) === 'school';
-  const visibleSchools  = isSchoolRole && schoolId
-    ? schools.filter(s => s.id === schoolId)
-    : schools;
-  const visibleStudents = isSchoolRole && schoolId
-    ? students.filter(s => (s as any).schoolId === schoolId)
-    : students;
-
-  // ── view switcher ─────────────────────────────────────────────
-  const [view, setView] = useState<View>('schools');
+  const { visibleSchools, visibleStudents } = getProgrammeVisibleScope(
+    students,
+    schools,
+    userRole,
+    schoolId,
+  );
 
   // ── schools view state ────────────────────────────────────────
   const [search,       setSearch]       = useState('');
@@ -90,15 +89,41 @@ export function NetworkOverview({
   const [rosterSearch, setRosterSearch]     = useState('');
   const [rosterSchool, setRosterSchool]     = useState('all');
   const [rosterPage,   setRosterPage]       = useState(1);
+  const [rosterCounsellor, setRosterCounsellor] = useState('all');
+  const [rosterStage, setRosterStage]           = useState<string>('all');
+  const [rosterYear, setRosterYear]             = useState<string>('all');
+  const [rosterStatus, setRosterStatus]         = useState<string>('all');
 
-  // ── KPI values ───────────────────────────────────────────────
-  const totalSchools     = visibleSchools.length;
-  const totalStudents    = visibleStudents.length;
-  const totalActive      = visibleStudents.filter(s => s.status === 'Active').length;
-  const totalInProgress  = visibleStudents.filter(s => s.stageProgress > 0 && s.currentStage !== 'complete').length;
-  const totalCompleted   = visibleStudents.filter(s => s.currentStage === 'complete').length;
-  const completedPct     = totalStudents > 0 ? Math.round((totalCompleted / totalStudents) * 100) : 0;
-  const totalCounsellors = Array.from(new Set(visibleStudents.map(s => s.counsellor).filter(Boolean))).length;
+  const rosterCounsellorOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(visibleStudents.map(s => s.counsellor).filter((c): c is string => Boolean(c && c.trim()))),
+      ).sort((a, b) => a.localeCompare(b)),
+    [visibleStudents],
+  );
+  const rosterYearOptions = useMemo(
+    () =>
+      Array.from(new Set(visibleStudents.map(s => s.yearLevel)))
+        .filter((y): y is number => y != null && !Number.isNaN(y))
+        .sort((a, b) => a - b),
+    [visibleStudents],
+  );
+  const rosterStageFilterKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const s of visibleStudents) {
+      keys.add(s.currentStage == null ? '__none__' : s.currentStage);
+    }
+    return Array.from(keys).sort((a, b) => {
+      const order = (k: string) =>
+        k === '__none__' ? -1 : ['referral', 'consent', 'career_guidance', 'complete'].indexOf(k);
+      return order(a) - order(b);
+    });
+  }, [visibleStudents]);
+
+  const rosterStatusOptions = useMemo(() => {
+    const present = new Set(visibleStudents.map(s => s.status));
+    return (['Active', 'Pending', 'Inactive'] as const).filter(st => present.has(st));
+  }, [visibleStudents]);
 
   const regions = ['all', ...Array.from(new Set(visibleSchools.map(s => s.region))).sort()];
 
@@ -124,7 +149,13 @@ export function NetworkOverview({
                         s.morrisbyId.toLowerCase().includes(rosterSearch.toLowerCase()) ||
                         (s.counsellor ?? '').toLowerCase().includes(rosterSearch.toLowerCase());
     const matchSchool = rosterSchool === 'all' || (s as any).schoolId === rosterSchool;
-    return matchSearch && matchSchool;
+    const matchCounsellor =
+      rosterCounsellor === 'all' || (s.counsellor ?? '').trim() === rosterCounsellor;
+    const stageKey = s.currentStage == null ? '__none__' : s.currentStage;
+    const matchStage = rosterStage === 'all' || stageKey === rosterStage;
+    const matchYear = rosterYear === 'all' || String(s.yearLevel) === rosterYear;
+    const matchStatus = rosterStatus === 'all' || s.status === rosterStatus;
+    return matchSearch && matchSchool && matchCounsellor && matchStage && matchYear && matchStatus;
   });
 
   const totalRosterPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
@@ -133,6 +164,10 @@ export function NetworkOverview({
 
   const handleRosterSearch = (v: string) => { setRosterSearch(v); setRosterPage(1); };
   const handleRosterSchool = (v: string) => { setRosterSchool(v); setRosterPage(1); };
+  const handleRosterCounsellor = (v: string) => { setRosterCounsellor(v); setRosterPage(1); };
+  const handleRosterStage = (v: string) => { setRosterStage(v); setRosterPage(1); };
+  const handleRosterYear = (v: string) => { setRosterYear(v); setRosterPage(1); };
+  const handleRosterStatus = (v: string) => { setRosterStatus(v); setRosterPage(1); };
 
   const rosterShowingFrom = filteredRoster.length === 0 ? 0 : (safeRosterPage - 1) * PAGE_SIZE + 1;
   const rosterShowingTo   = Math.min(safeRosterPage * PAGE_SIZE, filteredRoster.length);
@@ -142,14 +177,7 @@ export function NetworkOverview({
     rosterPageNumbers.push(i);
   }
 
-  const KPIS = [
-    { label: 'Total Schools',   value: totalSchools,                         highlight: false },
-    { label: 'Total Students',  value: totalStudents.toLocaleString(),       highlight: false },
-    { label: 'Active Students', value: totalActive.toLocaleString(),         highlight: false },
-    { label: 'In Progress',     value: totalInProgress.toLocaleString(),     highlight: false },
-    { label: 'Completed %',     value: `${completedPct}%`,                  highlight: true  },
-    { label: 'Counsellors',     value: totalCounsellors,                    highlight: false },
-  ];
+  const KPIS = buildProgrammeKpiCards(visibleSchools, visibleStudents);
 
   // ── nav items (role-filtered) ─────────────────────────────────
   // DE roles never see the per-student roster — aggregated views only.
@@ -157,92 +185,10 @@ export function NetworkOverview({
 
   // Clamp the active view if the role can't see the roster (e.g. impersonating DE).
   // Using a derived value avoids a setState-during-render loop.
-  const effectiveView: View = view === 'students' && !showStudentRoster ? 'schools' : view;
-
-  const NAV_ITEMS = [
-    { label: 'Dashboard',   icon: LayoutDashboard, viewKey: null       as View | null, always: true,  show: true },
-    { label: 'Schools',     icon: Building2,       viewKey: 'schools'  as View | null, always: true,  show: true },
-    { label: 'Students',    icon: Users,           viewKey: 'students' as View | null, always: false, show: showStudentRoster },
-    { label: 'Counsellors', icon: UserCheck,       viewKey: null       as View | null, always: false, show: showCounsellors },
-  ].filter(item => item.always || item.show);
+  const effectiveView: View = networkTab === 'students' && !showStudentRoster ? 'schools' : networkTab;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-
-      {/* ── Left Sidebar ──────────────────────────────────────── */}
-      <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col">
-
-        {/* Logo */}
-        <div className="p-6 flex items-center gap-3">
-          <div className="bg-primary rounded-lg p-2 text-white shrink-0">
-            <Network className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">EMCI</h1>
-            <p className="text-xs text-slate-500">Network Management</p>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-4 space-y-1 mt-2">
-          {NAV_ITEMS.map(item => {
-            const isActive = item.viewKey === effectiveView || (effectiveView === 'schools' && item.label === 'Dashboard');
-            const handleClick =
-              item.label === 'Counsellors' ? onGoToCounsellors
-              : item.viewKey              ? () => setView(item.viewKey as View)
-              : undefined;
-            return (
-              <button
-                key={item.label}
-                onClick={handleClick}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left
-                  ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'}`}
-              >
-                <item.icon className="w-5 h-5 shrink-0" />
-                {item.label}
-              </button>
-            );
-          })}
-
-          {/* Dataverse Lab — ACCE only */}
-          {showDevLab && (
-            <button
-              onClick={onGoToDevLab}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            >
-              <FlaskConical className="w-5 h-5 shrink-0" />
-              Dataverse Lab
-            </button>
-          )}
-
-          {/* Team Management — admins only */}
-          {showTeam && (
-            <button
-              onClick={onGoToTeam}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            >
-              <UsersRound className="w-5 h-5 shrink-0" />
-              Team Management
-            </button>
-          )}
-        </nav>
-
-        {/* User */}
-        <div className="p-4 border-t border-slate-200">
-          <div className="flex items-center gap-3 px-3">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 text-white text-xs font-bold">
-              {(authUser?.firstName ?? authUser?.email ?? 'U').slice(0, 1).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-800 truncate">{authUser?.displayName ?? authUser?.email ?? '—'}</p>
-              <p className="text-xs text-slate-500">{ROLE_LABELS[userRole]}</p>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main Content ──────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+    <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50">
 
         {/* ════════════════════════════════════════════════════════
             SCHOOLS VIEW
@@ -252,7 +198,7 @@ export function NetworkOverview({
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
               <div className="flex items-center gap-6 flex-1">
-                <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Network Overview</h2>
+                <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Schools</h2>
                 <div className="relative max-w-md w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -279,10 +225,6 @@ export function NetworkOverview({
                     </button>
                   ))}
                 </div>
-                <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative transition-colors">
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-white" />
-                </button>
               </div>
             </header>
 
@@ -339,8 +281,8 @@ export function NetworkOverview({
                               initial={{ opacity: 0, x: -6 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ duration: 0.12, delay: idx * 0.03 }}
-                              onClick={() => onSelectSchool(school)}
-                              className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                              onClick={canOpenSchoolDashboard ? () => onSelectSchool(school) : undefined}
+                              className={`transition-colors group ${canOpenSchoolDashboard ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
                             >
                               <td className="px-6 py-5">
                                 <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
@@ -415,7 +357,7 @@ export function NetworkOverview({
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
               <div className="flex items-center gap-6 flex-1">
-                <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Student Roster</h2>
+                <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Students</h2>
 
                 {/* Search */}
                 <div className="relative max-w-xs w-full">
@@ -441,11 +383,6 @@ export function NetworkOverview({
                   ))}
                 </select>
               </div>
-
-              <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg relative transition-colors">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-white" />
-              </button>
             </header>
 
             {/* Scrollable content */}
@@ -465,6 +402,61 @@ export function NetworkOverview({
                   ) : null;
                 })()}
 
+                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-end gap-x-2 gap-y-1.5">
+                  <label className="flex flex-col gap-0.5 shrink-0">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Counsellor</span>
+                    <select
+                      value={rosterCounsellor}
+                      onChange={e => handleRosterCounsellor(e.target.value)}
+                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 min-w-[7.25rem] max-w-[11rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
+                    >
+                      <option value="all">All</option>
+                      {rosterCounsellorOptions.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-0.5 shrink-0">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Current stage</span>
+                    <select
+                      value={rosterStage}
+                      onChange={e => handleRosterStage(e.target.value)}
+                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 min-w-[7.25rem] max-w-[10.5rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
+                    >
+                      <option value="all">All</option>
+                      {rosterStageFilterKeys.map(k => (
+                        <option key={k} value={k}>{rosterStageFilterLabel(k)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-0.5 shrink-0">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Year level</span>
+                    <select
+                      value={rosterYear}
+                      onChange={e => handleRosterYear(e.target.value)}
+                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 w-[4.5rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
+                    >
+                      <option value="all">All</option>
+                      {rosterYearOptions.map(y => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-0.5 shrink-0">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Status</span>
+                    <select
+                      value={rosterStatus}
+                      onChange={e => handleRosterStatus(e.target.value)}
+                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 min-w-[5.5rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
+                    >
+                      <option value="all">All</option>
+                      {rosterStatusOptions.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
                 {/* Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -483,17 +475,14 @@ export function NetworkOverview({
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Stage</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Progress</th>
                         <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
-                        {showStudentJourney && (
-                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {rosterSlice.length === 0 ? (
                         <tr>
-                          <td colSpan={5 + (showStudentNames ? 2 : 0) + (showStudentJourney ? 1 : 0)} className="py-16 text-center">
+                          <td colSpan={5 + (showStudentNames ? 2 : 0)} className="py-16 text-center">
                             <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                            <p className="text-sm text-slate-400">No students match your search.</p>
+                            <p className="text-sm text-slate-400">No students match your search or filters.</p>
                           </td>
                         </tr>
                       ) : (
@@ -528,10 +517,21 @@ export function NetworkOverview({
                                       </span>
                                       {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                                     </div>
-                                    {atRisk
-                                      ? <span className="text-xs text-red-500/80 font-medium">At Risk</span>
-                                      : <span className="text-xs text-slate-400 font-mono">{showStudentNames ? student.morrisbyId : '—'}</span>
-                                    }
+                                    <p className="text-xs text-slate-500 tabular-nums">
+                                      <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
+                                      {showStudentNames && (
+                                        <>
+                                          <span className="text-slate-300 mx-1">·</span>
+                                          <span className="text-slate-400 font-mono">{student.morrisbyId}</span>
+                                        </>
+                                      )}
+                                      {atRisk && (
+                                        <>
+                                          <span className="text-slate-300 mx-1">·</span>
+                                          <span className="text-red-500/80 font-medium">At risk</span>
+                                        </>
+                                      )}
+                                    </p>
                                   </div>
                                 </div>
                               </td>
@@ -579,17 +579,6 @@ export function NetworkOverview({
                                 </span>
                               </td>
 
-                              {/* Actions — only when role can open student journey */}
-                              {showStudentJourney && (
-                                <td className="px-6 py-4 text-right">
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
-                                    className="text-slate-400 hover:text-primary transition-colors"
-                                  >
-                                    <MoreVertical className="w-5 h-5" />
-                                  </button>
-                                </td>
-                              )}
                             </motion.tr>
                           );
                         })
@@ -644,7 +633,6 @@ export function NetworkOverview({
           </>
         )}
 
-      </main>
-    </div>
+    </main>
   );
 }
