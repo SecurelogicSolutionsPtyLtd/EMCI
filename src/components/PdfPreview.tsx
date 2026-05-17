@@ -13,7 +13,8 @@ interface PdfPreviewProps {
   morrisbyId: string;
   schoolName: string;
   counsellor: string;
-  yearLevel: number;
+  /** Display line for year / cohort (same copy as student profile / Dataverse label). */
+  yearLevelDisplay: string;
   currentStage: StageKey | null;
   stageProgress: number;
   events: TimelineEvent[];
@@ -133,7 +134,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export function PdfPreview({
   studentName, morrisbyId, schoolName, counsellor,
-  yearLevel, currentStage, stageProgress, events, onBack,
+  yearLevelDisplay, currentStage, stageProgress, events, onBack,
 }: PdfPreviewProps) {
   const generatedDate = format(new Date(), 'dd MMM yyyy');
   const currentStageOrder = currentStage ? (STAGE_ORDER[currentStage] ?? -1) : -1;
@@ -210,7 +211,7 @@ export function PdfPreview({
               <div>
                 <h2 className="text-3xl font-bold text-slate-900 leading-tight">{studentName}</h2>
                 <p className="text-base text-primary font-semibold mt-0.5">
-                  Year {yearLevel} &nbsp;·&nbsp; Student ID: {morrisbyId}
+                  {yearLevelDisplay} &nbsp;·&nbsp; Student ID: {morrisbyId}
                 </p>
                 <p className="text-slate-500 text-sm mt-0.5">{schoolName}</p>
               </div>

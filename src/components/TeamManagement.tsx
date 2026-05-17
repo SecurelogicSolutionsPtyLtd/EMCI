@@ -22,6 +22,7 @@ import {
 } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
 import { Eye, RotateCcw } from 'lucide-react';
+import { SELECT_PROGRAM_CLASS, SELECT_PROGRAM_CORE } from '../lib/selectProgramClass';
 
 interface SchoolOption {
   id:   string;
@@ -499,7 +500,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                               <select
                                 value={editingRole}
                                 onChange={e => setEditingRole(e.target.value as AppRole)}
-                                className="pl-2 pr-7 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white appearance-none"
+                                className={`${SELECT_PROGRAM_CLASS} appearance-none min-w-[9rem]`}
                               >
                                 {myAssignableRoles.map(r => (
                                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -661,7 +662,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                         <select
                           value={inviteType}
                           onChange={e => handleInviteTypeChange(e.target.value as RoleGroup)}
-                          className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition appearance-none bg-white"
+                          className={`${SELECT_PROGRAM_CORE} w-full shrink-0 pl-9 pr-8 appearance-none`}
                         >
                           <option value="acce">ACCE</option>
                           <option value="school">School</option>
@@ -678,7 +679,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                       <select
                         value={inviteRole}
                         onChange={e => setInviteRole(e.target.value as AppRole)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition appearance-none bg-white"
+                        className={`${SELECT_PROGRAM_CORE} w-full shrink-0 pl-3 pr-8 appearance-none`}
                         required
                       >
                         {(userRole === 'acce_admin' ? typeFilteredRoles : myAssignableRoles).map(r => (
@@ -698,7 +699,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                           <select
                             value={inviteSchoolId}
                             onChange={e => setInviteSchoolId(e.target.value)}
-                            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition appearance-none bg-white"
+                            className={`${SELECT_PROGRAM_CORE} w-full shrink-0 pl-9 pr-8 appearance-none`}
                             required
                           >
                             <option value="">Select a school…</option>

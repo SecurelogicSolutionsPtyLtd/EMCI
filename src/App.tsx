@@ -31,7 +31,7 @@ import {
 } from './services/dataverse';
 import { getRoleGroup, ROLE_LABELS } from './types/roles';
 import { Eye, Loader2, RotateCcw } from 'lucide-react';
-import { ProgrammeDataSkeleton } from './components/skeletons/ProgrammeDataSkeleton';
+import { ProgramDataSkeleton } from './components/skeletons/ProgramDataSkeleton';
 import { MainShell } from './routes/MainShell';
 import { OutletContextBridge } from './routes/OutletContextBridge';
 import { DashboardRoute } from './routes/DashboardRoute';
@@ -344,7 +344,7 @@ function AppInner() {
             aria-busy="true"
             aria-live="polite"
           >
-            <ProgrammeDataSkeleton />
+            <ProgramDataSkeleton />
           </div>
         )}
       </div>

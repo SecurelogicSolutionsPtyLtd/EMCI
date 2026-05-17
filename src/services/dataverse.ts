@@ -1,4 +1,5 @@
 import type { Student, StageKey } from '../data/studentsData';
+import { YEAR_LEVEL_PLUS_BUCKET } from '../data/studentsData';
 import type { School } from '../data/networkData';
 export type {
   RawInitialSurvey,
@@ -30,33 +31,33 @@ import type { SurveyField } from './surveyFields';
 const BASE_URL = '/dataverse/api/data/v9.2';
 
 // ── Option set decoders ────────────────────────────────────────────
-// cr89a_yearlevel is a Picklist. The raw option code is the only reliable source
-// for the numeric year — the FormattedValue label can be a cohort name like
-// "EMCI 2024 Students (Y9)" which cannot be safely parsed for a year number.
-//
-// Known codes observed in production data:
+// `cr89a_yearlevel` on **cr89a_wlpcstudent** (logical name; OData JSON uses lowercase
+// `cr89a_yearlevel`). Choice values from Dataverse (labels for reference):
 //   1000 → Year 9
 //   1001 → Year 10
-//   1002 → EMCI 2024 Students (Y10) → 10
-//   1003 → (Year 11, assumed)        → 11
-//   1004 → EMCI 2025 Students (Y10) → 10
-//   1005 → EMCI 2024 Students (Y9)  → 9
+//   1002 → EMCI 2024 Students (Y10)
+//   1003 → 15+
+//   1004 → EMCI 2025 Students (Y10)
+//   1005 → EMCI 2024 Students (Y9)
+//   1006 → EMCI 2025 Students (Y9)
 //
-// Any unmapped code falls back to code - 1000 as a best-effort estimate.
+// We decode to a small numeric bucket for filters (9, 10) plus YEAR_LEVEL_PLUS_BUCKET for 15+.
+// FormattedValue is stored as yearLevelLabel for display when cohort names matter.
+// Unknown / unmapped codes → 0 (avoid `code - 1000` guesses).
 const YEAR_LEVEL_CODE_MAP: Record<number, number> = {
   1000: 9,
   1001: 10,
   1002: 10,
-  1003: 11,
+  1003: YEAR_LEVEL_PLUS_BUCKET,
   1004: 10,
   1005: 9,
+  1006: 9,
 };
 
 function decodeYearLevel(val: number | null): number {
   if (val === null || val === undefined) return 0;
   if (val in YEAR_LEVEL_CODE_MAP) return YEAR_LEVEL_CODE_MAP[val];
-  if (val >= 1000 && val <= 1099) return val - 1000;
-  return val;
+  return 0;
 }
 
 function decodeStatus(statecode: number, statuscode: number): 'Active' | 'Inactive' | 'Pending' {
@@ -94,6 +95,7 @@ interface RawStudent {
   cr89a_studentname: string | null;
   emailaddress: string | null;
   cr89a_yearlevel: number | null;
+  /** OData annotation — cohort label from Dataverse (e.g. "Year 9", "15+", "EMCI 2025 Students (Y9)"). */
   'cr89a_yearlevel@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_registrationcode: string | null;
   _cr89a_wlpcschool_value: string | null;

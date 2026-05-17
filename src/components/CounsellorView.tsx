@@ -5,7 +5,7 @@ import {
   CheckCircle2, BookOpen, BarChart2, UserCheck, Building2,
   Star, Circle, ChevronDown, Search, X
 } from 'lucide-react';
-import type { Student } from '../data/studentsData';
+import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
 
 interface CounsellorViewProps {
@@ -410,7 +410,7 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-semibold text-slate-800">{student.firstName} {student.lastName}</div>
-                            <div className="text-xs text-slate-400">{school?.name ?? '—'} · Year {student.yearLevel || '—'} · {student.morrisbyId}</div>
+                            <div className="text-xs text-slate-400">{school?.name ?? '—'} · {formatYearLevelLine(student)} · {student.morrisbyId}</div>
                           </div>
                           {student.currentStage && stageCols ? (
                             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${stageCols.bg} ${stageCols.text} ${stageCols.border}`}>

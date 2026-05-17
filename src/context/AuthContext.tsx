@@ -89,8 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut();
   }, []);
 
-  const resolve = useCallback(async () => {
-    setStage('loading');
+  const resolve = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setStage('loading');
+    }
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
@@ -140,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     resolve();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         setAuthUser(null);
         setActualRole(null);
@@ -148,7 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearImpersonation();
         setStage('unauthenticated');
       } else {
-        resolve();
+        // Tab refocus often triggers TOKEN_REFRESHED — avoid flashing the full loading screen.
+        resolve({ silent: event === 'TOKEN_REFRESHED' });
       }
     });
 

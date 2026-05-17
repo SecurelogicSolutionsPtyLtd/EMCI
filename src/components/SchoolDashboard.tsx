@@ -2,19 +2,19 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
-  Search, Users, CheckCircle2, Clock, Award,
-  ChevronRight, ArrowLeft,
-  MoreVertical, AlertTriangle,
+  Search, MoreVertical, AlertTriangle,
   BookOpen,
 } from 'lucide-react';
-import type { Student } from '../data/studentsData';
+import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
+import { MetricCardGrid } from './MetricCardGrid';
+import { buildSchoolMetricCards } from '../lib/metricCards';
+import { SELECT_PROGRAM_CLASS } from '../lib/selectProgramClass';
 
 interface SchoolDashboardProps {
   students: Student[];
   school: School | null;
   onSelectStudent?: (student: Student) => void;
-  onBack: () => void;
 }
 
 const PAGE_SIZE = 10;
@@ -53,7 +53,7 @@ function getProgressBarColor(student: Student) {
   return 'bg-primary';
 }
 
-export function SchoolDashboard({ students, school, onSelectStudent, onBack }: SchoolDashboardProps) {
+export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDashboardProps) {
   const [search, setSearch]                     = useState('');
   const [filterStage, setFilterStage]           = useState<string>('all');
   const [filterCounsellor, setFilterCounsellor] = useState<string>('all');
@@ -99,102 +99,30 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
   const showingFrom = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const showingTo   = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
+  const metricCards = buildSchoolMetricCards(total, active, inProgress, completed);
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-slate-50">
-
-      {/* ── Scrollable content ──────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <main className="max-w-[1280px] mx-auto w-full px-6 py-6 flex flex-col gap-6">
-
-          {/* ── Breadcrumb + Heading ─────────────────────────────── */}
-          <div className="flex flex-col gap-4">
-            <nav className="flex items-center gap-1.5 text-sm font-medium text-slate-500">
-              <button onClick={onBack} className="hover:text-primary transition-colors">Dashboard</button>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-900">{school?.name ?? 'School'}</span>
-            </nav>
-
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-black text-slate-900 leading-tight tracking-tight">{school?.name ?? 'School'}</h1>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${SCHOOL_STATUS_BADGE[school?.status ?? 'Active']}`}>
-                    {school?.status ?? 'Active'}
-                  </span>
-                </div>
-                <p className="text-slate-500 text-base">
-                  Morrisby ID: <span className="text-slate-900 font-medium tracking-wide">{school?.morrisbyId ?? '—'}</span>
-                </p>
-              </div>
-              <button
-                onClick={onBack}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-300 transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to dashboard
-              </button>
-            </div>
+    <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50">
+      <header className="shrink-0 bg-white border-b border-slate-200 flex items-center px-8 py-3 gap-4">
+        <div className="flex flex-col min-w-0 gap-0.5 flex-1">
+          <div className="flex items-center gap-3 min-w-0">
+            <h2 className="text-xl font-bold text-slate-900 truncate">{school?.name ?? 'School'}</h2>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${SCHOOL_STATUS_BADGE[school?.status ?? 'Active']}`}>
+              {school?.status ?? 'Active'}
+            </span>
           </div>
+          <p className="text-sm text-slate-500 truncate">
+            Morrisby ID:{' '}
+            <span className="text-slate-800 font-medium font-mono tracking-wide">{school?.morrisbyId ?? '—'}</span>
+          </p>
+        </div>
+      </header>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="w-full px-8 py-6 flex flex-col gap-6">
 
           {/* ── KPI Cards ────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              {
-                label: 'Total Students',
-                value: total,
-                icon: Users,
-                iconColor: 'text-primary/60',
-                barColor: 'bg-primary',
-                barPct: 100,
-              },
-              {
-                label: 'Active',
-                value: active,
-                icon: CheckCircle2,
-                iconColor: 'text-emerald-500/60',
-                barColor: 'bg-emerald-500',
-                barPct: total > 0 ? Math.round((active / total) * 100) : 0,
-              },
-              {
-                label: 'In Progress',
-                value: inProgress,
-                icon: Clock,
-                iconColor: 'text-blue-500/60',
-                barColor: 'bg-blue-500',
-                barPct: total > 0 ? Math.round((inProgress / total) * 100) : 0,
-              },
-              {
-                label: 'Completed',
-                value: completed,
-                icon: Award,
-                iconColor: 'text-amber-500/60',
-                barColor: 'bg-amber-500',
-                barPct: total > 0 ? Math.round((completed / total) * 100) : 0,
-              },
-            ].map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: i * 0.05 }}
-                className="flex flex-col gap-2 rounded-xl p-5 bg-white border border-slate-200 shadow-sm"
-              >
-                <div className="flex justify-between items-start">
-                  <p className="text-slate-500 text-sm font-medium">{stat.label}</p>
-                  <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
-                </div>
-                <p className="text-slate-900 text-3xl font-bold tracking-tight">{stat.value.toLocaleString()}</p>
-                <div className="h-1 w-full bg-slate-100 rounded-full mt-1">
-                  <motion.div
-                    className={`h-full ${stat.barColor} rounded-full`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${stat.barPct}%` }}
-                    transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
-                  />
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <MetricCardGrid cards={metricCards} />
 
           {/* ── Student Table Card ───────────────────────────────── */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -216,7 +144,7 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
                 <select
                   value={filterStage}
                   onChange={e => handleFilterStage(e.target.value)}
-                  className="text-sm rounded-lg bg-slate-50 border border-slate-200 py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-slate-700 cursor-pointer"
+                  className={`${SELECT_PROGRAM_CLASS} min-w-[10.5rem]`}
                 >
                   <option value="all">All Stages</option>
                   <option value="referral">Initial Intake</option>
@@ -228,18 +156,18 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
                 <select
                   value={filterYear}
                   onChange={e => handleFilterYear(e.target.value)}
-                  className="text-sm rounded-lg bg-slate-50 border border-slate-200 py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-slate-700 cursor-pointer"
+                  className={`${SELECT_PROGRAM_CLASS} min-w-[9.5rem]`}
                 >
                   <option value="all">Year Level</option>
                   {yearLevels.map(y => (
-                    <option key={y} value={String(y)}>Year {y}</option>
+                    <option key={y} value={String(y)}>{y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`}</option>
                   ))}
                 </select>
 
                 <select
                   value={filterCounsellor}
                   onChange={e => handleFilterCounsellor(e.target.value)}
-                  className="text-sm rounded-lg bg-slate-50 border border-slate-200 py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-slate-700 cursor-pointer"
+                  className={`${SELECT_PROGRAM_CLASS} min-w-[11rem]`}
                 >
                   <option value="all">All Counsellors</option>
                   {counsellors.map(c => (
@@ -317,7 +245,9 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
                           </td>
 
                           {/* Year */}
-                          <td className="px-4 py-4 text-sm text-slate-700">{student.yearLevel}</td>
+                          <td className="px-4 py-4 text-sm text-slate-700 max-w-[10rem] truncate" title={formatYearLevelLine(student)}>
+                            {formatYearLevelLine(student)}
+                          </td>
 
                           {/* Counsellor */}
                           <td className="px-6 py-4 text-sm text-slate-700">{student.counsellor ?? '—'}</td>
@@ -417,8 +347,8 @@ export function SchoolDashboard({ students, school, onSelectStudent, onBack }: S
             Last synced: {format(new Date(), 'dd MMM yyyy, h:mm aa')}
           </p>
 
-        </main>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

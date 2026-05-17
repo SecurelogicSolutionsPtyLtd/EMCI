@@ -6,12 +6,13 @@ import {
   AlertTriangle, BookOpen, EyeOff,
 } from 'lucide-react';
 import type { School } from '../data/networkData';
-import type { Student } from '../data/studentsData';
+import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
 import type { AppRole } from '../types/roles';
 import { canAccessPage, canSeeStudentNames } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
 import type { NetworkMainTab } from './layout/MainSidebar';
-import { buildProgrammeKpiCards, getProgrammeVisibleScope } from '../lib/networkProgrammeMetrics';
+import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
+import { SELECT_PROGRAM_CLASS } from '../lib/selectProgramClass';
 
 interface NetworkOverviewProps {
   students: Student[];
@@ -73,7 +74,7 @@ export function NetworkOverview({
   const showStudentJourney = canAccessPage(userRole, 'student');
   const canOpenSchoolDashboard = canAccessPage(userRole, 'school');
 
-  const { visibleSchools, visibleStudents } = getProgrammeVisibleScope(
+  const { visibleSchools, visibleStudents } = getProgramVisibleScope(
     students,
     schools,
     userRole,
@@ -81,9 +82,8 @@ export function NetworkOverview({
   );
 
   // ── schools view state ────────────────────────────────────────
-  const [search,       setSearch]       = useState('');
-  const [regionFilter, setRegionFilter] = useState('all');
-  const [page,         setPage]         = useState(1);
+  const [search, setSearch] = useState('');
+  const [page,   setPage]   = useState(1);
 
   // ── student roster state ──────────────────────────────────────
   const [rosterSearch, setRosterSearch]     = useState('');
@@ -104,7 +104,7 @@ export function NetworkOverview({
   const rosterYearOptions = useMemo(
     () =>
       Array.from(new Set(visibleStudents.map(s => s.yearLevel)))
-        .filter((y): y is number => y != null && !Number.isNaN(y))
+        .filter((y): y is number => y != null && !Number.isNaN(y) && y > 0)
         .sort((a, b) => a - b),
     [visibleStudents],
   );
@@ -125,14 +125,11 @@ export function NetworkOverview({
     return (['Active', 'Pending', 'Inactive'] as const).filter(st => present.has(st));
   }, [visibleStudents]);
 
-  const regions = ['all', ...Array.from(new Set(visibleSchools.map(s => s.region))).sort()];
-
   // ── schools filter ────────────────────────────────────────────
   const filteredSchools = visibleSchools.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
                         s.morrisbyId.toLowerCase().includes(search.toLowerCase());
-    const matchRegion = regionFilter === 'all' || s.region === regionFilter;
-    return matchSearch && matchRegion;
+    return matchSearch;
   });
 
   const totalSchoolPages = Math.max(1, Math.ceil(filteredSchools.length / PAGE_SIZE));
@@ -140,7 +137,6 @@ export function NetworkOverview({
   const pageSlice        = filteredSchools.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
-  const handleRegion = (v: string) => { setRegionFilter(prev => prev === v ? 'all' : v); setPage(1); };
 
   // ── student roster filter ─────────────────────────────────────
   const filteredRoster = visibleStudents.filter(s => {
@@ -177,7 +173,7 @@ export function NetworkOverview({
     rosterPageNumbers.push(i);
   }
 
-  const KPIS = buildProgrammeKpiCards(visibleSchools, visibleStudents);
+  const KPIS = buildProgramKpiCards(visibleSchools, visibleStudents);
 
   // ── nav items (role-filtered) ─────────────────────────────────
   // DE roles never see the per-student roster — aggregated views only.
@@ -196,36 +192,8 @@ export function NetworkOverview({
         {effectiveView === 'schools' && (
           <>
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-              <div className="flex items-center gap-6 flex-1">
-                <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Schools</h2>
-                <div className="relative max-w-md w-full">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search schools or IDs..."
-                    value={search}
-                    onChange={e => handleSearch(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 placeholder:text-slate-400 text-slate-700"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {/* Region pills */}
-                <div className="flex items-center bg-slate-100 rounded-lg p-1 gap-0.5">
-                  {regions.filter(r => r !== 'all').map(r => (
-                    <button
-                      key={r}
-                      onClick={() => handleRegion(r)}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all
-                        ${regionFilter === r ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shrink-0">
+              <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Schools</h2>
             </header>
 
             {/* Scrollable content */}
@@ -253,6 +221,20 @@ export function NetworkOverview({
 
               {/* Schools table */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-200">
+                  <div className="relative w-full max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search schools by name or Morrisby ID…"
+                      value={search}
+                      onChange={e => handleSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
+                    />
+                  </div>
+
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -310,7 +292,7 @@ export function NetworkOverview({
                                 </div>
                               </td>
                               <td className="px-6 py-5">
-                                <span className="text-sm font-semibold text-slate-900">{stats.total.toLocaleString()}</span>
+                                <span className="text-sm font-semibold text-slate-900">{stats.total.toLocaleString('en-AU')}</span>
                               </td>
                             </motion.tr>
                           );
@@ -355,39 +337,80 @@ export function NetworkOverview({
         {effectiveView === 'students' && (
           <>
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-              <div className="flex items-center gap-6 flex-1">
-                <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Students</h2>
-
-                {/* Search */}
-                <div className="relative max-w-xs w-full">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, ID or counsellor..."
-                    value={rosterSearch}
-                    onChange={e => handleRosterSearch(e.target.value)}
-                    className="w-full bg-slate-100 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 placeholder:text-slate-400 text-slate-700"
-                  />
-                </div>
-
-                {/* School dropdown */}
-                <select
-                  value={rosterSchool}
-                  onChange={e => handleRosterSchool(e.target.value)}
-                  className="text-sm rounded-lg bg-slate-100 border-none py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-primary/40 text-slate-700 cursor-pointer min-w-[180px]"
-                >
-                  <option value="all">All Schools</option>
-                  {visibleSchools.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shrink-0">
+              <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Students</h2>
             </header>
 
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto p-8">
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+
+                {/* Toolbar */}
+                <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-4 items-center">
+                  <div className="relative w-full lg:w-96 shrink-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search students by name, ID or counsellor..."
+                      value={rosterSearch}
+                      onChange={e => handleRosterSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full lg:flex-1 lg:min-w-0">
+                    <select
+                      value={rosterCounsellor}
+                      onChange={e => handleRosterCounsellor(e.target.value)}
+                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
+                    >
+                      <option value="all">All Counsellors</option>
+                      {rosterCounsellorOptions.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={rosterStage}
+                      onChange={e => handleRosterStage(e.target.value)}
+                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
+                    >
+                      <option value="all">All Stages</option>
+                      {rosterStageFilterKeys.map(k => (
+                        <option key={k} value={k}>{rosterStageFilterLabel(k)}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={rosterYear}
+                      onChange={e => handleRosterYear(e.target.value)}
+                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
+                    >
+                      <option value="all">Year Level</option>
+                      {rosterYearOptions.map(y => (
+                        <option key={y} value={String(y)}>{y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={rosterStatus}
+                      onChange={e => handleRosterStatus(e.target.value)}
+                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
+                    >
+                      <option value="all">All Statuses</option>
+                      {rosterStatusOptions.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={rosterSchool}
+                      onChange={e => handleRosterSchool(e.target.value)}
+                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0 col-span-2 sm:col-span-1`}
+                    >
+                      <option value="all">All Schools</option>
+                      {visibleSchools.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
                 {/* Selected school info strip */}
                 {rosterSchool !== 'all' && (() => {
@@ -401,61 +424,6 @@ export function NetworkOverview({
                     </div>
                   ) : null;
                 })()}
-
-                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-end gap-x-2 gap-y-1.5">
-                  <label className="flex flex-col gap-0.5 shrink-0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Counsellor</span>
-                    <select
-                      value={rosterCounsellor}
-                      onChange={e => handleRosterCounsellor(e.target.value)}
-                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 min-w-[7.25rem] max-w-[11rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
-                    >
-                      <option value="all">All</option>
-                      {rosterCounsellorOptions.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-0.5 shrink-0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Current stage</span>
-                    <select
-                      value={rosterStage}
-                      onChange={e => handleRosterStage(e.target.value)}
-                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 min-w-[7.25rem] max-w-[10.5rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
-                    >
-                      <option value="all">All</option>
-                      {rosterStageFilterKeys.map(k => (
-                        <option key={k} value={k}>{rosterStageFilterLabel(k)}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-0.5 shrink-0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Year level</span>
-                    <select
-                      value={rosterYear}
-                      onChange={e => handleRosterYear(e.target.value)}
-                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 w-[4.5rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
-                    >
-                      <option value="all">All</option>
-                      {rosterYearOptions.map(y => (
-                        <option key={y} value={String(y)}>{y}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-0.5 shrink-0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">Status</span>
-                    <select
-                      value={rosterStatus}
-                      onChange={e => handleRosterStatus(e.target.value)}
-                      className="text-xs h-7 rounded-md border border-slate-200 bg-white pl-2 pr-7 min-w-[5.5rem] focus:outline-none focus:ring-1 focus:ring-primary/40 text-slate-800"
-                    >
-                      <option value="all">All</option>
-                      {rosterStatusOptions.map(st => (
-                        <option key={st} value={st}>{st}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
 
                 {/* Table */}
                 <div className="overflow-x-auto">
@@ -538,7 +506,9 @@ export function NetworkOverview({
 
                               {/* Year — student-level identifier; hidden for DE */}
                               {showStudentNames && (
-                                <td className="px-4 py-4 text-sm text-slate-700">{student.yearLevel}</td>
+                                <td className="px-4 py-4 text-sm text-slate-700 max-w-[10rem] truncate" title={formatYearLevelLine(student)}>
+                                  {formatYearLevelLine(student)}
+                                </td>
                               )}
 
                               {/* School */}

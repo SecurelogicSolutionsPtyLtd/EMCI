@@ -404,7 +404,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
               </div>
               <div>
                 <p className="text-base font-black tracking-tight text-slate-900 leading-none">EMCI</p>
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold leading-none mt-0.5">Platform</p>
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold leading-tight mt-0.5">Student Management Platform</p>
               </div>
             </div>
             {children}
@@ -412,7 +412,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
         </motion.div>
       </div>
       <div className="shrink-0 text-center py-4 text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
-        EMCI Platform · SecureLogic Solutions · {new Date().getFullYear()}
+        EMCI Student Management Platform · SecureLogic Solutions · {new Date().getFullYear()}
       </div>
     </div>
   );

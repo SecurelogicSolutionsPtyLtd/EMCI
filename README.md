@@ -1,12 +1,12 @@
 # EMCI — Student Intelligence Interface
 
-A purpose-built dashboard for EMCI counsellors and program administrators to track, manage, and report on student career guidance journeys across a network of schools.
+A purpose-built dashboard for EMCI counsellors and programme administrators to track, manage, and report on student career guidance journeys across a network of schools.
 
 ---
 
 ## What Is EMCI?
 
-EMCI (Early and Meaningful Career Intelligence) is a program that guides secondary school students (Year 9–10) through a structured career readiness journey. The program operates across multiple schools and is delivered by assigned EMCI counsellors.
+EMCI (Early and Meaningful Career Intelligence) is a programme that guides secondary school students (Year 9–10) through a structured career readiness journey. The programme operates across multiple schools and is delivered by assigned EMCI counsellors.
 
 This interface gives counsellors and administrators a single place to:
 
@@ -138,14 +138,14 @@ src/
 │   └── shellContext.ts
 ├── lib/
 │   ├── recordIdParam.ts            # URL id segment validation (GUID + safe fixture ids)
-│   └── networkProgrammeMetrics.ts  # Shared KPI scope for dashboard + NetworkOverview
+│   └── networkProgramMetrics.ts  # Shared KPI scope for dashboard + NetworkOverview
 ├── components/
 │   ├── layout/
 │   │   └── MainSidebar.tsx    # Shared nav + sign out for dashboard + school views
 │   ├── DashboardHome.tsx      # /dashboard programme landing (KPIs + shortcuts)
 │   ├── NetworkOverview.tsx    # /schools and /students main column (two modes)
 │   ├── skeletons/
-│   │   └── ProgrammeDataSkeleton.tsx  # Shown while programme data loads or refreshes
+│   │   └── ProgramDataSkeleton.tsx  # Shown while programme data loads or refreshes
 │   ├── CounsellorView.tsx     # Counsellor analytics page
 │   ├── SchoolDashboard.tsx    # School-level student list
 │   ├── ProfileSnapshot.tsx    # Left-hand student profile panel

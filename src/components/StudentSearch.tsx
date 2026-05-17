@@ -5,7 +5,7 @@ import {
   CheckCircle2, Circle, AlertCircle, Shield, Star, UserCheck,
   Building2, BookOpen, Filter, SlidersHorizontal, RotateCcw,
 } from 'lucide-react';
-import type { Student } from '../data/studentsData';
+import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
 
 interface StudentSearchProps {
@@ -111,8 +111,10 @@ function StudentRow({
         </div>
 
         {/* Year */}
-        <div className="w-14 shrink-0 text-center">
-          <span className="text-xs font-semibold text-slate-600">Yr {student.yearLevel}</span>
+        <div className="w-16 shrink-0 text-center min-w-0">
+          <span className="text-[10px] font-semibold text-slate-600 truncate block" title={formatYearLevelLine(student)}>
+            {formatYearLevelLine(student)}
+          </span>
         </div>
 
         {/* School */}
@@ -204,13 +206,15 @@ function StudentRow({
 // ── Filter dropdown ────────────────────────────────────────────────────────
 
 function FilterDropdown({
-  label, options, value, onChange, icon: Icon,
+  label, options, value, onChange, icon: Icon, formatOption,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (v: string) => void;
   icon: React.ElementType;
+  /** Optional display transform (filter value stays `options` entry). */
+  formatOption?: (opt: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -240,7 +244,7 @@ function FilterDropdown({
         }`}
       >
         <Icon className="w-3 h-3 shrink-0" />
-        <span className="max-w-[100px] truncate">{isActive ? value : label}</span>
+        <span className="max-w-[100px] truncate">{isActive ? (formatOption ? formatOption(value) : value) : label}</span>
         <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -287,7 +291,7 @@ function FilterDropdown({
                       value === opt ? 'font-bold text-violet-600 bg-violet-50' : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {opt}
+                    {formatOption ? formatOption(opt) : opt}
                   </button>
                 ))
               )}
@@ -316,7 +320,13 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
   const [showFilters, setShowFilters]   = useState(true);
 
   // Unique filter options
-  const yearOptions      = useMemo(() => Array.from(new Set(students.map(s => String(s.yearLevel)))).sort(), [students]);
+  const yearOptions      = useMemo(
+    () =>
+      Array.from(new Set(students.map(s => String(s.yearLevel)).filter(Boolean))).sort(
+        (a, b) => Number(a) - Number(b),
+      ),
+    [students],
+  );
   const statusOptions    = useMemo(() => Array.from(new Set(students.map(s => s.status))).sort(), [students]);
   const stageOptions     = useMemo(() => ['Not started', ...Array.from(new Set(students.filter(s => s.currentStage).map(s => STAGE_LABELS[s.currentStage!]))).sort()], [students]);
   const riskOptions      = useMemo(() => Array.from(new Set(students.map(s => s.riskLevel))).sort(), [students]);
@@ -448,7 +458,16 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
               className="overflow-hidden"
             >
               <div className="flex flex-wrap gap-2 pt-1">
-                <FilterDropdown label="Year Level"  options={yearOptions}       value={yearFilter}       onChange={setYearFilter}       icon={BookOpen}   />
+                <FilterDropdown
+                  label="Year Level"
+                  options={yearOptions}
+                  value={yearFilter}
+                  onChange={setYearFilter}
+                  icon={BookOpen}
+                  formatOption={v =>
+                    v === String(YEAR_LEVEL_PLUS_BUCKET) ? '15+' : `Year ${v}`
+                  }
+                />
                 <FilterDropdown label="Status"      options={statusOptions}     value={statusFilter}     onChange={setStatusFilter}     icon={AlertCircle}/>
                 <FilterDropdown label="Stage"       options={stageOptions}      value={stageFilter}      onChange={setStageFilter}      icon={Shield}     />
                 <FilterDropdown label="Risk Level"  options={riskOptions}       value={riskFilter}       onChange={setRiskFilter}       icon={AlertCircle}/>

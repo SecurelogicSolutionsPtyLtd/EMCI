@@ -281,9 +281,9 @@ records.filter(r => r._regardingobjectid_value === student.id)
 | `cr89a_elementsofemcisupportingstudentsother` | Memo | Elements — other | |
 | `cr89a_likelytousemorrisbyprofileagain` | Picklist | Likely to use Morrisby profile again | |
 | `cr89a_likelytousemorrisbyprofileagainname` | Annotation | — | Formatted label |
-| `cr89a_programimpactonstudentattendanceengagement` | Picklist | Feelings about future school plans | |
-| `cr89a_programimpactonstudentattendanceengagementname` | Annotation | — | Formatted label |
-| `cr89a_suggestionstohelpimproveourprogramin2025` | Memo | Suggestions to improve programme | Timeline notes |
+| `cr89a_programmeimpactonstudentattendanceengagement` | Picklist | Feelings about future school plans | |
+| `cr89a_programmeimpactonstudentattendanceengagementname` | Annotation | — | Formatted label |
+| `cr89a_suggestionstohelpimproveourprogrammein2025` | Memo | Suggestions to improve programme | Timeline notes |
 
 ---
 
@@ -302,9 +302,9 @@ records.filter(r => r._regardingobjectid_value === student.id)
 | `cr89a_iscurrentmethodofstudentcontactworking` | Picklist | Is current contact method working? |
 | `cr89a_iscurrentmethodofstudentcontactworkingname` | Annotation | Formatted label |
 | `cr89a_iscurrentmethodofstudentcontactworkingno` | Memo | If no — details |
-| `cr89a_programimpactonstudentattendanceatschool` | Picklist | Programme impact on attendance |
-| `cr89a_programimpactonstudentattendanceatschoolname` | Annotation | Formatted label |
-| `cr89a_suggestionstoimproveprogram2025` | Memo | Suggestions to improve programme |
+| `cr89a_programmeimpactonstudentattendanceatschool` | Picklist | Programme impact on attendance |
+| `cr89a_programmeimpactonstudentattendanceatschoolname` | Annotation | Formatted label |
+| `cr89a_suggestionstoimproveprogramme2025` | Memo | Suggestions to improve programme |
 
 ---
 
@@ -317,8 +317,8 @@ records.filter(r => r._regardingobjectid_value === student.id)
 
 | Field | Type | Display Label | App Usage |
 |---|---|---|---|
-| `cr89a_rateoverallexperienceinprogram` | Picklist | Rate overall experience | Timeline description (use `@FormattedValue`) |
-| `cr89a_rateoverallexperienceinprogramexplanation` | Memo | Explanation | Timeline notes |
+| `cr89a_rateoverallexperienceinprogramme` | Picklist | Rate overall experience | Timeline description (use `@FormattedValue`) |
+| `cr89a_rateoverallexperienceinprogrammeexplanation` | Memo | Explanation | Timeline notes |
 | `cr89a_activityorsessionenjoyedthemost` | Picklist | Activity enjoyed most | |
 | `cr89a_activityorsessionenjoyedthemostname` | Annotation | Formatted label | |
 | `cr89a_activityorsessionwhatdidyouenjoyaboutit` | Memo | What did you enjoy about it | Fallback notes |

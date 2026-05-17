@@ -5,7 +5,7 @@ import {
   CheckCircle2, Clock, AlertCircle, X, ChevronDown, ChevronUp,
   FileSearch, Info,
 } from 'lucide-react';
-import type { Student } from '../data/studentsData';
+import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
 
 interface SurveySearchProps {
@@ -170,7 +170,9 @@ export function SurveySearch({ students, studentEventsMap, onBack }: SurveySearc
       `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
       s.preferredName?.toLowerCase().includes(q) ||
       s.morrisbyId?.toLowerCase().includes(q) ||
-      String(s.yearLevel).includes(q),
+      String(s.yearLevel).includes(q) ||
+      (s.yearLevelLabel?.toLowerCase().includes(q) ?? false) ||
+      formatYearLevelLine(s).toLowerCase().includes(q),
     );
   }, [students, search]);
 
@@ -281,7 +283,7 @@ export function SurveySearch({ students, studentEventsMap, onBack }: SurveySearc
                           <span className="font-normal text-slate-400"> ({s.preferredName})</span>
                         )}
                       </p>
-                      <p className="text-[10px] text-slate-400">Year {s.yearLevel}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{formatYearLevelLine(s)}</p>
                     </div>
                     {surveyCount > 0 && (
                       <span className={`shrink-0 text-[10px] font-bold rounded-full px-1.5 py-0.5 ${
@@ -330,7 +332,9 @@ export function SurveySearch({ students, studentEventsMap, onBack }: SurveySearc
                       )}
                     </p>
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-slate-500">Year {selectedStudent.yearLevel}</span>
+                      <span className="text-[11px] text-slate-500 truncate max-w-[14rem]" title={formatYearLevelLine(selectedStudent)}>
+                        {formatYearLevelLine(selectedStudent)}
+                      </span>
                       <span className="text-[11px] text-slate-400">·</span>
                       <span className="text-[11px] text-slate-500">{selectedStudent.counsellor}</span>
                       <span className="text-[11px] text-slate-400">·</span>

@@ -4,7 +4,7 @@ import { Building2, LayoutDashboard, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { canSeeStudentNames } from '../types/roles';
 import type { AppShellOutletContext } from '../routes/shellContext';
-import { buildProgrammeKpiCards, getProgrammeVisibleScope } from '../lib/networkProgrammeMetrics';
+import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
 
 export function DashboardHome() {
   const navigate = useNavigate();
@@ -12,13 +12,13 @@ export function DashboardHome() {
   const { schoolId } = useAuth();
   const showStudentRoster = canSeeStudentNames(userRole);
 
-  const { visibleSchools, visibleStudents } = getProgrammeVisibleScope(
+  const { visibleSchools, visibleStudents } = getProgramVisibleScope(
     students,
     schools,
     userRole,
     schoolId,
   );
-  const kpis = buildProgrammeKpiCards(visibleSchools, visibleStudents);
+  const kpis = buildProgramKpiCards(visibleSchools, visibleStudents);
 
   return (
     <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-slate-50">

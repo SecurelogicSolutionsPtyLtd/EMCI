@@ -1,7 +1,7 @@
 import React from 'react';
 
 /** Full-view placeholder while programme data (students / schools / events) is loading or refreshing. */
-export function ProgrammeDataSkeleton() {
+export function ProgramDataSkeleton() {
   return (
     <div className="flex flex-col h-full min-h-0 w-full bg-slate-50" role="status" aria-label="Loading programme data">
       <div className="shrink-0 h-16 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center gap-4">

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { PdfPreview } from '../components/PdfPreview';
+import { formatYearLevelLine } from '../data/studentsData';
 import { useAuth } from '../context/AuthContext';
 import { canAccessPage, getRoleGroup } from '../types/roles';
 import type { AppShellOutletContext } from './shellContext';
@@ -54,7 +55,7 @@ export function PdfRoute() {
         morrisbyId={selectedStudent?.morrisbyId ?? '—'}
         schoolName={studentSchoolName ?? selectedSchool?.name ?? '—'}
         counsellor={selectedStudent?.counsellor ?? '—'}
-        yearLevel={selectedStudent?.yearLevel ?? 0}
+        yearLevelDisplay={selectedStudent ? formatYearLevelLine(selectedStudent) : '—'}
         currentStage={selectedStudent?.currentStage ?? null}
         stageProgress={selectedStudent?.stageProgress ?? 0}
         events={selectedStudent ? (studentEventsMap[selectedStudent.id] ?? []) : []}

@@ -7,24 +7,80 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-05-07 (latest)
 
-### Changed: Programme loading UX
+### Changed: App title
+
+- Browser tab, Open Graph title, sidebar tagline, and login branding use **EMCI Student Management Platform** (replacing **Student Intelligence Interface** / split **Platform** label).
+
+### Changed: Australian English (programme)
+
+- User-facing copy and docs use **programme** / **Programme** for EMCI and school context; existing **counsellor**, **enrolment**, and **organisation** forms retained. Internal module names (`networkProgramMetrics`, `SELECT_PROGRAM_CLASS`, `ProgramDataSkeleton`) unchanged.
+
+### Changed: Schools list — region filter removed
+
+- **Schools** (`/schools`): removed **Region** filter pills from the table toolbar; region is not implemented in Dataverse yet. Search by name or Morrisby ID is unchanged.
+
+### Changed: Students list and student journey UI
+
+- **Students** (`/students`): filter dropdowns (counsellor, stage, year level, status, school) use a shared **grid** on large screens so **All Schools** stays aligned with the other filters instead of wrapping alone on a second row.
+- **Student journey** (`/student/:id`): removed the top **metric tile** row (Progress, Absences, Guidance Sessions, Current Stage); profile sidebar and timeline are unchanged.
+
+### Changed: Students list (`/students`) table toolbar
+
+- **Search** and **filters** (counsellor, stage, year level, status, school) moved from the page header into the **white table card** toolbar — same pattern as [`SchoolDashboard`](src/components/SchoolDashboard.tsx) and the schools list.
+- Page header is **Students** title only.
+
+### Changed: Schools list (`/schools`) table toolbar
+
+- **Search** and **region** filters moved from the page header into the **white table card** toolbar (same pattern as [`SchoolDashboard`](src/components/SchoolDashboard.tsx): search left, region pills right).
+- Page header is **Schools** title only; KPI strip unchanged above the table.
+
+### Changed: en-AU locale for displayed numbers
+
+- KPI counts and similar `toLocaleString()` output use **`en-AU`** in [`networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`SchoolDashboard.tsx`](src/components/SchoolDashboard.tsx), and [`DataverseLab.tsx`](src/components/DataverseLab.tsx).
+
+### Changed: US spelling — program; shared code symbols renamed
+
+- User-facing copy and docs use **program** / **Program** consistently (replacing **programme** / **Programme**) across the app, [`README.md`](README.md), [`ROLES_AND_ACCESS.md`](ROLES_AND_ACCESS.md), [`DATAVERSE_CONNECTION_REFERENCE.md`](DATAVERSE_CONNECTION_REFERENCE.md) prose, and [`index.html`](index.html) meta tags (exact Dataverse attribute logical names in tables are unchanged where they differ).
+- Renamed modules: [`selectProgramClass.ts`](src/lib/selectProgramClass.ts) (`SELECT_PROGRAM_CLASS`, `SELECT_PROGRAM_CORE`), [`networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts) (`getProgramVisibleScope`, `buildProgramKpiCards`, `ProgramKpiCard`), [`ProgramDataSkeleton.tsx`](src/components/skeletons/ProgramDataSkeleton.tsx).
+
+### Changed: Schools list (`/schools`) header
+
+- **Region** filter pills moved from the top-right of the header to a row **below** the header (above the KPI strip), so the bar is **Schools** + search only.
+
+### Changed: School cohort page (`/school/:id`)
+
+- [`SchoolDashboard`](src/components/SchoolDashboard.tsx) uses the same **white bordered header** pattern as program list views: **school name**, **Morrisby ID**, and status; removed breadcrumb and **Back to dashboard**. [`SchoolRoute`](src/routes/SchoolRoute.tsx) no longer passes **`onBack`**.
+
+### Changed: MainSidebar
+
+- Nav buttons (**Dashboard**, **Schools**, **Students**, **Counsellors**, **Dataverse Lab**, **Team Management**) and **Sign out** include **`cursor-pointer`**.
+
+### Changed: Program loading UX
 
 - **Connecting to EMCI Student Management Platform…** (with spinner) is shown **only** while the Dataverse **token** is fetched immediately after sign-in (`stage === 'ready'`), not while schools/students/events are loading.
-- Programme **data load and refresh** use a full-view **[`ProgrammeDataSkeleton`](src/components/skeletons/ProgrammeDataSkeleton.tsx)** overlay (responsive pulse placeholders) instead of that copy.
+- Program **data load and refresh** use a full-view **[`ProgramDataSkeleton`](src/components/skeletons/ProgramDataSkeleton.tsx)** overlay (responsive pulse placeholders) instead of that copy.
 
-### Changed: Students programme list (`/students`)
+### Changed: Students program list (`/students`)
 
 - **Student Roster** page heading renamed to **Students** in [`NetworkOverview`](src/components/NetworkOverview.tsx).
 - Removed the **Actions** column from the students table; roles that can open the student journey still do so by **clicking the row**.
 - Added compact roster **filters** (counsellor, current stage, year level, status) above the students table, combined with search and school scope.
+- **Students** page: roster filters sit in the **same header band** as the school scope control (right-aligned cluster on large screens) so they line up with **All Schools**.
 
-### Changed: Programme network headers
+### Fixed: Dataverse `cr89a_yearlevel` (EMCI Students)
+
+- Picklist codes aligned with Dataverse choices: **1000–1006** mapped in **[`dataverse.ts`](src/services/dataverse.ts)** (including **1006** EMCI 2025 Y9 and **1003** **15+** via internal bucket **`YEAR_LEVEL_PLUS_BUCKET`** in [`studentsData.ts`](src/data/studentsData.ts)); removed incorrect **1003 → Year 11** and the **`code - 1000`** fallback that could mis-decode unknown options.
+- **[`formatYearLevelLine`](src/data/studentsData.ts)** used across roster/school tables, profile, PDF export, counsellor/survey tools, and DevLab student search so **cohort labels** and **15+** display correctly.
+
+### Changed: Auth session refresh (tab refocus)
+
+- **[`AuthContext`](src/context/AuthContext.tsx)** treats **`TOKEN_REFRESHED`** (common when returning to the browser tab) as a **silent** revalidation: it skips forcing **`stage === 'loading'`**, which was flashing the full-screen bootstrap UI and felt like a reload.
+
+### Changed: Program network headers
 
 - Removed the placeholder **notification bell** from the **Schools** and **Students** [`NetworkOverview`](src/components/NetworkOverview.tsx) headers (notifications deferred).
 
-### Changed: Main shell and programme navigation
-
-- **`/counsellors`**, **`/student/:studentId`**, and **`/student/:studentId/pdf`** now render inside **[`MainShell`](src/routes/MainShell.tsx)** with the same **[`MainSidebar`](src/components/layout/MainSidebar.tsx)** as the programme dashboard, schools list, students list, and school drill-in (shared data error banner above the outlet).
+- **`/counsellors`**, **`/student/:studentId`**, and **`/student/:studentId/pdf`** now render inside **[`MainShell`](src/routes/MainShell.tsx)** with the same **[`MainSidebar`](src/components/layout/MainSidebar.tsx)** as the program dashboard, schools list, students list, and school drill-in (shared data error banner above the outlet).
 - **Students** nav highlights for **`/students`** and any path under **`/student/`**; **Counsellors** highlights on **`/counsellors`**.
 - **[`CounsellorView`](src/components/CounsellorView.tsx)** uses **`h-full` / `min-h-0`** for the shell outlet and no longer shows a duplicate “back to dashboard” header.
 - **[`StudentJourneyRoute`](src/routes/StudentJourneyRoute.tsx)** removes the duplicate data-error strip and **Sign out** (handled in **`MainShell`** / sidebar); journey columns use **`min-h-0`** for reliable flex scrolling.
@@ -34,23 +90,27 @@ Entries are ordered newest-first within each release.
 - **`Student.absenceCount`** reflects linked **absence** records: set in **[`enrichStudents`](src/services/dataverse.ts)** (with **[`mapStudent`](src/services/dataverse.ts)** default `0`), aligned with demo **`riskLevel`** in seed data.
 - **[`NetworkOverview`](src/components/NetworkOverview.tsx)** and **[`SchoolDashboard`](src/components/SchoolDashboard.tsx)** show the count beside at-risk context; **[`ProfileSnapshot`](src/components/ProfileSnapshot.tsx)** shows **Absences** on the student journey.
 
+### Changed: Native `<select>` styling (program chrome)
+
+- Shared **[`SELECT_PROGRAM_CLASS`](src/lib/selectProgramClass.ts)** / **`SELECT_PROGRAM_CORE`** (slate fill, no border, `rounded-lg`, compact height) applied across roster/school filters, **[`DataverseLab`](src/components/DataverseLab.tsx)** toolbar selects, and **[`TeamManagement`](src/components/TeamManagement.tsx)** invite / inline role controls so native dropdowns match the **School** scope control. **Preview as** controls in Team admin stay amber-themed.
+
 ### Added: URL routing (React Router)
 
 - **`react-router-dom`** with **`BrowserRouter`** in [`src/main.tsx`](src/main.tsx). Authenticated app screens use **`Routes`** in [`src/App.tsx`](src/App.tsx) with opaque **Dataverse primary keys** in paths: **`/school/:schoolId`**, **`/student/:studentId`**, **`/student/:studentId/pdf`** (see [`src/lib/recordIdParam.ts`](src/lib/recordIdParam.ts) for param validation).
-- **Programme paths:** **`/dashboard`** (landing), **`/schools`** (all-schools directory), **`/students`** (network roster); **[`DashboardHome`](src/components/DashboardHome.tsx)** + **[`SchoolsListRoute`](src/routes/SchoolsListRoute.tsx)** / **[`StudentsListRoute`](src/routes/StudentsListRoute.tsx)**; shared KPI logic in [`src/lib/networkProgrammeMetrics.ts`](src/lib/networkProgrammeMetrics.ts).
+- **Program paths:** **`/dashboard`** (landing), **`/schools`** (all-schools directory), **`/students`** (network roster); **[`DashboardHome`](src/components/DashboardHome.tsx)** + **[`SchoolsListRoute`](src/routes/SchoolsListRoute.tsx)** / **[`StudentsListRoute`](src/routes/StudentsListRoute.tsx)**; shared KPI logic in [`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts).
 - **Nested dev lab paths:** **`/devlab/survey-search`**, **`/devlab/student-search`** under **`/devlab`**.
-- Shared data for route modules via **[`OutletContextBridge`](src/routes/OutletContextBridge.tsx)** + **`AppShellOutletContext`** ([`src/routes/shellContext.ts`](src/routes/shellContext.ts)); **[`MainShell`](src/routes/MainShell.tsx)** wraps the main programme shell (dashboard, schools, students, school drill-in, counsellors, student journey, PDF) with **`MainSidebar`**.
+- Shared data for route modules via **[`OutletContextBridge`](src/routes/OutletContextBridge.tsx)** + **`AppShellOutletContext`** ([`src/routes/shellContext.ts`](src/routes/shellContext.ts)); **[`MainShell`](src/routes/MainShell.tsx)** wraps the main program shell (dashboard, schools, students, school drill-in, counsellors, student journey, PDF) with **`MainSidebar`**.
 - **School-role home** still runs once per role + school id but now **`navigate('/school/{id}', { replace: true })`** so the address bar matches the school view.
 
 ### Changed: Shared shell for dashboard and school drill-in
 
 - **[`MainSidebar`](src/components/layout/MainSidebar.tsx)** includes an explicit **Dashboard** item and path-based active states: **`/dashboard`**, **`/schools`** / **`/school/...`**, **`/students`** / **`/student/...`**, **`/counsellors`** (where the role may see those items).
-- **[`NetworkOverview`](src/components/NetworkOverview.tsx)** is used only on **`/schools`** and **`/students`**; KPI scope matches [`getProgrammeVisibleScope`](src/lib/networkProgrammeMetrics.ts).
+- **[`NetworkOverview`](src/components/NetworkOverview.tsx)** is used only on **`/schools`** and **`/students`**; KPI scope matches [`getProgramVisibleScope`](src/lib/networkProgramMetrics.ts).
 - **[`SchoolDashboard`](src/components/SchoolDashboard.tsx)** sits in that shell with **`flex-1`** layout (no duplicate full-screen chrome header).
 
 ### Fixed: Navigation edge cases
 
-- **School-role home redirect** runs **once per `userRole` + `schoolId`** (ref marker), not on every `schools` array identity change from `loadData`, so school users can stay on the **programme dashboard** after a refresh.
+- **School-role home redirect** runs **once per `userRole` + `schoolId`** (ref marker), not on every `schools` array identity change from `loadData`, so school users can stay on the **program dashboard** after a refresh.
 - **School drill-in** remains gated with **`canAccessPage(role, 'school')`**; **school users** are redirected to their own **`/school/{id}`** if the path id does not match their assigned school.
 - Invalid or unknown **school** ids in the URL redirect to **`/schools`**; invalid **student** / forbidden cases redirect to **`/dashboard`**.
 
@@ -76,7 +136,7 @@ Entries are ordered newest-first within each release.
 
 ### Changed: Post-sign-in loading copy and layout
 
-- **Connecting to EMCI Student Management Platform…** appears only during the **token** step after login; programme data loading uses a skeleton overlay (see **Changed: Programme loading UX** above).
+- **Connecting to EMCI Student Management Platform…** appears only during the **token** step after login; program data loading uses a skeleton overlay (see **Changed: Program loading UX** above).
 - Spinner (`Loader2`) is shown inline beside the EMCI status text; `role="status"` and `aria-live="polite"` retained for that screen.
 
 ### Changed: School roles can now view student journeys (read-only)
@@ -355,7 +415,7 @@ Rebuilt `PdfPreview.tsx` from scratch to match the `concept/screen.png` and `con
 - **Stage Timeline:** 4-stage horizontal grid (Referral → Consent → Career Guidance → Complete) with connecting line; stages show Completed/Active/Upcoming state derived from real `currentStage` + `stageProgress` props.
 - **Academic Trends:** static bar chart placeholder (6-month bars, orange highlights on recent months).
 - **Attendance:** SVG donut ring chart derived from the student's absence count.
-- **Work Readiness Checklist:** 3-column grid — Programme Milestones checklist, Survey Records tags, Programme Progress bars — all driven by real event data.
+- **Work Readiness Checklist:** 3-column grid — Program Milestones checklist, Survey Records tags, Program Progress bars — all driven by real event data.
 - **Activity Log:** table of up to 8 most recent timeline events (date, title, description truncated, status badge) from real `events` prop.
 - **Counsellor Insights:** contextual quote generated from `currentStage`, with counsellor name and signature line.
 - **Footer:** page number, year, confidential note.
@@ -415,7 +475,7 @@ A new **Survey Search** page has been added, accessible from Dataverse Lab via t
 
 ### Survey Matching — Diagnosis Complete + UX Cleanup
 
-**Finding from diagnostic logging:** The `EndOfPilotSurveys2026` table has only 1 record, linked to a test account ("Securelogic Student", `stage=null`) — it will never match a real student. The legacy end-of-pilot surveys (61 records) correctly match 60 real students. Students without survey data were showing a misleading "Post-programme survey completed" fallback.
+**Finding from diagnostic logging:** The `EndOfPilotSurveys2026` table has only 1 record, linked to a test account ("Securelogic Student", `stage=null`) — it will never match a real student. The legacy end-of-pilot surveys (61 records) correctly match 60 real students. Students without survey data were showing a misleading "Post-program survey completed" fallback.
 
 #### Updated: `src/App.tsx`
 - Removed all diagnostic `console.log` / `console.warn` blocks now that the root cause is identified.
@@ -542,7 +602,7 @@ A new **Survey Search** page has been added, accessible from Dataverse Lab via t
 - **Added** — "Counsellors" nav item wired to `onGoToCounsellors()`; "Dataverse Lab" wired to `onGoToDevLab()`.
 - **Updated** — Top header now shows "Network Overview" title, inline search bar (`bg-slate-100` pill), dynamic region filter pills (derived from real school data), and a notification bell with orange dot.
 - **Redesigned** — KPI section changed from 5 icon cards to a single white card with 6 columns divided by vertical lines (Total Schools, Total Students, Active Students, In Progress, Completed %, Counsellors). Completed % value renders in `text-primary` orange.
-- **Redesigned** — Schools list changed from a 3-column card grid to a full-width table with columns: School Name, Morrisby ID, Region, Status, Programme Completion (orange bar + %), Total Students.
+- **Redesigned** — Schools list changed from a 3-column card grid to a full-width table with columns: School Name, Morrisby ID, Region, Status, Program Completion (orange bar + %), Total Students.
 - **Updated** — Status display: dot indicator + text (`bg-emerald-500` green for Active, `bg-primary` orange for Onboarding, `bg-slate-400` for Inactive).
 - **Updated** — Region shown as a grey rounded pill badge.
 - **Updated** — Completion bar always uses `bg-primary` orange (no colour-shifting logic).
@@ -781,7 +841,7 @@ Removed all blue and violet/purple accent colours from the student journey page 
 
 #### New: `ROLES_AND_ACCESS.md`
 - **Added** — Comprehensive roles and access levels document covering all platform user types.
-- **Added** — Seven defined roles across three tiers: Operational (EMCI Counsellor, School Counsellor / Guidance Officer), Administrative (School Administrator / Principal, EMCI Programme Manager, System Administrator / Developer), and Oversight (Department of Education User, EMCI Executive).
+- **Added** — Seven defined roles across three tiers: Operational (EMCI Counsellor, School Counsellor / Guidance Officer), Administrative (School Administrator / Principal, EMCI Program Manager, System Administrator / Developer), and Oversight (Department of Education User, EMCI Executive).
 - **Added** — Per-role breakdown of what each user can and cannot do, scoped data access tables, and a full access matrix summary across all platform views and features.
 - **Added** — Azure AD role assignment guidance with suggested AAD security group names for each role.
 - **Added** — Data privacy and compliance section noting obligations under the Australian Privacy Act 1988 and state education data governance frameworks.
@@ -850,7 +910,7 @@ Removed all blue and violet/purple accent colours from the student journey page 
 ### Network Overview (`NetworkOverview.tsx`)
 - **Fixed** — KPI card label corrected from "Active Students / X% of total" to **"In Progress / Across all stages"**, with a dedicated counter for students actively working through a stage.
 - **Added** — Region filter dropdown in the schools search bar, dynamically populated from the unique regions present in `networkData.ts`. Filters combine with the existing Status filter and search box.
-- **Removed** — "Network Programme Completion" progress-bar card that previously appeared between the KPI row and the filters. Its data is now surfaced per-school via the individual school card bars.
+- **Removed** — "Network Program Completion" progress-bar card that previously appeared between the KPI row and the filters. Its data is now surfaced per-school via the individual school card bars.
 - **Removed** — Avatar image from school cards. Cards now show school name, region/Morrisby ID, status badge, completion bar, student stats, and footer without a logo image.
 
 ### School Dashboard (`SchoolDashboard.tsx`)
@@ -888,7 +948,7 @@ Removed all blue and violet/purple accent colours from the student journey page 
 
 ### Documentation
 - **Added** — `CHANGELOG.md` — this file; records all changes from initial commit onward.
-- **Updated** — `README.md` — fully rewritten to describe EMCI's purpose, programme stages, navigation structure, tech stack, project layout, data interfaces, and local setup instructions.
+- **Updated** — `README.md` — fully rewritten to describe EMCI's purpose, program stages, navigation structure, tech stack, project layout, data interfaces, and local setup instructions.
 
 ---
 
@@ -942,7 +1002,7 @@ Removed all blue and violet/purple accent colours from the student journey page 
 ### Network Overview (`NetworkOverview.tsx`)
 - **Fixed** — KPI card label corrected from "Active Students / X% of total" to **"In Progress / Across all stages"**, with a dedicated counter for students actively working through a stage.
 - **Added** — Region filter dropdown in the schools search bar, dynamically populated from the unique regions present in `networkData.ts`. Filters combine with the existing Status filter and search box.
-- **Removed** — "Network Programme Completion" progress-bar card that previously appeared between the KPI row and the filters. Its data is now surfaced per-school via the individual school card bars.
+- **Removed** — "Network Program Completion" progress-bar card that previously appeared between the KPI row and the filters. Its data is now surfaced per-school via the individual school card bars.
 - **Removed** — Avatar image from school cards. Cards now show school name, region/Morrisby ID, status badge, completion bar, student stats, and footer without a logo image.
 
 ### School Dashboard (`SchoolDashboard.tsx`)

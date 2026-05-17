@@ -37,7 +37,6 @@ export function SchoolRoute() {
       onSelectStudent={canAccessPage(userRole, 'student')
         ? st => navigate(`/student/${st.id}`)
         : undefined}
-      onBack={() => navigate('/schools')}
     />
   );
 }

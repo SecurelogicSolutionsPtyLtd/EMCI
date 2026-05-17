@@ -51,8 +51,8 @@ export const timelineData = {
       title: 'EMCI Consent',
       status: 'Active',
       by: 'Liam Duffy',
-      description: 'Parental consent obtained for the EMCI program.',
-      notes: 'Parental consent obtained for the EMCI program.',
+      description: 'Parental consent obtained for the EMCI programme.',
+      notes: 'Parental consent obtained for the EMCI programme.',
       track: 'above'
     },
     {
@@ -66,7 +66,7 @@ export const timelineData = {
       description: 'Morrisby unpacking and career planning',
       sessionLength: '30 Minutes',
       interventionType: 'Unpack',
-      notes: 'Completed intensive 4-month career guidance program.',
+      notes: 'Completed intensive 4-month career guidance programme.',
       track: 'above'
     },
     {

@@ -2,7 +2,7 @@ import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { AlertTriangle, Clock, X, User, Info, MoreVertical, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import type { Student } from '../data/studentsData';
+import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { SurveyField } from '../services/surveyFields';
 
 interface ContextPanelProps {
@@ -32,7 +32,10 @@ function BooleanDot({ value }: { value: boolean }) {
 function buildOverview(student: Student | null): string {
   if (!student) return '—';
   const name = `${student.firstName} ${student.lastName}`.trim();
-  const year = student.yearLevel ? `Year ${student.yearLevel}` : 'an unknown year level';
+  const yearPhrase =
+    !student.yearLevel && !student.yearLevelLabel?.trim()
+      ? 'an unknown year level'
+      : formatYearLevelLine(student);
   const stageMap: Record<string, string> = {
     referral:        'has recently been referred into the programme',
     consent:         'has completed the referral and is awaiting consent',
@@ -47,7 +50,7 @@ function buildOverview(student: Student | null): string {
     ? ' An interview has been conducted.'
     : ' An interview has not yet been conducted.';
 
-  return `${name} is a student in ${year} ${stageStr}.${suffix}`;
+  return `${name} is a student in ${yearPhrase} ${stageStr}.${suffix}`;
 }
 
 export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelProps) {
@@ -230,7 +233,7 @@ export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelPr
                 />
                 <ContextRow
                   label="Year Level"
-                  value={student?.yearLevel ? `Year ${student.yearLevel}` : '—'}
+                  value={student ? formatYearLevelLine(student) : '—'}
                 />
                 <div className="flex justify-between items-center p-3 rounded-lg border border-slate-100">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">

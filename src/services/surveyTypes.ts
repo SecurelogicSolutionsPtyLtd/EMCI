@@ -67,9 +67,9 @@ export interface RawMidPilotStudentSurvey extends RawActivity {
   cr89a_elementsofemcisupportingstudentsother?: string | null;
   cr89a_likelytousemorrisbyprofileagain?: number | null;
   'cr89a_likelytousemorrisbyprofileagainname'?: string | null;
-  cr89a_programimpactonstudentattendanceengagement?: number | null;
-  'cr89a_programimpactonstudentattendanceengagementname'?: string | null;
-  cr89a_suggestionstohelpimproveourprogramin2025?: string | null;
+  cr89a_programmeimpactonstudentattendanceengagement?: number | null;
+  'cr89a_programmeimpactonstudentattendanceengagementname'?: string | null;
+  cr89a_suggestionstohelpimproveourprogrammein2025?: string | null;
 }
 
 // ── Mid-Pilot School Survey (cr89a_midpilotschoolsurveies) ─────────────────
@@ -81,17 +81,17 @@ export interface RawMidPilotSchoolSurvey extends RawActivity {
   cr89a_iscurrentmethodofstudentcontactworking?: number | null;
   'cr89a_iscurrentmethodofstudentcontactworkingname'?: string | null;
   cr89a_iscurrentmethodofstudentcontactworkingno?: string | null;
-  cr89a_programimpactonstudentattendanceatschool?: number | null;
-  'cr89a_programimpactonstudentattendanceatschoolname'?: string | null;
-  cr89a_suggestionstoimproveprogram2025?: string | null;
+  cr89a_programmeimpactonstudentattendanceatschool?: number | null;
+  'cr89a_programmeimpactonstudentattendanceatschoolname'?: string | null;
+  cr89a_suggestionstoimproveprogramme2025?: string | null;
 }
 
 // ── End-of-Pilot Survey (Legacy — cr89a_emciendofpilotstudentsurveies) ──────
 // Pre-2026 end-of-programme student survey with a richer field set.
 export interface RawEndOfPilotSurveyLegacy extends RawActivity {
-  cr89a_rateoverallexperienceinprogram?: number | null;
-  'cr89a_rateoverallexperienceinprogram@OData.Community.Display.V1.FormattedValue'?: string | null;
-  cr89a_rateoverallexperienceinprogramexplanation?: string | null;
+  cr89a_rateoverallexperienceinprogramme?: number | null;
+  'cr89a_rateoverallexperienceinprogramme@OData.Community.Display.V1.FormattedValue'?: string | null;
+  cr89a_rateoverallexperienceinprogrammeexplanation?: string | null;
   cr89a_activityorsessionenjoyedthemost?: number | null;
   'cr89a_activityorsessionenjoyedthemostname'?: string | null;
   cr89a_activityorsessionwhatdidyouenjoyaboutit?: string | null;

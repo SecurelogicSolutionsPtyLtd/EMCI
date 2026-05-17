@@ -1,13 +1,18 @@
 export type StageKey = 'referral' | 'consent' | 'career_guidance' | 'complete' | null;
 
+/** Decoded bucket for Dataverse `cr89a_yearlevel` option **1003** ("15+"); filters with 9 and 10. */
+export const YEAR_LEVEL_PLUS_BUCKET = 15;
+
 export interface Student {
   id: string;
   firstName: string;
   lastName: string;
   preferredName?: string;
   email?: string;
-  yearLevel: number;       // Numeric year (9, 10, 11, 12) decoded from raw picklist code
-  yearLevelLabel?: string; // Raw Dataverse formatted label, e.g. "EMCI 2024 Students (Y9)"
+  /** Decoded from `cr89a_yearlevel` picklist (9, 10, or {@link YEAR_LEVEL_PLUS_BUCKET} for "15+"). */
+  yearLevel: number;
+  /** Dataverse formatted label (e.g. "Year 9", "15+", "EMCI 2025 Students (Y9)"). */
+  yearLevelLabel?: string;
   morrisbyId: string;
   status: 'Active' | 'Inactive' | 'Pending';
   currentStage: StageKey;
@@ -28,6 +33,19 @@ export interface Student {
   studentDeactivationAt?: string | null;
   /** Year group label captured at deactivation (flow-populated). */
   studentDeactivationYearGroupSnapshot?: string | null;
+}
+
+/** Single-line year / cohort for headers, PDF, and profile (prefers Dataverse label). */
+export function formatYearLevelLine(
+  student: Pick<Student, 'yearLevel' | 'yearLevelLabel'> | null | undefined,
+): string {
+  if (!student) return '—';
+  const label = student.yearLevelLabel?.trim();
+  if (label) return label;
+  const y = student.yearLevel;
+  if (!y) return '—';
+  if (y === YEAR_LEVEL_PLUS_BUCKET) return '15+';
+  return `Year ${y}`;
 }
 
 export const schoolStudents: Student[] = [

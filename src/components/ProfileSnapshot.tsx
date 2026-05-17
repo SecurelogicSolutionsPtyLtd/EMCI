@@ -1,7 +1,7 @@
 import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { UserX } from 'lucide-react';
-import type { Student } from '../data/studentsData';
+import { type Student, formatYearLevelLine } from '../data/studentsData';
 
 interface ProfileSnapshotProps {
   student: Student | null;
@@ -33,7 +33,6 @@ export function ProfileSnapshot({
   const morrisbyId = student?.morrisbyId   ?? '—';
   const counsellor = student?.counsellor   ?? '—';
   const status     = student?.status       ?? 'Active';
-  const yearLevel  = student?.yearLevel    ?? 0;
   const avatar     = student?.avatar;
 
   const hasDeactivationInfo =
@@ -64,7 +63,7 @@ export function ProfileSnapshot({
             <h1 className="text-xl font-bold text-slate-900">{firstName} {lastName}</h1>
             <p className="text-slate-500 text-sm">
               {preferred && preferred !== firstName ? `Preferred: ${preferred} | ` : ''}
-              {yearLevel ? `Year ${yearLevel}` : '—'}
+              {student ? formatYearLevelLine(student) : '—'}
               {schoolName ? ` · ${schoolName}` : ''}
             </p>
           </div>

@@ -8,6 +8,7 @@ import {
   Database, ChevronRight, ArrowRight, Columns, Tag, SquareFunction,
   ChevronDown, Info, ClipboardList, Users
 } from 'lucide-react';
+import { SELECT_PROGRAM_CLASS } from '../lib/selectProgramClass';
 
 interface RequestHistoryItem {
   id: string;
@@ -90,11 +91,11 @@ function parseJwtExpiry(token: string): { exp: Date | null; isExpired: boolean; 
       const ago = Math.abs(diffMs);
       if (ago < 60_000) expiresIn = `Expired ${Math.round(ago / 1000)}s ago`;
       else if (ago < 3_600_000) expiresIn = `Expired ${Math.round(ago / 60_000)}m ago`;
-      else expiresIn = `Expired ${exp.toLocaleString()}`;
+      else expiresIn = `Expired ${exp.toLocaleString('en-AU')}`;
     } else {
       if (diffMs < 60_000) expiresIn = `Expires in ${Math.round(diffMs / 1000)}s`;
       else if (diffMs < 3_600_000) expiresIn = `Expires in ${Math.round(diffMs / 60_000)}m`;
-      else expiresIn = `Expires ${exp.toLocaleString()}`;
+      else expiresIn = `Expires ${exp.toLocaleString('en-AU')}`;
     }
     return { exp, isExpired, expiresIn };
   } catch {
@@ -604,7 +605,7 @@ export function DataverseLab({ onBack, onGoToSurveySearch, onGoToStudentSearch }
               <select
                 value={method}
                 onChange={e => setMethod(e.target.value as any)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs text-slate-700 focus:outline-none focus:border-violet-400 w-24 cursor-pointer"
+                className={`${SELECT_PROGRAM_CLASS} w-24`}
               >
                 <option>GET</option>
                 <option>POST</option>
@@ -1125,7 +1126,7 @@ export function DataverseLab({ onBack, onGoToSurveySearch, onGoToStudentSearch }
                         <select
                           value={attrTypeFilter}
                           onChange={e => setAttrTypeFilter(e.target.value)}
-                          className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none text-slate-600 cursor-pointer"
+                          className={`${SELECT_PROGRAM_CLASS} min-w-[8.5rem]`}
                         >
                           <option value="all">All Types</option>
                           {attrTypes.map(t => <option key={t} value={t}>{t}</option>)}

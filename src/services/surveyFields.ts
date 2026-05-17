@@ -89,7 +89,7 @@ export function buildMidPilotStudentFields(s: RawMidPilotStudentSurvey): SurveyF
     { label: 'Focus Next 6 Months',          value: s['cr89a_focusoverthenext6months@OData.Community.Display.V1.FormattedValue'] ?? s.cr89a_focusovernext6monthsother },
     { label: 'Elements Supporting Students', value: s['cr89a_elementsofemcisupportingstudentsname'] ?? s.cr89a_elementsofemcisupportingstudentsother },
     { label: 'Likely to Use Morrisby Again', value: s['cr89a_likelytousemorrisbyprofileagainname'] },
-    { label: 'Program Impact on Attendance', value: s['cr89a_programimpactonstudentattendanceengagementname'] },
+    { label: 'Programme Impact on Attendance', value: s['cr89a_programimpactonstudentattendanceengagementname'] },
     { label: 'Suggestions for Improvement',  value: s.cr89a_suggestionstohelpimproveourprogramin2025 },
   ]);
 }

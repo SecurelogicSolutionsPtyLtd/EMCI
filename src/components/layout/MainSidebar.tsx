@@ -65,7 +65,7 @@ export function MainSidebar({
         </div>
         <div>
           <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">EMCI</h1>
-          <p className="text-xs text-slate-500">Student Management</p>
+          <p className="text-xs text-slate-500 leading-tight">Student Management Platform</p>
         </div>
       </div>
 
@@ -73,7 +73,7 @@ export function MainSidebar({
         <button
           type="button"
           onClick={onGoToDashboard}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left
+          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left cursor-pointer
             ${dashboardActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'}`}
         >
           <LayoutDashboard className="w-5 h-5 shrink-0" />
@@ -85,7 +85,7 @@ export function MainSidebar({
             key={item.label}
             type="button"
             onClick={item.onClick}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left cursor-pointer
               ${item.isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'}`}
           >
             <item.icon className="w-5 h-5 shrink-0" />
@@ -97,7 +97,7 @@ export function MainSidebar({
           <button
             type="button"
             onClick={onGoToDevLab}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
           >
             <FlaskConical className="w-5 h-5 shrink-0" />
             Dataverse Lab
@@ -108,7 +108,7 @@ export function MainSidebar({
           <button
             type="button"
             onClick={onGoToTeam}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
           >
             <UsersRound className="w-5 h-5 shrink-0" />
             Team Management
@@ -137,7 +137,7 @@ export function MainSidebar({
               setSigningOut(false);
             }
           }}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
         >
           {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
           Sign out
