@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ChevronLeft, Search, Users, X, ChevronDown, ChevronUp,
-  CheckCircle2, Circle, AlertCircle, Shield, Star, UserCheck,
-  Building2, BookOpen, Filter, SlidersHorizontal, RotateCcw,
+  ChevronLeft, Search, Users, X, ChevronUp,
+  CheckCircle2, Circle, BookOpen, SlidersHorizontal, RotateCcw, Star,
 } from 'lucide-react';
+import { SearchableDropdown } from './ui/SearchableDropdown';
 import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
 
@@ -203,106 +203,6 @@ function StudentRow({
   );
 }
 
-// ── Filter dropdown ────────────────────────────────────────────────────────
-
-function FilterDropdown({
-  label, options, value, onChange, icon: Icon, formatOption,
-}: {
-  label: string;
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-  icon: React.ElementType;
-  /** Optional display transform (filter value stays `options` entry). */
-  formatOption?: (opt: string) => string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false); setSearch('');
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
-  const isActive = value !== '';
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => { setOpen(v => !v); setSearch(''); }}
-        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
-          isActive
-            ? 'bg-violet-500 text-white border-violet-500'
-            : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-600'
-        }`}
-      >
-        <Icon className="w-3 h-3 shrink-0" />
-        <span className="max-w-[100px] truncate">{isActive ? (formatOption ? formatOption(value) : value) : label}</span>
-        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            transition={{ duration: 0.1 }}
-            className="absolute left-0 top-full mt-1 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
-          >
-            {options.length > 6 && (
-              <div className="px-2 pt-2 pb-1 border-b border-slate-100">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                  <input
-                    autoFocus
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Search…"
-                    className="w-full pl-6 pr-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-violet-400 placeholder-slate-400"
-                  />
-                </div>
-              </div>
-            )}
-            <div className="max-h-48 overflow-y-auto py-1">
-              {isActive && (
-                <button
-                  onClick={() => { onChange(''); setOpen(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-50 transition-colors"
-                >
-                  <X className="w-3 h-3" /> Clear filter
-                </button>
-              )}
-              {filtered.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-slate-400">No matches</p>
-              ) : (
-                filtered.map(opt => (
-                  <button
-                    key={opt}
-                    onClick={() => { onChange(opt); setOpen(false); setSearch(''); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                      value === opt ? 'font-bold text-violet-600 bg-violet-50' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {formatOption ? formatOption(opt) : opt}
-                  </button>
-                ))
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function StudentSearch({ students, schools, onBack }: StudentSearchProps) {
@@ -335,6 +235,53 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
   const typeOptions      = useMemo(() => Array.from(new Set(students.map(s => s.studentType).filter(Boolean))).sort(), [students]);
 
   const activeFilterCount = [yearFilter, statusFilter, stageFilter, riskFilter, counsellorFilter, schoolFilter, typeFilter, interviewedFilter, profileFilter].filter(Boolean).length;
+
+  const yearFilterDropdownOptions = useMemo(
+    () => [
+      { value: '', label: 'Year Level' },
+      ...yearOptions.map(y => ({
+        value: y,
+        label: y === String(YEAR_LEVEL_PLUS_BUCKET) ? '15+' : `Year ${y}`,
+      })),
+    ],
+    [yearOptions],
+  );
+
+  const statusFilterDropdownOptions = useMemo(
+    () => [{ value: '', label: 'Status' }, ...statusOptions.map(s => ({ value: s, label: s }))],
+    [statusOptions],
+  );
+
+  const stageFilterDropdownOptions = useMemo(
+    () => [{ value: '', label: 'Stage' }, ...stageOptions.map(s => ({ value: s, label: s }))],
+    [stageOptions],
+  );
+
+  const riskFilterDropdownOptions = useMemo(
+    () => [{ value: '', label: 'Risk Level' }, ...riskOptions.map(r => ({ value: r, label: r }))],
+    [riskOptions],
+  );
+
+  const counsellorFilterDropdownOptions = useMemo(
+    () => [{ value: '', label: 'Counsellor' }, ...counsellorOptions.map(c => ({ value: c, label: c }))],
+    [counsellorOptions],
+  );
+
+  const schoolFilterDropdownOptions = useMemo(
+    () => [{ value: '', label: 'School' }, ...schoolOptions.map(s => ({ value: s, label: s }))],
+    [schoolOptions],
+  );
+
+  const typeFilterDropdownOptions = useMemo(
+    () => [{ value: '', label: 'Student Type' }, ...typeOptions.map(t => ({ value: t, label: t }))],
+    [typeOptions],
+  );
+
+  const yesNoFilterOptions = (label: string) => [
+    { value: '', label },
+    { value: 'Yes', label: 'Yes' },
+    { value: 'No', label: 'No' },
+  ];
 
   function resetFilters() {
     setQuery(''); setYearFilter(''); setStatusFilter(''); setStageFilter('');
@@ -458,24 +405,15 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
               className="overflow-hidden"
             >
               <div className="flex flex-wrap gap-2 pt-1">
-                <FilterDropdown
-                  label="Year Level"
-                  options={yearOptions}
-                  value={yearFilter}
-                  onChange={setYearFilter}
-                  icon={BookOpen}
-                  formatOption={v =>
-                    v === String(YEAR_LEVEL_PLUS_BUCKET) ? '15+' : `Year ${v}`
-                  }
-                />
-                <FilterDropdown label="Status"      options={statusOptions}     value={statusFilter}     onChange={setStatusFilter}     icon={AlertCircle}/>
-                <FilterDropdown label="Stage"       options={stageOptions}      value={stageFilter}      onChange={setStageFilter}      icon={Shield}     />
-                <FilterDropdown label="Risk Level"  options={riskOptions}       value={riskFilter}       onChange={setRiskFilter}       icon={AlertCircle}/>
-                <FilterDropdown label="Counsellor"  options={counsellorOptions} value={counsellorFilter} onChange={setCounsellorFilter} icon={UserCheck}  />
-                <FilterDropdown label="School"      options={schoolOptions}     value={schoolFilter}     onChange={setSchoolFilter}     icon={Building2}  />
-                <FilterDropdown label="Student Type"options={typeOptions}       value={typeFilter}       onChange={setTypeFilter}       icon={Users}      />
-                <FilterDropdown label="Interviewed" options={['Yes', 'No']}     value={interviewedFilter}onChange={setInterviewedFilter}icon={CheckCircle2}/>
-                <FilterDropdown label="Has Profile" options={['Yes', 'No']}     value={profileFilter}    onChange={setProfileFilter}    icon={Star}       />
+                <SearchableDropdown allValue="" value={yearFilter} onChange={setYearFilter} options={yearFilterDropdownOptions} placeholder="Year Level" searchPlaceholder="Search year levels…" panelWidthClass="w-48" />
+                <SearchableDropdown allValue="" value={statusFilter} onChange={setStatusFilter} options={statusFilterDropdownOptions} placeholder="Status" searchPlaceholder="Search statuses…" panelWidthClass="w-48" />
+                <SearchableDropdown allValue="" value={stageFilter} onChange={setStageFilter} options={stageFilterDropdownOptions} placeholder="Stage" searchPlaceholder="Search stages…" panelWidthClass="w-52" />
+                <SearchableDropdown allValue="" value={riskFilter} onChange={setRiskFilter} options={riskFilterDropdownOptions} placeholder="Risk Level" searchPlaceholder="Search risk levels…" panelWidthClass="w-48" />
+                <SearchableDropdown allValue="" value={counsellorFilter} onChange={setCounsellorFilter} options={counsellorFilterDropdownOptions} placeholder="Counsellor" searchPlaceholder="Search counsellors…" panelWidthClass="w-56" />
+                <SearchableDropdown allValue="" value={schoolFilter} onChange={setSchoolFilter} options={schoolFilterDropdownOptions} placeholder="School" searchPlaceholder="Search schools…" panelWidthClass="w-64" />
+                <SearchableDropdown allValue="" value={typeFilter} onChange={setTypeFilter} options={typeFilterDropdownOptions} placeholder="Student Type" searchPlaceholder="Search types…" panelWidthClass="w-52" />
+                <SearchableDropdown allValue="" value={interviewedFilter} onChange={setInterviewedFilter} options={yesNoFilterOptions('Interviewed')} placeholder="Interviewed" searchable={false} panelWidthClass="w-40" />
+                <SearchableDropdown allValue="" value={profileFilter} onChange={setProfileFilter} options={yesNoFilterOptions('Has Profile')} placeholder="Has Profile" searchable={false} panelWidthClass="w-40" />
               </div>
             </motion.div>
           )}

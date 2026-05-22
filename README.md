@@ -186,7 +186,19 @@ npm run build
 
 ### Production hosting (SPA)
 
-Every path (for example `/school/…`, `/student/…`) must resolve to **`index.html`** so React Router can handle the route. Configure your host with an **SPA fallback** to `index.html` for paths that are not static files (Azure Static Web Apps `navigationFallback`, nginx `try_files`, IIS URL Rewrite, Vercel rewrites, and so on). If you cannot change server rules, switch **`BrowserRouter`** to **`HashRouter`** in [`src/main.tsx`](src/main.tsx) so URLs use a hash (`#/dashboard`, etc.).
+Every path (for example `/counsellors`, `/school/…`, `/student/…`) must resolve to **`index.html`** so React Router can handle the route — otherwise **refresh** on a client path returns a host 404. Configure your host with an **SPA fallback** to `index.html` for paths that are not static files.
+
+**Vercel** ([`vercel.json`](vercel.json)) — API rewrites first, then the SPA shell:
+
+```json
+"rewrites": [
+  { "source": "/devtoken", "destination": "/api/devtoken" },
+  { "source": "/dataverse/:path*", "destination": "/api/dataverse?path=:path*" },
+  { "source": "/(.*)", "destination": "/index.html" }
+]
+```
+
+Other hosts: Azure Static Web Apps `navigationFallback`, nginx `try_files`, IIS URL Rewrite, and so on. If you cannot change server rules, switch **`BrowserRouter`** to **`HashRouter`** in [`src/main.tsx`](src/main.tsx) so URLs use a hash (`#/dashboard`, etc.).
 
 ---
 

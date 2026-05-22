@@ -12,7 +12,7 @@ import { canAccessPage, canSeeStudentNames } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
 import type { NetworkMainTab } from './layout/MainSidebar';
 import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
-import { SELECT_PROGRAM_CLASS } from '../lib/selectProgramClass';
+import { SearchableDropdown } from './ui/SearchableDropdown';
 
 interface NetworkOverviewProps {
   students: Student[];
@@ -124,6 +124,49 @@ export function NetworkOverview({
     const present = new Set(visibleStudents.map(s => s.status));
     return (['Active', 'Pending', 'Inactive'] as const).filter(st => present.has(st));
   }, [visibleStudents]);
+
+  const counsellorFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Counsellors' },
+      ...rosterCounsellorOptions.map(c => ({ value: c, label: c })),
+    ],
+    [rosterCounsellorOptions],
+  );
+
+  const stageFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Stages' },
+      ...rosterStageFilterKeys.map(k => ({ value: k, label: rosterStageFilterLabel(k) })),
+    ],
+    [rosterStageFilterKeys],
+  );
+
+  const yearFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Year Level' },
+      ...rosterYearOptions.map(y => ({
+        value: String(y),
+        label: y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`,
+      })),
+    ],
+    [rosterYearOptions],
+  );
+
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Statuses' },
+      ...rosterStatusOptions.map(st => ({ value: st, label: st })),
+    ],
+    [rosterStatusOptions],
+  );
+
+  const schoolFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Schools' },
+      ...visibleSchools.map(s => ({ value: s.id, label: s.name })),
+    ],
+    [visibleSchools],
+  );
 
   // ── schools filter ────────────────────────────────────────────
   const filteredSchools = visibleSchools.filter(s => {
@@ -359,56 +402,47 @@ export function NetworkOverview({
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full lg:flex-1 lg:min-w-0">
-                    <select
+                    <SearchableDropdown
                       value={rosterCounsellor}
-                      onChange={e => handleRosterCounsellor(e.target.value)}
-                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
-                    >
-                      <option value="all">All Counsellors</option>
-                      {rosterCounsellorOptions.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <select
+                      onChange={handleRosterCounsellor}
+                      options={counsellorFilterOptions}
+                      placeholder="All Counsellors"
+                      searchPlaceholder="Search counsellors…"
+                      panelWidthClass="w-56"
+                    />
+                    <SearchableDropdown
                       value={rosterStage}
-                      onChange={e => handleRosterStage(e.target.value)}
-                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
-                    >
-                      <option value="all">All Stages</option>
-                      {rosterStageFilterKeys.map(k => (
-                        <option key={k} value={k}>{rosterStageFilterLabel(k)}</option>
-                      ))}
-                    </select>
-                    <select
+                      onChange={handleRosterStage}
+                      options={stageFilterOptions}
+                      placeholder="All Stages"
+                      searchPlaceholder="Search stages…"
+                      panelWidthClass="w-56"
+                    />
+                    <SearchableDropdown
                       value={rosterYear}
-                      onChange={e => handleRosterYear(e.target.value)}
-                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
-                    >
-                      <option value="all">Year Level</option>
-                      {rosterYearOptions.map(y => (
-                        <option key={y} value={String(y)}>{y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`}</option>
-                      ))}
-                    </select>
-                    <select
+                      onChange={handleRosterYear}
+                      options={yearFilterOptions}
+                      placeholder="Year Level"
+                      searchPlaceholder="Search year levels…"
+                      panelWidthClass="w-48"
+                    />
+                    <SearchableDropdown
                       value={rosterStatus}
-                      onChange={e => handleRosterStatus(e.target.value)}
-                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0`}
-                    >
-                      <option value="all">All Statuses</option>
-                      {rosterStatusOptions.map(st => (
-                        <option key={st} value={st}>{st}</option>
-                      ))}
-                    </select>
-                    <select
+                      onChange={handleRosterStatus}
+                      options={statusFilterOptions}
+                      placeholder="All Statuses"
+                      searchPlaceholder="Search statuses…"
+                      panelWidthClass="w-48"
+                    />
+                    <SearchableDropdown
                       value={rosterSchool}
-                      onChange={e => handleRosterSchool(e.target.value)}
-                      className={`${SELECT_PROGRAM_CLASS} w-full min-w-0 col-span-2 sm:col-span-1`}
-                    >
-                      <option value="all">All Schools</option>
-                      {visibleSchools.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
+                      onChange={handleRosterSchool}
+                      options={schoolFilterOptions}
+                      placeholder="All Schools"
+                      searchPlaceholder="Search schools…"
+                      panelWidthClass="w-64"
+                      className="col-span-2 sm:col-span-1"
+                    />
                   </div>
                 </div>
 

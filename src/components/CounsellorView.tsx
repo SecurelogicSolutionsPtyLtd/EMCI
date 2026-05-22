@@ -1,12 +1,18 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, TrendingUp,
   CheckCircle2, BookOpen, BarChart2, UserCheck, Building2,
-  Star, Circle, ChevronDown, Search, X
+  Star, Circle,
 } from 'lucide-react';
+import { SearchableDropdown } from './ui/SearchableDropdown';
 import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
+import { useAuth } from '../context/AuthContext';
+import { canAccessPage } from '../types/roles';
+
+const PAGE_SIZE = 10;
 
 interface CounsellorViewProps {
   students: Student[];
@@ -71,6 +77,10 @@ function StatChip({ label, value, color }: { label: string; value: number; color
 }
 
 export function CounsellorView({ students, schools }: CounsellorViewProps) {
+  const navigate = useNavigate();
+  const { userRole } = useAuth();
+  const showStudentJourney = canAccessPage(userRole, 'student');
+
   // Derive unique counsellor list from students
   const counsellors: DerivedCounsellor[] = Array.from(
     new Set(students.map(s => s.counsellor).filter(Boolean))
@@ -78,6 +88,7 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
 
   const [selected, setSelected] = useState<DerivedCounsellor>(counsellors[0] ?? { id: '', name: '' });
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>('all');
+  const [rosterPage, setRosterPage] = useState(1);
 
   const stats = counsellorStats(selected.name, students, schools);
 
@@ -85,7 +96,25 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
   function handleSelectCounsellor(c: DerivedCounsellor) {
     setSelected(c);
     setSelectedSchoolId('all');
+    setRosterPage(1);
   }
+
+  function handleSelectSchool(schoolId: string) {
+    setSelectedSchoolId(schoolId);
+    setRosterPage(1);
+  }
+
+  const schoolDropdownOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All schools', count: stats.students.length },
+      ...stats.schoolObjects.map(sc => ({
+        value: sc.id,
+        label: sc.name,
+        count: stats.students.filter(s => (s as { schoolId?: string }).schoolId === sc.id).length,
+      })),
+    ],
+    [stats.students, stats.schoolObjects],
+  );
 
   // Filtered student list based on school dropdown
   const rosterStudents = useMemo(() => {
@@ -93,28 +122,18 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
     return stats.students.filter(s => (s as any).schoolId === selectedSchoolId);
   }, [stats.students, selectedSchoolId]);
 
-  // Searchable school dropdown state
-  const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false);
-  const [schoolSearch, setSchoolSearch] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setSchoolDropdownOpen(false);
-        setSchoolSearch('');
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  const filteredSchoolOptions = useMemo(() => {
-    const q = schoolSearch.toLowerCase().trim();
-    if (!q) return stats.schoolObjects;
-    return stats.schoolObjects.filter(sc => sc.name.toLowerCase().includes(q));
-  }, [stats.schoolObjects, schoolSearch]);
+  const totalRosterPages = Math.max(1, Math.ceil(rosterStudents.length / PAGE_SIZE));
+  const safeRosterPage = Math.min(rosterPage, totalRosterPages);
+  const rosterSlice = rosterStudents.slice(
+    (safeRosterPage - 1) * PAGE_SIZE,
+    safeRosterPage * PAGE_SIZE,
+  );
+  const rosterShowingFrom = rosterStudents.length === 0 ? 0 : (safeRosterPage - 1) * PAGE_SIZE + 1;
+  const rosterShowingTo = Math.min(safeRosterPage * PAGE_SIZE, rosterStudents.length);
+  const rosterPageNumbers: number[] = [];
+  for (let i = Math.max(1, safeRosterPage - 2); i <= Math.min(totalRosterPages, safeRosterPage + 2); i++) {
+    rosterPageNumbers.push(i);
+  }
 
   const selectedSchoolName = selectedSchoolId === 'all'
     ? null
@@ -284,89 +303,16 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
                     <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="text-xs font-semibold text-slate-500 shrink-0">Filter by school</span>
 
-                    {/* Custom searchable dropdown */}
-                    <div ref={dropdownRef} className="relative">
-                      <button
-                        onClick={() => { setSchoolDropdownOpen(v => !v); setSchoolSearch(''); }}
-                        className={`flex items-center gap-2 pl-3 pr-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                          selectedSchoolId !== 'all'
-                            ? 'bg-primary/10 border-primary/30 text-primary'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
-                        }`}
-                      >
-                        <span className="max-w-[200px] truncate">
-                          {selectedSchoolName ?? `All schools (${stats.students.length})`}
-                        </span>
-                        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${schoolDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      <AnimatePresence>
-                        {schoolDropdownOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                            transition={{ duration: 0.12 }}
-                            className="absolute left-0 top-full mt-1 z-50 w-64 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
-                          >
-                            {/* Search input */}
-                            <div className="px-2 pt-2 pb-1 border-b border-slate-100">
-                              <div className="relative">
-                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                                <input
-                                  autoFocus
-                                  type="text"
-                                  placeholder="Search schools…"
-                                  value={schoolSearch}
-                                  onChange={e => setSchoolSearch(e.target.value)}
-                                  className="w-full pl-6 pr-6 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-primary/40 placeholder-slate-400"
-                                />
-                                {schoolSearch && (
-                                  <button onClick={() => setSchoolSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Options list */}
-                            <div className="max-h-52 overflow-y-auto py-1">
-                              {!schoolSearch && (
-                                <button
-                                  onClick={() => { setSelectedSchoolId('all'); setSchoolDropdownOpen(false); setSchoolSearch(''); }}
-                                  className={`w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-slate-50 transition-colors ${
-                                    selectedSchoolId === 'all' ? 'font-bold text-primary' : 'text-slate-700'
-                                  }`}
-                                >
-                                  <span>All schools</span>
-                                  <span className="text-[10px] text-slate-400 font-normal">{stats.students.length}</span>
-                                </button>
-                              )}
-                              {filteredSchoolOptions.length === 0 ? (
-                                <p className="px-3 py-3 text-xs text-slate-400 text-center">No schools match</p>
-                              ) : (
-                                filteredSchoolOptions.map(sc => {
-                                  const count = stats.students.filter(s => (s as any).schoolId === sc.id).length;
-                                  const isActive = selectedSchoolId === sc.id;
-                                  return (
-                                    <button
-                                      key={sc.id}
-                                      onClick={() => { setSelectedSchoolId(sc.id); setSchoolDropdownOpen(false); setSchoolSearch(''); }}
-                                      className={`w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-slate-50 transition-colors ${
-                                        isActive ? 'font-bold text-primary bg-primary/5' : 'text-slate-700'
-                                      }`}
-                                    >
-                                      <span className="truncate">{sc.name}</span>
-                                      <span className="text-[10px] text-slate-400 font-normal shrink-0 ml-2">{count}</span>
-                                    </button>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                    <SearchableDropdown
+                      value={selectedSchoolId}
+                      onChange={handleSelectSchool}
+                      options={schoolDropdownOptions}
+                      placeholder={`All schools (${stats.students.length})`}
+                      searchPlaceholder="Search schools…"
+                      emptyMessage="No schools match"
+                      panelWidthClass="w-64"
+                      triggerClassName="max-w-[240px]"
+                    />
 
                     {selectedSchoolId !== 'all' && (
                       <AnimatePresence>
@@ -374,7 +320,7 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
                           initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.9 }}
-                          onClick={() => setSelectedSchoolId('all')}
+                          onClick={() => handleSelectSchool('all')}
                           className="text-[11px] text-slate-400 hover:text-slate-600 underline transition-colors"
                         >
                           Clear
@@ -400,16 +346,21 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
                       <p className="text-sm text-slate-400">No students assigned.</p>
                     </div>
                   ) : (
-                    rosterStudents.map(student => {
+                    rosterSlice.map(student => {
                       const stageCols = student.currentStage ? STAGE_COLORS[student.currentStage] : null;
                       const school = schools.find(s => s.id === (student as any).schoolId);
-                      return (
-                        <div key={student.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
+                      const rowClass = `flex items-center gap-4 px-5 py-3 w-full text-left transition-colors ${
+                        showStudentJourney ? 'hover:bg-slate-50 cursor-pointer group' : ''
+                      }`;
+                      const rowContent = (
+                        <>
                           <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
                             <Circle className="w-4 h-4 text-slate-400" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-slate-800">{student.firstName} {student.lastName}</div>
+                            <div className={`text-sm font-semibold text-slate-800 ${showStudentJourney ? 'group-hover:text-primary transition-colors' : ''}`}>
+                              {student.firstName} {student.lastName}
+                            </div>
                             <div className="text-xs text-slate-400">{school?.name ?? '—'} · {formatYearLevelLine(student)} · {student.morrisbyId}</div>
                           </div>
                           {student.currentStage && stageCols ? (
@@ -419,15 +370,76 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
                           ) : (
                             <span className="text-[11px] text-slate-400 italic shrink-0">Not started</span>
                           )}
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0 pointer-events-none">
                             <CheckCircle2 className={`w-3.5 h-3.5 ${student.interviewed ? 'text-emerald-500' : 'text-slate-300'}`} />
                             <Star className={`w-3.5 h-3.5 ${student.hasProfile ? 'text-amber-400' : 'text-slate-300'}`} />
                           </div>
+                        </>
+                      );
+                      return showStudentJourney ? (
+                        <button
+                          key={student.id}
+                          type="button"
+                          onClick={() => navigate(`/student/${student.id}`)}
+                          className={rowClass}
+                        >
+                          {rowContent}
+                        </button>
+                      ) : (
+                        <div key={student.id} className={rowClass}>
+                          {rowContent}
                         </div>
                       );
                     })
                   )}
                 </div>
+                {rosterStudents.length > 0 && (
+                  <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p className="text-sm text-slate-500">
+                      Showing{' '}
+                      <span className="font-bold text-slate-900">{rosterShowingFrom}</span>
+                      {' '}to{' '}
+                      <span className="font-bold text-slate-900">{rosterShowingTo}</span>
+                      {' '}of{' '}
+                      <span className="font-bold text-slate-900">{rosterStudents.length}</span>
+                      {' '}students
+                    </p>
+                    {totalRosterPages > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setRosterPage(p => Math.max(1, p - 1))}
+                          disabled={safeRosterPage === 1}
+                          className="px-3 py-1 text-sm border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Previous
+                        </button>
+                        {rosterPageNumbers.map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setRosterPage(n)}
+                            className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                              n === safeRosterPage
+                                ? 'bg-primary text-white'
+                                : 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
+                          disabled={safeRosterPage === totalRosterPages}
+                          className="px-3 py-1 text-sm border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 flex gap-4 text-[11px] text-slate-400">
                   <div className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Interviewed</div>
                   <div className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-400" /> Has Morrisby profile</div>

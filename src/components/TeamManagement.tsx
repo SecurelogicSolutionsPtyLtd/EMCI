@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, UserPlus, ChevronLeft, Search,
   Shield, CheckCircle2, Loader2, AlertCircle,
-  Mail, User, Building2, ChevronDown, Lock,
+  Mail, User, Building2, Lock,
 } from 'lucide-react';
 import {
   listTeamMembers,
@@ -22,7 +22,13 @@ import {
 } from '../types/roles';
 import { useAuth } from '../context/AuthContext';
 import { Eye, RotateCcw } from 'lucide-react';
-import { SELECT_PROGRAM_CLASS, SELECT_PROGRAM_CORE } from '../lib/selectProgramClass';
+import { SearchableDropdown } from './ui/SearchableDropdown';
+
+const ROLE_GROUP_OPTIONS = [
+  { value: 'acce', label: 'ACCE' },
+  { value: 'school', label: 'School' },
+  { value: 'de', label: 'Department of Education' },
+] as const;
 
 interface SchoolOption {
   id:   string;
@@ -338,36 +344,33 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                 {/* Type */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">Type</label>
-                  <div className="relative">
-                    <select
-                      value={previewPickType}
-                      onChange={e => handlePreviewTypeChange(e.target.value as RoleGroup)}
-                      className="pl-3 pr-7 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 appearance-none"
-                    >
-                      <option value="acce">ACCE</option>
-                      <option value="school">School</option>
-                      <option value="de">Department of Education</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400 pointer-events-none" />
-                  </div>
+                  <SearchableDropdown
+                    value={previewPickType}
+                    onChange={v => handlePreviewTypeChange(v as RoleGroup)}
+                    options={[...ROLE_GROUP_OPTIONS]}
+                    placeholder="Type"
+                    allValue="__none__"
+                    searchPlaceholder="Search types…"
+                    panelWidthClass="w-56"
+                    triggerClassName="min-w-[10rem]"
+                  />
                 </div>
 
                 {/* Role */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">Role</label>
-                  <div className="relative">
-                    <select
-                      value={previewPickRole}
-                      onChange={e => setPreviewPickRole(e.target.value as AppRole)}
-                      className="pl-3 pr-7 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 appearance-none"
-                    >
-                      {(['acce_admin','acce_staff','school_admin','school_staff','de_admin','de_staff'] as AppRole[])
-                        .filter(r => getRoleGroup(r) === previewPickType)
-                        .map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)
-                      }
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400 pointer-events-none" />
-                  </div>
+                  <SearchableDropdown
+                    value={previewPickRole}
+                    onChange={v => setPreviewPickRole(v as AppRole)}
+                    options={(['acce_admin', 'acce_staff', 'school_admin', 'school_staff', 'de_admin', 'de_staff'] as AppRole[])
+                      .filter(r => getRoleGroup(r) === previewPickType)
+                      .map(r => ({ value: r, label: ROLE_LABELS[r] }))}
+                    placeholder="Role"
+                    allValue="__none__"
+                    searchPlaceholder="Search roles…"
+                    panelWidthClass="w-56"
+                    triggerClassName="min-w-[10rem]"
+                  />
                 </div>
 
                 {/* School — only when type is school */}
@@ -376,17 +379,16 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                     <label className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">School</label>
                     <div className="relative">
                       {schools.length > 0 ? (
-                        <>
-                          <select
-                            value={previewPickSchoolId}
-                            onChange={e => setPreviewPickSchoolId(e.target.value)}
-                            className="pl-3 pr-7 py-2 rounded-xl border border-amber-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 appearance-none min-w-[200px]"
-                          >
-                            <option value="">Select a school…</option>
-                            {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                          </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400 pointer-events-none" />
-                        </>
+                        <SearchableDropdown
+                          value={previewPickSchoolId}
+                          onChange={setPreviewPickSchoolId}
+                          options={schools.map(s => ({ value: s.id, label: s.name }))}
+                          placeholder="Select a school…"
+                          allValue=""
+                          searchPlaceholder="Search schools…"
+                          panelWidthClass="w-64"
+                          triggerClassName="min-w-[200px]"
+                        />
                       ) : (
                         <input
                           type="text"
@@ -496,18 +498,16 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                       <td className="px-5 py-3.5">
                         {isEditing ? (
                           <div className="flex items-center gap-2">
-                            <div className="relative">
-                              <select
-                                value={editingRole}
-                                onChange={e => setEditingRole(e.target.value as AppRole)}
-                                className={`${SELECT_PROGRAM_CLASS} appearance-none min-w-[9rem]`}
-                              >
-                                {myAssignableRoles.map(r => (
-                                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                                ))}
-                              </select>
-                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                            </div>
+                            <SearchableDropdown
+                              value={editingRole}
+                              onChange={v => setEditingRole(v as AppRole)}
+                              options={myAssignableRoles.map(r => ({ value: r, label: ROLE_LABELS[r] }))}
+                              placeholder="Role"
+                              allValue="__none__"
+                              searchPlaceholder="Search roles…"
+                              panelWidthClass="w-56"
+                              triggerClassName="min-w-[9rem]"
+                            />
                             <button
                               onClick={() => void handleRoleUpdate(member.id)}
                               disabled={editLoading}
@@ -657,58 +657,53 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                   {/* Type — shown only for acce_admin; scoped admins have a fixed type */}
                   {userRole === 'acce_admin' && (
                     <FormField label="Type" required>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <select
-                          value={inviteType}
-                          onChange={e => handleInviteTypeChange(e.target.value as RoleGroup)}
-                          className={`${SELECT_PROGRAM_CORE} w-full shrink-0 pl-9 pr-8 appearance-none`}
-                        >
-                          <option value="acce">ACCE</option>
-                          <option value="school">School</option>
-                          <option value="de">Department of Education</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                      </div>
+                      <SearchableDropdown
+                        className="w-full"
+                        triggerClassName="w-full"
+                        panelWidthClass="w-full"
+                        value={inviteType}
+                        onChange={v => handleInviteTypeChange(v as RoleGroup)}
+                        options={[...ROLE_GROUP_OPTIONS]}
+                        placeholder="Type"
+                        allValue="__none__"
+                        searchPlaceholder="Search types…"
+                      />
                     </FormField>
                   )}
 
                   {/* Role — filtered by selected type */}
                   <FormField label="Role" required>
-                    <div className="relative">
-                      <select
-                        value={inviteRole}
-                        onChange={e => setInviteRole(e.target.value as AppRole)}
-                        className={`${SELECT_PROGRAM_CORE} w-full shrink-0 pl-3 pr-8 appearance-none`}
-                        required
-                      >
-                        {(userRole === 'acce_admin' ? typeFilteredRoles : myAssignableRoles).map(r => (
-                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    </div>
+                    <SearchableDropdown
+                      className="w-full"
+                      triggerClassName="w-full"
+                      panelWidthClass="w-full"
+                      value={inviteRole}
+                      onChange={v => setInviteRole(v as AppRole)}
+                      options={(userRole === 'acce_admin' ? typeFilteredRoles : myAssignableRoles).map(r => ({
+                        value: r,
+                        label: ROLE_LABELS[r],
+                      }))}
+                      placeholder="Role"
+                      allValue="__none__"
+                      searchPlaceholder="Search roles…"
+                    />
                   </FormField>
 
                   {/* School — dropdown for acce_admin assigning school roles */}
                   {showSchoolIdFieldInModal && (
                     <FormField label="School" required>
                       {schools.length > 0 ? (
-                        <div className="relative">
-                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <select
-                            value={inviteSchoolId}
-                            onChange={e => setInviteSchoolId(e.target.value)}
-                            className={`${SELECT_PROGRAM_CORE} w-full shrink-0 pl-9 pr-8 appearance-none`}
-                            required
-                          >
-                            <option value="">Select a school…</option>
-                            {schools.map(s => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        </div>
+                        <SearchableDropdown
+                          className="w-full"
+                          triggerClassName="w-full"
+                          panelWidthClass="w-full"
+                          value={inviteSchoolId}
+                          onChange={setInviteSchoolId}
+                          options={schools.map(s => ({ value: s.id, label: s.name }))}
+                          placeholder="Select a school…"
+                          allValue=""
+                          searchPlaceholder="Search schools…"
+                        />
                       ) : (
                         <div className="relative">
                           <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />

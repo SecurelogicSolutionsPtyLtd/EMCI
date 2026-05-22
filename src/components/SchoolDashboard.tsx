@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
@@ -9,7 +9,7 @@ import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../da
 import type { School } from '../data/networkData';
 import { MetricCardGrid } from './MetricCardGrid';
 import { buildSchoolMetricCards } from '../lib/metricCards';
-import { SELECT_PROGRAM_CLASS } from '../lib/selectProgramClass';
+import { SearchableDropdown } from './ui/SearchableDropdown';
 
 interface SchoolDashboardProps {
   students: Student[];
@@ -66,6 +66,36 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
 
   const counsellors = Array.from(new Set(schoolStudents.map(s => s.counsellor).filter(Boolean)));
   const yearLevels  = Array.from(new Set(schoolStudents.map(s => s.yearLevel).filter(y => y > 0))).sort((a, b) => a - b);
+
+  const stageFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Stages' },
+      { value: 'referral', label: 'Initial Intake' },
+      { value: 'consent', label: 'Consent' },
+      { value: 'career_guidance', label: 'Career Guidance' },
+      { value: 'complete', label: 'Job Ready' },
+    ],
+    [],
+  );
+
+  const yearFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Year Level' },
+      ...yearLevels.map(y => ({
+        value: String(y),
+        label: y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`,
+      })),
+    ],
+    [yearLevels],
+  );
+
+  const counsellorFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Counsellors' },
+      ...counsellors.map(c => ({ value: c, label: c })),
+    ],
+    [counsellors],
+  );
 
   const filtered = schoolStudents.filter(s => {
     const name        = `${s.firstName} ${s.lastName} ${s.preferredName ?? ''}`.toLowerCase();
@@ -141,40 +171,33 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
               </div>
 
               <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto lg:ml-auto">
-                <select
+                <SearchableDropdown
                   value={filterStage}
-                  onChange={e => handleFilterStage(e.target.value)}
-                  className={`${SELECT_PROGRAM_CLASS} min-w-[10.5rem]`}
-                >
-                  <option value="all">All Stages</option>
-                  <option value="referral">Initial Intake</option>
-                  <option value="consent">Consent</option>
-                  <option value="career_guidance">Career Guidance</option>
-                  <option value="complete">Job Ready</option>
-                </select>
-
-                <select
+                  onChange={handleFilterStage}
+                  options={stageFilterOptions}
+                  placeholder="All Stages"
+                  searchPlaceholder="Search stages…"
+                  panelWidthClass="w-56"
+                  triggerClassName="min-w-[10.5rem]"
+                />
+                <SearchableDropdown
                   value={filterYear}
-                  onChange={e => handleFilterYear(e.target.value)}
-                  className={`${SELECT_PROGRAM_CLASS} min-w-[9.5rem]`}
-                >
-                  <option value="all">Year Level</option>
-                  {yearLevels.map(y => (
-                    <option key={y} value={String(y)}>{y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`}</option>
-                  ))}
-                </select>
-
-                <select
+                  onChange={handleFilterYear}
+                  options={yearFilterOptions}
+                  placeholder="Year Level"
+                  searchPlaceholder="Search year levels…"
+                  panelWidthClass="w-48"
+                  triggerClassName="min-w-[9.5rem]"
+                />
+                <SearchableDropdown
                   value={filterCounsellor}
-                  onChange={e => handleFilterCounsellor(e.target.value)}
-                  className={`${SELECT_PROGRAM_CLASS} min-w-[11rem]`}
-                >
-                  <option value="all">All Counsellors</option>
-                  {counsellors.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-
+                  onChange={handleFilterCounsellor}
+                  options={counsellorFilterOptions}
+                  placeholder="All Counsellors"
+                  searchPlaceholder="Search counsellors…"
+                  panelWidthClass="w-56"
+                  triggerClassName="min-w-[11rem]"
+                />
               </div>
             </div>
 

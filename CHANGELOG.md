@@ -7,6 +7,20 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-05-07 (latest)
 
+### Changed: Unified searchable dropdown UI
+
+- Added [`SearchableDropdown`](src/components/ui/SearchableDropdown.tsx) (counsellor **Filter by school** pattern: bordered trigger, search field, scrollable list, primary highlight, optional counts).
+- Replaced native `<select>` and DevLab-style filter menus on **Students**, **Schools**, **School cohort**, **Counsellors**, **Team Management**, **Student Search**, and **Dataverse Lab** with the shared component.
+
+### Fixed: SPA routes on Vercel (refresh / direct URLs)
+
+- [`vercel.json`](vercel.json): catch-all rewrite to `index.html` so paths such as `/counsellors`, `/schools`, and `/student/:id` work on refresh and when opened directly (not only via in-app navigation).
+
+### Changed: Counsellors page student roster
+
+- [`CounsellorView`](src/components/CounsellorView.tsx): roster rows navigate to **`/student/:id`** when the role may open the student journey (same as schools/students lists).
+- Student roster is **paginated** (10 per page) with Previous/Next and page numbers; page resets when counsellor or school filter changes.
+
 ### Changed: App title
 
 - Browser tab, Open Graph title, sidebar tagline, and login branding use **EMCI Student Management Platform** (replacing **Student Intelligence Interface** / split **Platform** label).

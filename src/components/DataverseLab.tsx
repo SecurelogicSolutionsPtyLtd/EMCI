@@ -8,7 +8,7 @@ import {
   Database, ChevronRight, ArrowRight, Columns, Tag, SquareFunction,
   ChevronDown, Info, ClipboardList, Users
 } from 'lucide-react';
-import { SELECT_PROGRAM_CLASS } from '../lib/selectProgramClass';
+import { SearchableDropdown } from './ui/SearchableDropdown';
 
 interface RequestHistoryItem {
   id: string;
@@ -602,16 +602,21 @@ export function DataverseLab({ onBack, onGoToSurveySearch, onGoToStudentSearch }
 
             {/* Method + endpoint */}
             <div className="flex gap-2 mb-3">
-              <select
+              <SearchableDropdown
                 value={method}
-                onChange={e => setMethod(e.target.value as any)}
-                className={`${SELECT_PROGRAM_CLASS} w-24`}
-              >
-                <option>GET</option>
-                <option>POST</option>
-                <option>PATCH</option>
-                <option>DELETE</option>
-              </select>
+                onChange={v => setMethod(v as 'GET' | 'POST' | 'PATCH' | 'DELETE')}
+                options={[
+                  { value: 'GET', label: 'GET' },
+                  { value: 'POST', label: 'POST' },
+                  { value: 'PATCH', label: 'PATCH' },
+                  { value: 'DELETE', label: 'DELETE' },
+                ]}
+                placeholder="Method"
+                allValue="__none__"
+                searchable={false}
+                panelWidthClass="w-32"
+                triggerClassName="w-24"
+              />
               <input
                 value={endpoint}
                 onChange={e => setEndpoint(e.target.value)}
@@ -1123,14 +1128,18 @@ export function DataverseLab({ onBack, onGoToSurveySearch, onGoToStudentSearch }
                             className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 placeholder:text-slate-400"
                           />
                         </div>
-                        <select
+                        <SearchableDropdown
                           value={attrTypeFilter}
-                          onChange={e => setAttrTypeFilter(e.target.value)}
-                          className={`${SELECT_PROGRAM_CLASS} min-w-[8.5rem]`}
-                        >
-                          <option value="all">All Types</option>
-                          {attrTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                          onChange={setAttrTypeFilter}
+                          options={[
+                            { value: 'all', label: 'All Types' },
+                            ...attrTypes.map(t => ({ value: t, label: t })),
+                          ]}
+                          placeholder="All Types"
+                          searchPlaceholder="Search types…"
+                          panelWidthClass="w-52"
+                          triggerClassName="min-w-[8.5rem]"
+                        />
                         {!attrsLoading && (
                           <span className="text-[10px] text-slate-400 ml-auto font-mono">{filteredAttrs.length} of {attributes.length} fields</span>
                         )}

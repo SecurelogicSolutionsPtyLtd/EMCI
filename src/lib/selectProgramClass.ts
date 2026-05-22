@@ -1,6 +1,5 @@
 /**
- * Native `<select>` styling for programme chrome (matches school scope / roster filters).
- * Slate fill, no border, rounded-lg, text-sm — add width/min-width and `pl-*` / `pr-*` as needed.
+ * Legacy native `<select>` styling (prefer [`SearchableDropdown`](../components/ui/SearchableDropdown.tsx) for filters).
  */
 export const SELECT_PROGRAM_CORE =
   'text-sm h-8 min-h-[2rem] rounded-lg bg-slate-100 border-none py-0 ' +
