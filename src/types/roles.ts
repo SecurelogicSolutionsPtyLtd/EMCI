@@ -60,7 +60,8 @@ export function canAccessPage(role: AppRole, page: Page): boolean {
     case 'school':        return group === 'acce' || group === 'school';
     // School roles can VIEW the student journey for their own students (read-only).
     // PDF export and write actions remain ACCE-only via separate gates.
-    case 'student':       return group === 'acce' || group === 'school';
+    // DE: read-only redacted journey (no write / PDF).
+    case 'student':       return group === 'acce' || group === 'school' || group === 'de';
     case 'pdf':           return group === 'acce';
     case 'counsellors':   return group === 'acce';
     case 'devlab':        return group === 'acce';
@@ -72,9 +73,14 @@ export function canAccessPage(role: AppRole, page: Page): boolean {
 
 // ── Data-level permission helpers ─────────────────────────────────────────────
 
-/** DE users must never see individual student names or identifiers. */
+/** Structured student PII (name, Morrisby, email, year line, counsellor on profile). */
 export function canSeeStudentNames(role: AppRole): boolean {
   return getRoleGroup(role) !== 'de';
+}
+
+/** Student roster (anonymized for DE). */
+export function canViewStudentRoster(role: AppRole): boolean {
+  return true;
 }
 
 /** Only ACCE roles can access write operations. */

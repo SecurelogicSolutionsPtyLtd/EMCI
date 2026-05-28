@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Building2, LayoutDashboard, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { canSeeStudentNames } from '../types/roles';
+import { canSeeStudentNames, canViewStudentRoster } from '../types/roles';
 import type { AppShellOutletContext } from '../routes/shellContext';
 import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
 
@@ -10,7 +10,8 @@ export function DashboardHome() {
   const navigate = useNavigate();
   const { students, schools, userRole } = useOutletContext<AppShellOutletContext>();
   const { schoolId } = useAuth();
-  const showStudentRoster = canSeeStudentNames(userRole);
+  const showStudentRoster = canViewStudentRoster(userRole);
+  const showStudentNames = canSeeStudentNames(userRole);
 
   const { visibleSchools, visibleStudents } = getProgramVisibleScope(
     students,
@@ -77,7 +78,9 @@ export function DashboardHome() {
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Students</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  Network student roster, filters, and journey access (where permitted).
+                  {showStudentNames
+                    ? 'Network student roster, filters, and journey access (where permitted).'
+                    : 'Anonymized student roster and read-only redacted journey.'}
                 </p>
               </div>
             </button>

@@ -5,9 +5,14 @@ import { ProfileSnapshot } from '../components/ProfileSnapshot';
 import { TimelineCore } from '../components/TimelineCore';
 import { ContextPanel } from '../components/ContextPanel';
 import { useAuth } from '../context/AuthContext';
-import { canAccessPage, getRoleGroup } from '../types/roles';
+import { canAccessPage, canSeeStudentNames, getRoleGroup } from '../types/roles';
 import type { AppShellOutletContext } from './shellContext';
 import { isPlausibleRecordIdParam } from '../lib/recordIdParam';
+import {
+  redactTimelineEvents,
+  studentPseudonym,
+  toRedactedStudentView,
+} from '../lib/studentRedaction';
 
 export function StudentJourneyRoute() {
   const { studentId: studentIdParam } = useParams();
@@ -17,10 +22,24 @@ export function StudentJourneyRoute() {
   const { schoolId: authSchoolId } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
+  const hidePii = !canSeeStudentNames(userRole);
+  const canOpenSchool = canAccessPage(userRole, 'school');
+
   const selectedStudent = useMemo(() => {
     if (!isPlausibleRecordIdParam(studentIdParam)) return null;
     return students.find(s => s.id === studentIdParam) ?? null;
   }, [students, studentIdParam]);
+
+  const displayStudent = useMemo(
+    () => (hidePii ? toRedactedStudentView(selectedStudent) : selectedStudent),
+    [hidePii, selectedStudent],
+  );
+
+  const studentEvents = useMemo(() => {
+    if (!selectedStudent) return [];
+    const raw = studentEventsMap[selectedStudent.id] ?? [];
+    return redactTimelineEvents(raw, selectedStudent, userRole);
+  }, [selectedStudent, studentEventsMap, userRole]);
 
   if (!isPlausibleRecordIdParam(studentIdParam)) {
     return <Navigate to="/dashboard" replace />;
@@ -53,7 +72,9 @@ export function StudentJourneyRoute() {
         undefined)
     : undefined;
 
-  const studentEvents = selectedStudent ? (studentEventsMap[selectedStudent.id] ?? []) : [];
+  const breadcrumbStudentLabel = selectedStudent
+    ? (hidePii ? studentPseudonym(selectedStudent.id) : `${selectedStudent.firstName} ${selectedStudent.lastName}`)
+    : 'Student Journey';
 
   return (
     <div className="h-full min-h-0 w-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
@@ -68,20 +89,35 @@ export function StudentJourneyRoute() {
             Dashboard
           </button>
           <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-          <button
-            type="button"
-            onClick={() =>
-              selectedSchoolForStudent
-                ? navigate(`/school/${selectedSchoolForStudent.id}`)
-                : navigate('/schools')
-            }
-            className="text-sm text-slate-500 hover:text-primary transition-colors font-medium truncate"
-          >
-            {selectedSchoolForStudent?.name ?? 'School'}
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+          {canOpenSchool ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  selectedSchoolForStudent
+                    ? navigate(`/school/${selectedSchoolForStudent.id}`)
+                    : navigate('/schools')
+                }
+                className="text-sm text-slate-500 hover:text-primary transition-colors font-medium truncate"
+              >
+                {selectedSchoolForStudent?.name ?? 'School'}
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/students')}
+                className="text-sm text-slate-500 hover:text-primary transition-colors font-medium truncate"
+              >
+                Students
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+            </>
+          )}
           <span className="text-sm text-slate-800 font-semibold truncate">
-            {selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : 'Student Journey'}
+            {breadcrumbStudentLabel}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -100,11 +136,15 @@ export function StudentJourneyRoute() {
 
       <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
         <div className="w-72 shrink-0 border-r border-slate-200 flex flex-col min-h-0 bg-white">
-          <ProfileSnapshot student={selectedStudent} schoolName={studentSchoolName} />
+          <ProfileSnapshot
+            student={displayStudent}
+            schoolName={studentSchoolName}
+            hidePii={hidePii}
+          />
         </div>
         <div className="flex-1 flex flex-col relative overflow-hidden min-h-0 min-w-0">
           <TimelineCore
-            student={selectedStudent}
+            student={displayStudent}
             events={studentEvents}
             onSelectEvent={setSelectedEvent}
           />
@@ -114,6 +154,7 @@ export function StudentJourneyRoute() {
             student={selectedStudent}
             selectedEvent={selectedEvent}
             onClose={() => setSelectedEvent(null)}
+            hidePii={hidePii}
           />
         </div>
       </div>

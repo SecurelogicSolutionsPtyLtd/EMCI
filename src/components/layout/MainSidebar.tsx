@@ -11,7 +11,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import type { AppRole } from '../../types/roles';
-import { canAccessPage, canSeeStudentNames, isAdminRole, ROLE_LABELS } from '../../types/roles';
+import { canAccessPage, canViewStudentRoster, isAdminRole, ROLE_LABELS } from '../../types/roles';
 import { useAuth } from '../../context/AuthContext';
 
 export type NetworkMainTab = 'schools' | 'students';
@@ -46,7 +46,7 @@ export function MainSidebar({
   const { authUser, signOutUser } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
-  const showStudentRoster = canSeeStudentNames(userRole);
+  const showStudentRoster = canViewStudentRoster(userRole);
   const showCounsellors    = canAccessPage(userRole, 'counsellors');
   const showDevLab         = canAccessPage(userRole, 'devlab');
   const showTeam           = isAdminRole(userRole);

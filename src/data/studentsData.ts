@@ -8,6 +8,8 @@ export interface Student {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  /** Dataverse `cr89a_studentname` — used for redaction pattern matching. */
+  studentName?: string;
   email?: string;
   /** Decoded from `cr89a_yearlevel` picklist (9, 10, or {@link YEAR_LEVEL_PLUS_BUCKET} for "15+"). */
   yearLevel: number;

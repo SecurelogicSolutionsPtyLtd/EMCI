@@ -219,6 +219,7 @@ function mapStudent(raw: RawStudent): Student & { schoolId: string } {
     firstName:     raw.cr89a_firstname  ?? '',
     lastName:      raw.cr89a_lastname   ?? '',
     preferredName: raw.cr89a_preferredname ?? undefined,
+    studentName:   raw.cr89a_studentname ?? undefined,
     email:         raw.emailaddress     ?? undefined,
     yearLevel,
     yearLevelLabel,

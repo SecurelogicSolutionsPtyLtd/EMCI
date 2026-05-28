@@ -4,11 +4,13 @@ import { AlertTriangle, Clock, X, User, Info, MoreVertical, FileText } from 'luc
 import { motion, AnimatePresence } from 'motion/react';
 import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { SurveyField } from '../services/surveyFields';
+import { buildRedactedOverview } from '../lib/studentRedaction';
 
 interface ContextPanelProps {
   student: Student | null;
   selectedEvent: any | null;
   onClose: () => void;
+  hidePii?: boolean;
 }
 
 function ContextRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -53,7 +55,19 @@ function buildOverview(student: Student | null): string {
   return `${name} is a student in ${yearPhrase} ${stageStr}.${suffix}`;
 }
 
-export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelProps) {
+function isBoilerplateReferralConsent(
+  text: string,
+  student: Student | null,
+): boolean {
+  if (!student) return false;
+  const full = `${student.firstName} ${student.lastName}`.trim();
+  return (
+    text === `Initial referral received for ${full}.` ||
+    text === `Parental consent obtained for ${full}.`
+  );
+}
+
+export function ContextPanel({ student, selectedEvent, onClose, hidePii = false }: ContextPanelProps) {
   return (
     <div className="flex flex-col h-full bg-white overflow-y-auto">
       <AnimatePresence mode="wait">
@@ -134,8 +148,7 @@ export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelPr
             {/* Description (only if it differs from notes) */}
             {selectedEvent.description &&
              selectedEvent.description !== selectedEvent.notes &&
-             selectedEvent.description !== `Initial referral received for ${student?.firstName} ${student?.lastName}.` &&
-             selectedEvent.description !== `Parental consent obtained for ${student?.firstName} ${student?.lastName}.` && (
+             (hidePii || !isBoilerplateReferralConsent(selectedEvent.description, student)) && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Description</span>
                 <p className="text-sm text-slate-700 leading-relaxed border-l-2 border-primary/30 pl-3 py-1">
@@ -146,8 +159,7 @@ export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelPr
 
             {/* Notes */}
             {selectedEvent.notes &&
-             selectedEvent.notes !== `Initial referral received for ${student?.firstName} ${student?.lastName}.` &&
-             selectedEvent.notes !== `Parental consent obtained for ${student?.firstName} ${student?.lastName}.` && (
+             (hidePii || !isBoilerplateReferralConsent(selectedEvent.notes, student)) && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
                   {selectedEvent.type === 'session' ? 'Session Notes' : 'Notes'}
@@ -216,7 +228,7 @@ export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelPr
                 STUDENT OVERVIEW
               </label>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-sm leading-relaxed text-slate-700">
-                {buildOverview(student)}
+                {hidePii ? buildRedactedOverview(student) : buildOverview(student)}
               </div>
             </div>
 
@@ -231,10 +243,12 @@ export function ContextPanel({ student, selectedEvent, onClose }: ContextPanelPr
                   label="Student Type"
                   value={student?.studentType || '—'}
                 />
-                <ContextRow
-                  label="Year Level"
-                  value={student ? formatYearLevelLine(student) : '—'}
-                />
+                {!hidePii && (
+                  <ContextRow
+                    label="Year Level"
+                    value={student ? formatYearLevelLine(student) : '—'}
+                  />
+                )}
                 <div className="flex justify-between items-center p-3 rounded-lg border border-slate-100">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Student Interviewed

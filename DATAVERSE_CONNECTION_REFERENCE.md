@@ -59,7 +59,7 @@ Prefer:           odata.include-annotations="*"
 | `cr89a_firstname` | First Name | String | `student.firstName` | |
 | `cr89a_lastname` | Last Name | String | `student.lastName` | |
 | `cr89a_preferredname` | Preferred Name | String | `student.preferredName` | |
-| `cr89a_studentname` | Full Name | String | — | Not mapped separately |
+| `cr89a_studentname` | Full Name | String | `student.studentName` | Used for DE redaction pattern matching only (not shown in UI) |
 | `emailaddress` | Email | String | `student.email` | |
 | `cr89a_yearlevel` | Year Level | Picklist (code) | `student.yearLevel` | Decoded via `YEAR_LEVEL_CODE_MAP` — **do not parse the label** |
 | `cr89a_yearlevel@OData...FormattedValue` | Year Level Label | Annotation | `student.yearLevelLabel` | Stored for display only (can be cohort name like "EMCI 2024 Students (Y9)") |

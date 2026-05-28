@@ -5,7 +5,20 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-05-07 (latest)
+## — 2026-05-28 (latest)
+
+### Added: DE student redaction and redacted read-only journey
+
+- New [`src/lib/studentRedaction.ts`](src/lib/studentRedaction.ts): pattern builder, literal + fuzzy typo scrubbing, pseudonym labels, timeline event redaction, and unit tests (`npm run test`).
+- **DE roles** (`de_staff`, `de_admin`): may open the **Students** roster (pseudonym column, no name/Morrisby/year/counsellor filters) and a **read-only Student Journey** with structured PII hidden and session/survey free-text scrubbed.
+- [`canViewStudentRoster`](src/types/roles.ts) separated from [`canSeeStudentNames`](src/types/roles.ts); DE `canAccessPage('student')` enabled for read-only journey.
+- [`ProfileSnapshot`](src/components/ProfileSnapshot.tsx), [`ContextPanel`](src/components/ContextPanel.tsx), [`StudentJourneyRoute`](src/routes/StudentJourneyRoute.tsx), and [`NetworkOverview`](src/components/NetworkOverview.tsx) updated for DE privacy mode.
+- Dataverse [`cr89a_studentname`](src/services/dataverse.ts) mapped to `student.studentName` for redaction patterns.
+- [`ROLES_AND_ACCESS.md`](ROLES_AND_ACCESS.md) updated to describe anonymized roster, redacted journey, and residual free-text risk.
+
+---
+
+## — 2026-05-07
 
 ### Changed: Unified searchable dropdown UI
 

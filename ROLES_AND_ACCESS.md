@@ -102,9 +102,9 @@ School Administrators and Principals are responsible for their school's particip
 ### 3. Department of Education / DE External Users
 **Tier:** External Oversight  
 **Authentication:** Username + Password + MFA  
-**Access Level:** Aggregated Read Only — student names and identifiers are never visible
+**Access Level:** Aggregated Read Only with anonymized student roster and redacted read-only journey
 
-Department of Education (DE) External Users are government stakeholders who monitor the EMCI programme at a policy and outcomes level. They authenticate as external users and see only aggregated, de-identified data. **DE users must never see student names, student IDs, or any other individual student identifier anywhere in the platform.**
+Department of Education (DE) External Users are government stakeholders who monitor the EMCI programme at a policy and outcomes level. They authenticate as external users and see de-identified data at the network and school level. **DE users must never see student names, Morrisby IDs, year levels, emails, or counsellor identities.** They may open an **anonymized student roster** (pseudonym labels only) and a **read-only Student Journey** where structured PII is hidden and free-text in sessions/surveys is scrubbed.
 
 #### What They Can Do
 - Sign in with username + password protected by mandatory MFA (MFA enrolment is required and enforced on first login — access is blocked until MFA is configured)
@@ -112,17 +112,26 @@ Department of Education (DE) External Users are government stakeholders who moni
 - View per-school programme completion percentages and stage distributions
 - Filter the network by region
 - View high-level counsellor coverage (count of active counsellors, not individual records)
+- Browse the **anonymized student roster** (pseudonym per student, stage, progress, school — no names or Morrisby IDs)
+- Open a **read-only, redacted Student Journey** (timeline and event details with PII scrubbed from text fields)
 - Access summary programme health reports
 - Export anonymised, aggregated network-level data
 
 #### What They Cannot Do
-- **View any student's name, Morrisby ID, year level, email, or other personal identifier — anywhere in the platform**
-- View any individual student record, profile, journey, or event history
-- Open the School Dashboard student table or any list that surfaces student names
-- Open the Student Journey view for any student
-- View individual counsellor performance or workload detail
+- **View any student's legal name, preferred name, Morrisby ID, year level, email, or assigned counsellor name**
+- Open the School Dashboard or any school cohort table that surfaces student names
+- View individual counsellor performance or workload detail (Counsellor View)
+- Generate or export PDF student reports
+- Log or edit timeline events, progress stages, or any other write operation
 - Access the Dataverse Developer Lab
 - Modify any data in the system
+
+#### Redaction behaviour (DE journey)
+- **Structured fields hidden:** name, preferred name, Morrisby ID, email, year/cohort line, counsellor, deactivation year-group snapshot.
+- **Pseudonym:** roster and breadcrumbs use `Student · {suffix}` derived from the internal record key (not the student's name).
+- **Free-text scrubbed:** session subjects, internal notes, external support details, and survey memo fields are passed through a redaction layer that replaces known name tokens and common typos (e.g. misspelled first names) with `[Redacted]`.
+- **Recorded by:** shown as `EMCI Staff` (no individual counsellor name).
+- **Residual risk:** counsellor-entered text that does not match canonical name tokens (unusual nicknames, unrelated words) may not be caught; Dataverse guidance should discourage embedding student names in free-text fields.
 
 #### Data Scope
 | Data | Access |
@@ -130,7 +139,9 @@ Department of Education (DE) External Users are government stakeholders who moni
 | Network KPI totals | Read Only (aggregated) |
 | Per-school completion stats | Read Only (aggregated) |
 | Regional breakdowns | Read Only (aggregated) |
-| Individual student records (names, IDs, year levels, Morrisby IDs) | **No Access** |
+| Anonymized student roster | Read Only (pseudonym labels) |
+| Redacted student journey (timeline) | Read Only (scrubbed text) |
+| Student names, Morrisby IDs, year levels, emails | **No Access** |
 | Counsellor performance detail | No Access |
 | Dataverse / system data | No Access |
 | PDF export | No Access |
@@ -147,8 +158,9 @@ The table below summarises which pages and features are accessible per role.
 | Network Overview (school cards) | ✅ | — | ✅ (agg.) |
 | School Dashboard (own school) | ✅ | ✅ (read) | — |
 | School Dashboard (other schools) | ✅ | — | — |
-| Student Journey (any student) | ✅ | — | — |
-| Student names / IDs visible | ✅ | ✅ (own school) | — |
+| Student Journey (any student) | ✅ | ✅ (read, own school) | ✅ (read, redacted) |
+| Student names / IDs visible | ✅ | ✅ (own school) | — (pseudonym only) |
+| Anonymized student roster | ✅ | ✅ | ✅ |
 | Log / Edit Timeline Events | ✅ | — | — |
 | Progress Student Stage | ✅ | — | — |
 | PDF Export (any student) | ✅ | — | — |
@@ -177,7 +189,7 @@ Roles are managed through **Azure Active Directory (Azure AD)** security groups.
 ## Data Privacy & Compliance Considerations
 
 - **Student PII** (names, Morrisby IDs, emails, year levels) is restricted to **ACCE Users** (full access) and **School Administrators / Principals** (own school only). DE External Users must never see any of these fields anywhere in the platform.
-- **DE External Users** receive only aggregated, non-identifiable statistics. The user interface must hide all student identifiers from this role at the data and presentation layers.
+- **DE External Users** receive aggregated statistics plus an anonymized roster and redacted read-only journey. The UI must hide structured student identifiers and scrub free-text activity fields at the presentation layer (`src/lib/studentRedaction.ts`).
 - **MFA** is mandatory for all username + password sign-ins (School Administrators / Principals and DE External Users). MFA enrolment is enforced on first login — the platform must block access until the user has completed MFA setup. MFA cannot be bypassed or deferred. MFA session tokens expire in less than 24 hours — users must re-authenticate with MFA on each new session.
 - **ACCE Users** authenticate exclusively via Microsoft SSO; password-based sign-in is not available to this role.
 - All data access is mediated through the Dataverse API layer. No direct database access is permitted for any user-facing role.

@@ -8,7 +8,8 @@ import {
 import type { School } from '../data/networkData';
 import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
 import type { AppRole } from '../types/roles';
-import { canAccessPage, canSeeStudentNames } from '../types/roles';
+import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../types/roles';
+import { studentPseudonym } from '../lib/studentRedaction';
 import { useAuth } from '../context/AuthContext';
 import type { NetworkMainTab } from './layout/MainSidebar';
 import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
@@ -71,6 +72,7 @@ export function NetworkOverview({
 }: NetworkOverviewProps) {
   const { schoolId } = useAuth();
   const showStudentNames   = canSeeStudentNames(userRole);
+  const showStudentRoster  = canViewStudentRoster(userRole);
   const showStudentJourney = canAccessPage(userRole, 'student');
   const canOpenSchoolDashboard = canAccessPage(userRole, 'school');
 
@@ -183,10 +185,15 @@ export function NetworkOverview({
 
   // ── student roster filter ─────────────────────────────────────
   const filteredRoster = visibleStudents.filter(s => {
-    const name    = `${s.firstName} ${s.lastName} ${s.preferredName ?? ''}`.toLowerCase();
-    const matchSearch = name.includes(rosterSearch.toLowerCase()) ||
-                        s.morrisbyId.toLowerCase().includes(rosterSearch.toLowerCase()) ||
-                        (s.counsellor ?? '').toLowerCase().includes(rosterSearch.toLowerCase());
+    const q = rosterSearch.toLowerCase();
+    const matchSearch = showStudentNames
+      ? `${s.firstName} ${s.lastName} ${s.preferredName ?? ''}`.toLowerCase().includes(q) ||
+        s.morrisbyId.toLowerCase().includes(q) ||
+        (s.counsellor ?? '').toLowerCase().includes(q)
+      : studentPseudonym(s.id).toLowerCase().includes(q) ||
+        (visibleSchools.find(sc => sc.id === (s as { schoolId?: string }).schoolId)?.name ?? '')
+          .toLowerCase()
+          .includes(q);
     const matchSchool = rosterSchool === 'all' || (s as any).schoolId === rosterSchool;
     const matchCounsellor =
       rosterCounsellor === 'all' || (s.counsellor ?? '').trim() === rosterCounsellor;
@@ -218,11 +225,7 @@ export function NetworkOverview({
 
   const KPIS = buildProgramKpiCards(visibleSchools, visibleStudents);
 
-  // ── nav items (role-filtered) ─────────────────────────────────
-  // DE roles never see the per-student roster — aggregated views only.
-  const showStudentRoster = showStudentNames;
-
-  // Clamp the active view if the role can't see the roster (e.g. impersonating DE).
+  // Clamp the active view if the role can't see the roster.
   // Using a derived value avoids a setState-during-render loop.
   const effectiveView: View = networkTab === 'students' && !showStudentRoster ? 'schools' : networkTab;
 
@@ -394,22 +397,28 @@ export function NetworkOverview({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search students by name, ID or counsellor..."
+                      placeholder={
+                        showStudentNames
+                          ? 'Search students by name, ID or counsellor...'
+                          : 'Search by pseudonym or school...'
+                      }
                       value={rosterSearch}
                       onChange={e => handleRosterSearch(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full lg:flex-1 lg:min-w-0">
-                    <SearchableDropdown
-                      value={rosterCounsellor}
-                      onChange={handleRosterCounsellor}
-                      options={counsellorFilterOptions}
-                      placeholder="All Counsellors"
-                      searchPlaceholder="Search counsellors…"
-                      panelWidthClass="w-56"
-                    />
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:flex-1 lg:min-w-0 ${showStudentNames ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
+                    {showStudentNames && (
+                      <SearchableDropdown
+                        value={rosterCounsellor}
+                        onChange={handleRosterCounsellor}
+                        options={counsellorFilterOptions}
+                        placeholder="All Counsellors"
+                        searchPlaceholder="Search counsellors…"
+                        panelWidthClass="w-56"
+                      />
+                    )}
                     <SearchableDropdown
                       value={rosterStage}
                       onChange={handleRosterStage}
@@ -418,14 +427,16 @@ export function NetworkOverview({
                       searchPlaceholder="Search stages…"
                       panelWidthClass="w-56"
                     />
-                    <SearchableDropdown
-                      value={rosterYear}
-                      onChange={handleRosterYear}
-                      options={yearFilterOptions}
-                      placeholder="Year Level"
-                      searchPlaceholder="Search year levels…"
-                      panelWidthClass="w-48"
-                    />
+                    {showStudentNames && (
+                      <SearchableDropdown
+                        value={rosterYear}
+                        onChange={handleRosterYear}
+                        options={yearFilterOptions}
+                        placeholder="Year Level"
+                        searchPlaceholder="Search year levels…"
+                        panelWidthClass="w-48"
+                      />
+                    )}
                     <SearchableDropdown
                       value={rosterStatus}
                       onChange={handleRosterStatus}
@@ -515,7 +526,9 @@ export function NetworkOverview({
                                   <div className="flex flex-col min-w-0">
                                     <div className="flex items-center gap-2">
                                       <span className={`font-bold text-slate-900 ${showStudentJourney ? 'group-hover:text-primary transition-colors' : ''}`}>
-                                        {showStudentNames ? `${student.firstName} ${student.lastName}` : '— Redacted —'}
+                                        {showStudentNames
+                                          ? `${student.firstName} ${student.lastName}`
+                                          : studentPseudonym(student.id)}
                                       </span>
                                       {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                                     </div>
