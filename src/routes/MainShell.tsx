@@ -18,6 +18,7 @@ export function MainShell({ context }: MainShellProps) {
   const schoolsNavActive = path === '/schools' || path.startsWith('/school/');
   const studentsNavActive = path === '/students' || path.startsWith('/student/');
   const counsellorsNavActive = path === '/counsellors';
+  const deAnalyticsActive = path.startsWith('/de');
 
   const ErrorBanner = dataError ? (
     <div className="shrink-0 bg-red-50 border-b border-red-200 px-6 py-2 flex items-center gap-3">
@@ -42,10 +43,12 @@ export function MainShell({ context }: MainShellProps) {
           schoolsNavActive={schoolsNavActive}
           studentsNavActive={studentsNavActive}
           counsellorsNavActive={counsellorsNavActive}
+          deAnalyticsActive={deAnalyticsActive}
           onGoToDashboard={() => navigate('/dashboard')}
           onGoToSchools={() => navigate('/schools')}
           onGoToStudents={() => navigate('/students')}
           onGoToCounsellors={() => navigate('/counsellors')}
+          onGoToDeAnalytics={() => navigate('/de/analytics')}
           onGoToDevLab={() => navigate('/devlab')}
           onGoToTeam={() => navigate('/team')}
           userRole={userRole}

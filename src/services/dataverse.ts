@@ -161,13 +161,22 @@ export interface RawSession extends RawActivity {
   'cr89a_typeofintervention@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_internalnotes: string | null;
   cr89a_externalsupportdetails: string | null;
+  // Intervention multiselect picklists — the human-readable labels arrive in the
+  // semicolon-delimited @FormattedValue annotation (raw fields hold option codes).
   cr89a_intervention_ms: string | null;
+  'cr89a_intervention_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventionmorrisby_ms: string | null;
+  'cr89a_interventionmorrisby_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventioncap_ms: string | null;
+  'cr89a_interventioncap_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventionindustryengagement_ms: string | null;
+  'cr89a_interventionindustryengagement_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventionwexpreparation_ms: string | null;
+  'cr89a_interventionwexpreparation_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventionworkreadiness_ms: string | null;
+  'cr89a_interventionworkreadiness_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventionother_ms: string | null;
+  'cr89a_interventionother_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
 }
 
 // cr89a_emcistudentabsence specific fields
@@ -507,6 +516,13 @@ export function enrichStudents(
 }
 
 // ── Timeline event type ────────────────────────────────────────────
+/** Session detail surfaced on pending / empty end-of-pilot survey events. */
+export interface RelatedSessionContext {
+  title: string;
+  date: string;
+  fields: SurveyField[];
+}
+
 export interface TimelineEvent {
   id: string;
   date: string;
@@ -521,6 +537,48 @@ export interface TimelineEvent {
   sessionLength?: string;
   interventionType?: string;
   surveyFields?: SurveyField[];
+  /** Counselling session context for end surveys awaiting student responses. */
+  relatedSession?: RelatedSessionContext;
+}
+
+function isRealSessionEvent(ev: TimelineEvent): boolean {
+  return ev.type === 'session' && ev.id.startsWith('session-');
+}
+
+function isEndSurveyEvent(ev: TimelineEvent): boolean {
+  return ev.type === 'survey' && (ev.id.startsWith('end-survey-') || ev.id === 'step-4');
+}
+
+function endSurveyNeedsSessionContext(ev: TimelineEvent): boolean {
+  return isEndSurveyEvent(ev) && (ev.surveyFields?.length ?? 0) === 0;
+}
+
+/** Latest real session — used to give end-of-pilot surveys session context for AI + UI. */
+function latestSessionContext(events: TimelineEvent[]): RelatedSessionContext | undefined {
+  const sessions = events.filter(isRealSessionEvent);
+  if (!sessions.length) return undefined;
+
+  const latest = sessions[sessions.length - 1]!;
+  const fields = [...(latest.surveyFields ?? [])];
+  if (
+    latest.notes &&
+    latest.notes !== 'Session notes not recorded.' &&
+    !fields.some(f => f.label === 'Notes')
+  ) {
+    fields.push({ label: 'Notes', value: latest.notes });
+  }
+  if (!fields.length) return undefined;
+
+  return { title: latest.title, date: latest.date, fields };
+}
+
+function enrichEndSurveysWithSessionContext(events: TimelineEvent[]): TimelineEvent[] {
+  const sessionCtx = latestSessionContext(events);
+  if (!sessionCtx) return events;
+
+  return events.map(ev =>
+    endSurveyNeedsSessionContext(ev) ? { ...ev, relatedSession: sessionCtx } : ev,
+  );
 }
 
 // ── Build real timeline events for a student ───────────────────────
@@ -794,10 +852,12 @@ export function deriveStudentEvents(
   // The event is a placeholder — no survey fields are available.
   const hasEndSurveys = (endOfPilotSurveysLegacy?.length ?? 0) + (endOfPilotSurveys2026?.length ?? 0) > 0;
   if (student.currentStage === 'complete' && !hasEndSurveys) {
+    const latestSession = events.filter(isRealSessionEvent).at(-1);
+    const endSurveyDate = latestSession?.date ?? fallbackDate;
     events.push({
       id:           'step-4',
-      date:         fallbackDate,
-      modifiedDate: fallbackDate,
+      date:         endSurveyDate,
+      modifiedDate: endSurveyDate,
       type:         'survey',
       title:        'EMCI End of Pilot Survey',
       status:       'Pending',
@@ -811,5 +871,5 @@ export function deriveStudentEvents(
 
   // Sort all events chronologically
   events.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
-  return events;
+  return enrichEndSurveysWithSessionContext(events);
 }

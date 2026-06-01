@@ -38,16 +38,38 @@ export function buildSurveyFields(
     .map(p => ({ label: p.label, value: String(p.value).trim() }));
 }
 
+// ── Helper: strip HTML tags from memo fields for plain-text display ─
+function stripHtml(html: string | null | undefined): string | null {
+  if (!html) return null;
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.length > 0 ? text : null;
+}
+
 // ── Session ───────────────────────────────────────────────────────
+// Surfaces every EMCI-specific session field (intervention multiselects use
+// their semicolon-delimited @FormattedValue label) so the slideout and the AI
+// analysis see the full intervention picture.
 export function buildSessionFields(
   s: RawSession,
   sessionLength: string | undefined,
   interventionType: string | undefined,
 ): SurveyField[] {
+  const fmt = (key: keyof RawSession) =>
+    (s[`${key}@OData.Community.Display.V1.FormattedValue` as keyof RawSession] as string | null | undefined)
+    ?? (s[key] as string | null | undefined);
+
   return buildSurveyFields([
-    { label: 'Session Length',    value: sessionLength },
-    { label: 'Intervention Type', value: interventionType },
-    { label: 'External Support',  value: s.cr89a_externalsupportdetails as string | null },
+    { label: 'Session Length',     value: sessionLength },
+    { label: 'Intervention Type',  value: interventionType },
+    { label: 'Intervention Areas', value: fmt('cr89a_intervention_ms') },
+    { label: 'Morrisby Activities', value: fmt('cr89a_interventionmorrisby_ms') },
+    { label: 'Career Action Plan', value: fmt('cr89a_interventioncap_ms') },
+    { label: 'Industry Engagement', value: fmt('cr89a_interventionindustryengagement_ms') },
+    { label: 'Work Experience Prep', value: fmt('cr89a_interventionwexpreparation_ms') },
+    { label: 'Work Readiness',     value: fmt('cr89a_interventionworkreadiness_ms') },
+    { label: 'Other Intervention', value: fmt('cr89a_interventionother_ms') },
+    { label: 'External Support',   value: s.cr89a_externalsupportdetails as string | null },
+    { label: 'Notes',              value: stripHtml(s.cr89a_internalnotes) },
   ]);
 }
 

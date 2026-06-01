@@ -5,9 +5,259 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-05-28 (latest)
+## — 2026-06-01 (latest)
 
-### Added: DE student redaction and redacted read-only journey
+### Fixed: End-of-pilot survey missing session context
+
+- Pending or empty End of Pilot Survey events now surface the related counselling session (intervention details and internal notes) in the timeline drawer, so practitioners see session context while the survey is being completed ([`src/services/dataverse.ts`](src/services/dataverse.ts), [`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx)).
+- End-of-pilot survey records linked to a session (rather than directly to the student) are now matched correctly when building the timeline ([`src/App.tsx`](src/App.tsx)).
+- AI analysis session detail now always includes counsellor notes when present on the timeline event ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+
+### Added: Branded EMCI loading screen
+
+- Replaced the plain spinner shown while the app is loading with a custom branded loading screen — the animated EMCI growth-bars emblem, wordmark and a progress bar on the brand navy background. Used for both the initial auth check and the "connecting to the platform" state, and it respects reduced-motion preferences ([`src/components/EmciLoadingScreen.tsx`](src/components/EmciLoadingScreen.tsx), [`src/App.tsx`](src/App.tsx)).
+
+### Changed: Auto-score Career Guidance students on load
+
+- When a student in the Career Guidance stage is opened and has no stored tracking score yet, the score is now generated automatically on load instead of waiting for a manual trigger. It runs once per student until the result is cached; students in other stages still score on demand ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Changed: Richer watch-out tooltips on the Student Journey
+
+- Watch-out chips now reveal the same custom hover tooltip used by the tracking-score breakdown, explaining in more depth why each one was flagged (and the recommended next step where one applies) instead of a short native tooltip ([`src/components/StudentWatchouts.tsx`](src/components/StudentWatchouts.tsx)).
+
+### Fixed: Inaccurate career signals in the score tooltips
+
+- The Career score tooltip could claim a "part-time job" the student didn't have (a brittle keyword match producing false positives) and report "no work experience" for a student who did work experience in a session. Work experience is now detected from session interventions as well as surveys — so the Career tooltip, the score, and the Quick Insights panel agree ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+- Part-time-job and independent-career-research signals are no longer keyword-guessed; the AI now infers them from the actual notes and surveys, and is instructed not to confuse a work-experience placement with a paid job ([`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Bumped the rating cache so affected students are re-scored automatically ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Fixed: In-progress students wrongly described as "completed" in score tooltips
+
+- The attendance & momentum tooltip could read "Completed programme, full recency awarded" for a student still in Career Guidance. Root cause: the completion override was left for the AI to infer from a numeric stage value, which it mis-applied. Completion is now decided in code and passed to the model as an explicit `programmeComplete` flag, and the rubric forbids describing a non-complete student as finished ([`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Bumped the rating cache so affected students are re-scored automatically ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Fixed: Completed students no longer penalised for inactivity
+
+- The attendance & momentum score no longer counts days-since-last-activity against a student who has finished the programme. The AI rubric now applies a completion override that awards full recency for completed students (`stageProgress = 4`) and frames their status as "completed" rather than citing inactivity ([`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Inactivity watch-outs ("Active but no activity in N days" and "Stalled") no longer fire for completed students, since post-completion inactivity is expected ([`src/lib/studentWatchouts.ts`](src/lib/studentWatchouts.ts), [`src/lib/studentWatchouts.test.ts`](src/lib/studentWatchouts.test.ts)).
+- Bumped the rating cache version so existing students are re-scored with the corrected rubric on next view, without a manual regenerate ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Added: DE Analytics Dashboard (Phase 1)
+
+- Introduced a dedicated, aggregated analytics dashboard for Department of Education oversight users at `/de/analytics`, gated to the DE role group (ACCE can preview). DE users are routed here as their home on sign-in ([`src/routes/DeAnalyticsRoute.tsx`](src/routes/DeAnalyticsRoute.tsx), [`src/App.tsx`](src/App.tsx), [`src/types/roles.ts`](src/types/roles.ts)).
+- Added a "DE Analytics" sidebar entry shown only to roles with access ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx), [`src/routes/MainShell.tsx`](src/routes/MainShell.tsx)).
+- The dashboard presents five de-identified, aggregate-only views — no student names, identifiers or counsellor details ever leave the metrics layer ([`src/lib/deAnalyticsMetrics.ts`](src/lib/deAnalyticsMetrics.ts), [`src/components/de/DeAnalyticsDashboard.tsx`](src/components/de/DeAnalyticsDashboard.tsx)):
+  - **Programme Overview** — enrolled students, active schools, completion rate, students in career guidance, and students needing follow-up (stalled journeys).
+  - **Outcomes by Student Type** — completion and career outcomes (Career Action Plan, Work Experience, Morrisby profile) compared across Disability, Koorie, Out-of-Home Care, Youth Justice, At Risk and Standard cohorts.
+  - **Stage Progress Funnel** — Referral to Complete, filterable by cohort.
+  - **Completion Gap Analysis** — each priority cohort's completion rate against the overall population, surfacing equity gaps.
+  - **Regional Performance** — completion, engagement and stalled rates by region.
+- Added `recharts` for the funnel, cohort and regional charts.
+- Made the dashboard navigable with a view switcher — Overview, By Cohort, Stage Funnel, Completion Gap and Regional tabs — so each view is focused rather than one long scroll ([`src/components/de/DeAnalyticsDashboard.tsx`](src/components/de/DeAnalyticsDashboard.tsx)).
+- Added user-settable filters (region and student status) that scope every view, with a live student count and a one-click clear ([`src/components/de/DeAnalyticsFilters.tsx`](src/components/de/DeAnalyticsFilters.tsx), [`src/lib/deAnalyticsMetrics.ts`](src/lib/deAnalyticsMetrics.ts)). The Stage Funnel keeps its own per-view cohort selector.
+- Cohort breakdowns read the existing recorded cohort tags; the dashboard degrades gracefully where cohort data is sparse.
+
+### Changed: App icon / favicon
+
+- Replaced the app icon with the EMCI growth-bars logo, with its white background removed (transparent, auto-cropped and squared). Generated `favicon.ico` (multi-size), `favicon.png` and `apple-touch-icon.png` and wired them into [`index.html`](index.html) ([`public/favicon.png`](public/favicon.png)).
+- Updated the sidebar header to use the same logo instead of the generic network icon ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx)).
+- Updated the login screen header to the EMCI icon + wordmark lockup ([`public/emci-logo-lockup.png`](public/emci-logo-lockup.png), [`src/components/LoginPage.tsx`](src/components/LoginPage.tsx)).
+- Refined the login screen with a more premium feel: layered card shadows, frosted glass panel, slow ambient background motion, spring entry animations, sliding tab indicator, and subtle hover lift on primary actions ([`src/components/LoginPage.tsx`](src/components/LoginPage.tsx)).
+- Added a 1200×630 Open Graph / Twitter preview image ([`public/og-image.png`](public/og-image.png)) and expanded social meta tags in [`index.html`](index.html) (`og:image`, dimensions, alt text, Twitter `summary_large_image`, `en_AU` locale). Optional `VITE_SITE_URL` in [`.env.example`](.env.example) injects absolute preview URLs at build time via [`vite.config.ts`](vite.config.ts).
+
+### Added: Proactive student watch-outs on the Student Journey
+
+- The Student Journey header now surfaces proactive "watch-outs" beneath the tracking score — small severity-coloured chips that flag things worth a look without the user having to dig, e.g. "Active but no activity in 129 days", "In Career Guidance with no sessions logged", or "Completed without a Career Action Plan" ([`src/components/StudentWatchouts.tsx`](src/components/StudentWatchouts.tsx)).
+- Watch-outs are computed by a new pure, side-effect-free engine from the existing student record, derived timeline events and (when generated) the AI rating — no extra data fetches or writes. Most checks are deterministic and factual; a few softer signals (wellbeing concern, disengagement, thriving, equity escalation) come from the AI rating flags ([`src/lib/studentWatchouts.ts`](src/lib/studentWatchouts.ts)).
+- Each watch-out carries a severity — Action (follow up soon), Watch (keep an eye on) or Positive (recognise) — and the strip is ordered by severity. Low-confidence ratings tag their AI-derived signals with a "verify first" hint. Hidden in redacted (no-PII) views.
+- Thresholds and the wider design are documented in [`STUDENT_WATCHOUTS.md`](STUDENT_WATCHOUTS.md); the engine is covered by unit tests ([`src/lib/studentWatchouts.test.ts`](src/lib/studentWatchouts.test.ts)).
+
+### Added: Tracking-score category breakdown on the Student Journey
+
+- Beside the tracking score in the Student Journey header, a minimalist breakdown now shows the four rubric categories that make up the headline number — Engagement, Career, Attendance and Wellbeing — each with a short plain-language description of what it measures, a thin score-coloured meter and the 0–100 value ([`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx)).
+- Hovering (or focusing) a category reveals a custom tooltip explaining how that category is scored — its weight, the signal-by-signal point rubric, the AI's short reason for this student, and a note that the headline number blends categories by weight. The tooltip renders in a portal so it is never clipped by the header card.
+- Refined the breakdown's typographic hierarchy: an uppercase category label, a prominent score with a muted "/100", the meter, then a caption description.
+- Categories with no supporting data render muted with an em dash. The strip appears only once a score has been generated and is hidden in redacted (no-PII) views.
+- The rating state was lifted into the journey header so the score badge and the breakdown share a single source; `StudentRatingBadge` is now presentational ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/StudentRatingBadge.tsx`](src/components/StudentRatingBadge.tsx)).
+
+### Added: Student tracking score (AI-core, code-finalised)
+
+- Introduced a per-student tracking score shown as a minimal, text-free progress ring in the Student Journey header — a quick at-a-glance read of how a student is tracking, sized to sit quietly beside their name (Linear-style restraint) ([`src/components/StudentRatingBadge.tsx`](src/components/StudentRatingBadge.tsx), [`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- Scoring is manually triggered: until a score exists the badge shows a text-free empty state — an on-brand gauge-and-sparkle icon ([`public/rating-empty-state.png`](public/rating-empty-state.png)) — that the user clicks to generate, with a loading ring while it runs and a clickable retry state if it fails. Clicking an existing score regenerates it.
+- Added a dedicated `rate-student` Supabase edge function that grades a compact, name-redacted data packet against a fixed rubric (engagement, career outcomes/CAP/WEX, attendance & momentum, growth & wellbeing) at `temperature: 0` and returns bounded category scores via OpenAI structured output — kept separate from `analyze-student` to avoid mixing concerns ([`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Score aggregation, banding and support-need are computed deterministically in code, not by the model: weighted overall, band thresholds, and a support-need read derived from year level and cohort. Disadvantage indicators raise support need but never lower the achievement score ([`src/lib/studentRating.ts`](src/lib/studentRating.ts)).
+- Ratings are cached in `localStorage` keyed by the same source fingerprint used for analysis, so the model is only re-run when the underlying student record changes; hidden entirely in redacted (no-PII) views ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Added: Full session intervention detail in the slideout and AI analysis
+
+- The activity timeline slideout now surfaces every EMCI-specific session field, not just three. Added Intervention Areas, Morrisby Activities, Career Action Plan, Industry Engagement, Work Experience Prep, Work Readiness, Other Intervention and the session Notes — each resolved from its `@FormattedValue` label for the multiselect picklists ([`src/services/surveyFields.ts`](src/services/surveyFields.ts), [`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- The AI analysis now receives the full per-session intervention detail (`sessionDetails`) as reference context, so summaries can reflect what actually happened in counselling sessions (Morrisby, CAP, industry engagement, work-readiness, notes) rather than just deterministic counts and survey snapshots ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts), [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts), [`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts)).
+- Session detail is included in the analysis source fingerprint, so changes to session interventions correctly mark an existing analysis as out of date.
+
+### Added: At-a-glance highlight chips on generated EMCI analyses
+
+- When an analysis is generated, up to three minimal highlight chips now appear above the prose so a practitioner can instantly recognise a student — **Career Interest** (e.g. Firefighter), **Strength** (e.g. Music) and **Current Work** (e.g. KFC) ([`src/components/AnalysisHighlights.tsx`](src/components/AnalysisHighlights.tsx), [`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- Each chip renders a fitting icon chosen by the model from a fixed Lucide allowlist, keeping them consistent and instant (no per-value image generation) ([`src/lib/analysisHighlights.ts`](src/lib/analysisHighlights.ts)).
+- The `analyze-student` edge function now returns structured highlights alongside the prose using OpenAI structured output, with values constrained to short, non-identifying terms ([`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts)).
+- Highlights are persisted with the analysis (same encrypted field, backward-compatible JSON wrapper) and shown dimmed alongside an out-of-date analysis in the stale state ([`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts)).
+
+### Added: On-brand illustrations for Analysis Summary states
+
+- Generated two new empty-state illustrations matching the existing career guidance analysis icon style (peach circle, navy outlines, sparkle accents): [`public/analysis-not-yet-available.png`](public/analysis-not-yet-available.png) for the referral-stage "not yet available" state, and [`public/analysis-needs-regenerate.png`](public/analysis-needs-regenerate.png) for the stale "needs regenerate" state ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+
+### Added: Context-aware Analysis Summary states on the Student Journey page
+
+- The Analysis Summary card now shows distinct states based on programme progress and analysis freshness ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts)):
+  - **Too early** (referral/consent, `stageProgress` &lt; 3): informational message only — no generate button, as insufficient data exists yet.
+  - **Ready** (career guidance or complete, no stored analysis): existing empty state with "Generate EMCI Analysis" call-to-action.
+  - **Current**: stored analysis displayed with optional Regenerate link.
+  - **Stale**: amber banner when student data has changed since the analysis was generated, with a Regenerate prompt; previous analysis shown dimmed below.
+- Staleness is detected by comparing a deterministic input fingerprint (`buildAnalysisSourceFingerprint`) against a `source_hash` persisted with each analysis ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts); Supabase migration `student_analysis_source_hash`).
+
+### Changed: Consistent typography hierarchy across the Student Journey page
+
+- Unified the page on a single Linear-inspired type scale — title (`text-2xl font-bold tracking-tight`), section eyebrow (`text-[10px] font-bold uppercase tracking-widest`), card heading (`text-sm font-semibold text-slate-900`), body prose (`text-sm text-slate-600`), inline label (`text-sm font-medium text-slate-700`) and caption (`text-xs text-slate-400`).
+- Brought the Analysis Summary card into line: student name now uses tight tracking, analysis/fallback/empty-state prose use the shared `slate-600` body colour, and the empty-state heading matches the `slate-900` card-heading tier ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)). Quick Insights and Activity Timeline already conformed and were left unchanged.
+
+### Changed: Per-step icons in the Student Journey progress stepper
+
+- Each stepper node now shows a minimal, on-brand Lucide icon instead of a plain dot: Referral (`UserPlus`), Career Guidance (`Compass`) and Complete (`Flag`). Completed steps still display a check, and pending steps render their icon in muted slate ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- Stepper labels now use the Linear-inspired typography used across the app — sentence-case, `font-medium`, tight tracking — instead of wide uppercase micro-caps, with the current step emphasised in slate-900 and pending steps muted.
+
+### Changed: Richer empty state for the Analysis Summary card
+
+- Replaced the plain dashed "Generate EMCI Analysis" button with a friendly empty state featuring an illustration, a "No analysis generated yet" heading, a short description, and a solid primary call-to-action button ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- Added an on-brand AI-insight illustration generated for the empty state ([`public/analysis-empty-state.png`](public/analysis-empty-state.png)).
+
+### Fixed: Student Journey header & progress stepper rendering inconsistencies
+
+- Year level no longer disappears for students without a linked school. The school name and year badge were both gated behind `schoolName`, so a student with no school showed no year at all. The year badge now renders independently using the shared `formatYearLevelLine` helper ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- The progress stepper is now driven by the numeric `stageProgress` (0–4) — the same value the AI analysis reports as "X/4" — instead of the nullable `currentStage`. This removes the desync where a completed or inactive student could render an inconsistent or empty stepper while the analysis claimed "4/4". The stepper now renders deterministically and identically for every student regardless of status.
+- Completed students (`stageProgress` 4) show all three steps as done; students in career guidance (3) show Referral done and Career Guidance current; not-yet-started students (0) show all steps pending.
+
+### Fixed: Student header card "missing" on some students when navigating between profiles
+
+- The `/student/:studentId` route reused a single scroll container across student navigations, so opening a new student inherited the previous scroll position. Combined with a redundant nested scroll container, the header card (name + progress stepper) could open already scrolled out of view, making it look like it was missing for "random" students — especially those with a tall generated analysis. ([`src/routes/StudentJourneyRoute.tsx`](src/routes/StudentJourneyRoute.tsx), [`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx))
+- The breadcrumb/action bar is now pinned and only the content area scrolls, the redundant inner scroller was removed, and scroll resets to the top whenever the viewed student changes — so the header card is always visible when opening any student.
+
+### Changed: Pointer cursor on all clickable elements in the Student Journey page
+
+- Added `cursor-pointer` to every interactive element across the student page: breadcrumb button, View Details, Export PDF, Generate/Regenerate/Try again analysis buttons, timeline filter tabs, timeline event rows, event drawer close button, modal close button, and both modal/drawer backdrop overlays.
+
+---
+
+## — 2026-06-01
+
+### Fixed: Student Journey header card disappearing for some students
+
+- `StudentTimeline` called `format(parseISO(event.date), ...)` and `date.localeCompare()` without guarding against `null`/unparseable dates. For students whose Dataverse records contained a `null` or malformed `createdon`/`modifiedon` value, this threw a `RangeError`, crashing the component tree (no error boundary) and unmounting the entire `StudentJourneySummary` — including the header card.
+- Fixed in [`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx): added `safeParse`/`safeFormat` helpers (backed by `date-fns` `isValid`) that return a `'—'` fallback instead of throwing, and guarded the sort comparator with `?? ''` on both sides.
+
+### Added: Minimalist Linear-inspired Activity Timeline on the Student Journey screen
+
+- New `StudentTimeline` component ([`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx)) renders a compact, grouped-by-month activity feed below the Analysis Summary and Quick Insights panels.
+- Design is inspired by Linear.app: small coloured dots, type labels as uppercase pill badges, monospace dates, and a clean vertical connector line — no heavy cards.
+- Filter tabs (All / Referral / Consent / Sessions / Surveys / Absences) appear when more than one event type is present; tab set is adaptive to what data exists.
+- Clicking any event opens a minimal side drawer with full event detail (type, status, recorded-by, description, survey/session fields, and created/modified dates).
+- Empty state with a neutral icon and label when no events match the active filter.
+- Integrated into [`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx) as the third section after the analysis grid.
+
+---
+
+### Changed: Subtle modern refresh of the Student Journey progress stepper
+
+- The progress stepper (Referral → Career Guidance → Complete) now adds a soft focus ring and shadow to active/completed step markers, rounds the connector lines, and uses smoother transitions — a light visual polish with no layout or behaviour changes ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+
+### Added: AI-driven Analysis Summary + deterministic Quick Insights with pilot-survey shift narration
+
+- The **Analysis Summary** card on the Student Journey page is now powered by the `analyze-student` Supabase Edge Function (GPT-4o mini) instead of static prose. A "Generate EMCI Analysis" button kicks off the call; loading / error / success states are surfaced inline, with a Regenerate action.
+- **Quick Insights** panel rebuilt around the requested categories:
+  - **Career Action Plan** — counts CAP-tagged sessions; renders `{count} · Complete|Pending`.
+  - **Morrisby Unpack** — counts unpack/Morrisby-tagged sessions; renders `{count} · Complete|Pending`.
+  - **Morrisby Profile** — Yes / No based on the student record.
+  - **Work Experience** — Yes / No derived from affirmative responses on initial / mid / end pilot survey fields.
+  - **Absences** — recorded count with an attention flag when the threshold is exceeded.
+- **Pilot survey comparison** — start / mid / end survey snapshots are extracted from the student's timeline and passed to the edge function, which now narrates how the student's responses shifted across the programme (preparedness, understanding of strengths, work-experience exposure, programme helpfulness, focus areas).
+- [`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts) extended to accept `insights` and `surveyShifts` in the request body, with an updated system prompt that requires the model to reference each insight category and to describe survey shifts when multiple stages are available. Deployed as version 2 (verify_jwt preserved as false).
+- [`src/lib/studentInsights.ts`](src/lib/studentInsights.ts) (new) — `computeQuickInsights()` and `buildSurveyShifts()` operating on `TimelineEvent[]` + `Student`.
+- [`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx) (new) — presentational component for the five insight rows.
+- [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts) now accepts `events` and forwards the computed insights + survey shifts to the edge function.
+- [`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/StudentOverviewTab.tsx`](src/components/StudentOverviewTab.tsx), and [`src/components/StudentJourneyModal.tsx`](src/components/StudentJourneyModal.tsx) updated to accept and forward `events`.
+- [`src/routes/StudentJourneyRoute.tsx`](src/routes/StudentJourneyRoute.tsx) re-derives the student's redacted timeline events from `studentEventsMap` and passes them to both the summary and the modal.
+- Privacy-restricted mode (`hidePii`) keeps a deterministic static fallback summary instead of calling the AI.
+
+### Changed: View Details modal merged into a single combined overview
+
+- The student **View Details** modal no longer uses tabs (Overview / Profile / Timeline / Details). Everything is now shown in one scrollable view.
+- New layout: the student profile card alongside programme progress, key details and AI Counsellor Analysis.
+
+### Removed: Timeline from the View Details modal
+
+- The student journey timeline is no longer rendered inside the View Details modal (it remains available on the main Student Journey page).
+- `StudentJourneyModal` simplified (removed tab state, the unused `student` prop, and the `studentEvents` prop); `StudentJourneyRoute` no longer derives or passes timeline events to the modal; `ProfileSnapshot` and `StudentOverviewTab` adjusted to render as cards within the modal.
+
+---
+
+## — 2026-05-28
+
+### Changed: Sidebar collapsed by default with hover-to-expand animation
+
+- `MainSidebar` now renders collapsed (`w-14`, icon-only) by default and smoothly expands to full width (`w-64`) on hover.
+- Smooth `transition-[width] duration-300 ease-in-out` on the `<aside>` element.
+- Labels fade in with a short delay after the width starts opening (`opacity` transition + `delay-100`), and fade out immediately on collapse.
+- Icons remain centered when collapsed; native `title` tooltips provide accessible labels in the collapsed state.
+- No changes to `MainShell` or any other file — self-contained within `MainSidebar.tsx`.
+
+---
+
+## — 2026-05-28
+
+### Added: Overview tab with AI-powered EMCI analysis
+
+- New **Overview** tab (first tab in the student details modal) — shows:
+  - 4-step programme stage tracker (Referral → Consent → Career Guidance → Complete) with done/in-progress/pending states
+  - Key stats grid: Interview, Morrisby Profile, Absences, Student Type
+  - AI Counsellor Analysis — calls the new `analyze-student` Supabase Edge Function (GPT-4o mini) to generate a professional EMCI engagement note; respects privacy mode (disabled when PII is hidden)
+- [`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts): Deno edge function that accepts student programme data and returns an OpenAI-generated counsellor note. OpenAI key stored as a Supabase secret (`OPENAI_API_KEY`).
+- [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts): React hook (`useStudentAnalysis`) that calls the edge function via `supabase.functions.invoke`.
+- [`src/components/StudentOverviewTab.tsx`](src/components/StudentOverviewTab.tsx): new component rendering the overview layout.
+- `.env.example` updated with documentation for the Supabase secret setup.
+
+### Deployment required
+
+```bash
+# 1. Set the OpenAI API key as a Supabase secret
+supabase secrets set OPENAI_API_KEY=sk-proj-...
+
+# 2. Deploy the edge function
+supabase functions deploy analyze-student --project-ref yfvvroesornchrxufwut
+```
+
+---
+
+
+
+- [`StudentJourneyModal`](src/components/StudentJourneyModal.tsx): new modal with three tabs — **Profile** (ProfileSnapshot), **Timeline** (TimelineCore), **Details** (ContextPanel). Clicking a timeline event auto-switches to the Details tab.
+- Modal uses spring-animated sliding tab indicator, backdrop blur, and spring entry/exit — styled after the Linear app (clean, minimal, slate palette).
+- Closes on `Escape` key or backdrop click.
+- [`StudentJourneyRoute`](src/routes/StudentJourneyRoute.tsx): summary view is always the base; modal overlays it. Removed inline 3-panel body and now-unused `selectedEvent` state.
+
+---
+
+
+
+- New default view on the Student Journey page — replaces the three-panel layout as the entry point.
+- [`StudentJourneySummary`](src/components/StudentJourneySummary.tsx): student name + status badge, school + year badge, horizontal 3-step progress stepper (Referral → Career Guidance → Complete), Analysis Summary paragraph derived from student data, and Quick Insights tags (colour-coded: default / success / warning).
+- "View Details" toggle button in the header bar switches between the new summary view and the existing full three-panel layout (ProfileSnapshot + TimelineCore + ContextPanel).
+
+### Changed
+
+- Breadcrumb updated to: **Students → [Name] → [YearLevelLabel]** (was Dashboard → School/Students → Name).
+- "Export to PDF" button label shortened to "Export PDF" for consistency with the new header layout.
+
+---
+
+
 
 - New [`src/lib/studentRedaction.ts`](src/lib/studentRedaction.ts): pattern builder, literal + fuzzy typo scrubbing, pseudonym labels, timeline event redaction, and unit tests (`npm run test`).
 - **DE roles** (`de_staff`, `de_admin`): may open the **Students** roster (pseudonym column, no name/Morrisby/year/counsellor filters) and a **read-only Student Journey** with structured PII hidden and session/survey free-text scrubbed.

@@ -30,8 +30,9 @@ import {
   type RawMidPilotStudentSurvey,
 } from './services/dataverse';
 import { getRoleGroup, ROLE_LABELS } from './types/roles';
-import { Eye, Loader2, RotateCcw } from 'lucide-react';
+import { Eye, RotateCcw } from 'lucide-react';
 import { ProgramDataSkeleton } from './components/skeletons/ProgramDataSkeleton';
+import { EmciLoadingScreen } from './components/EmciLoadingScreen';
 import { MainShell } from './routes/MainShell';
 import { OutletContextBridge } from './routes/OutletContextBridge';
 import { DashboardRoute } from './routes/DashboardRoute';
@@ -40,6 +41,7 @@ import { StudentsListRoute } from './routes/StudentsListRoute';
 import { SchoolRoute } from './routes/SchoolRoute';
 import { StudentJourneyRoute } from './routes/StudentJourneyRoute';
 import { PdfRoute } from './routes/PdfRoute';
+import { DeAnalyticsRoute } from './routes/DeAnalyticsRoute';
 import { RequirePage } from './routes/RequirePage';
 import type { AppShellOutletContext } from './routes/shellContext';
 
@@ -60,10 +62,13 @@ function AppInner() {
   const [dataLoading, setDataLoading]   = useState(false);
   const [dataError, setDataError]       = useState<string | null>(null);
   const refreshTimerRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** True after the first successful data load — refreshes use the skeleton, not the full loading screen. */
+  const hasLoadedRef                    = useRef(false);
 
   const [studentEventsMap, setStudentEventsMap] = useState<Record<string, TimelineEvent[]>>({});
 
   const schoolHomeAppliedRef = useRef<string | null>(null);
+  const deHomeAppliedRef     = useRef<string | null>(null);
 
   // ── Token fetch ───────────────────────────────────────────────────────────
   const fetchToken = useCallback(async (): Promise<string> => {
@@ -114,32 +119,46 @@ function AppInner() {
       const enriched = enrichStudents(fetchedStudents, [], sessions, absences);
 
       const eventsMap: Record<string, TimelineEvent[]> = {};
-      const matchesStudent = (record: { [key: string]: unknown }, sid: string): boolean => {
+      const matchesStudent = (
+        record: { [key: string]: unknown },
+        sid: string,
+        sessionIds?: ReadonlySet<string>,
+      ): boolean => {
         const normalize = (v: unknown) => typeof v === 'string' ? v.toLowerCase() : null;
         const target = sid.toLowerCase();
+        const regarding = normalize(record['_regardingobjectid_value']);
+        if (regarding === target) return true;
+        // End-of-pilot surveys are sometimes created with Regarding = the session, not the student.
+        if (regarding && sessionIds?.has(regarding)) return true;
         return (
-          normalize(record['_regardingobjectid_value']) === target ||
-          normalize(record['_cr89a_wlpcstudent_value'])  === target ||
+          normalize(record['_cr89a_wlpcstudent_value']) === target ||
           normalize(record['_cr89a_student_value'])       === target ||
           normalize(record['cr89a_wlpcstudentid'])        === target
         );
       };
       for (const student of enriched) {
         const sid = student.id;
+        const studentSessions = sessions.filter(s => matchesStudent(s, sid));
+        const sessionIds = new Set(
+          studentSessions.map(s => s.activityid.toLowerCase()),
+        );
+        const matchesForStudent = (record: { [key: string]: unknown }) =>
+          matchesStudent(record, sid, sessionIds);
         eventsMap[sid] = deriveStudentEvents(
           student,
-          sessions.filter(s => matchesStudent(s, sid)),
-          initSurveys.filter(s => matchesStudent(s, sid)),
-          initSurveys2026.filter(s => matchesStudent(s, sid)),
-          endSurveysLegacy.filter(s => matchesStudent(s, sid)),
-          endSurveys2026.filter(s => matchesStudent(s, sid)),
-          midStudentSurveys.filter(s => matchesStudent(s, sid)),
+          studentSessions,
+          initSurveys.filter(matchesForStudent),
+          initSurveys2026.filter(matchesForStudent),
+          endSurveysLegacy.filter(matchesForStudent),
+          endSurveys2026.filter(matchesForStudent),
+          midStudentSurveys.filter(matchesForStudent),
         );
       }
 
       setStudents(enriched);
       setSchools(fetchedSchools);
       setStudentEventsMap(eventsMap);
+      hasLoadedRef.current = true;
       return enriched;
     } catch (e: any) {
       setDataError(e.message ?? 'Failed to load data from Dataverse');
@@ -192,6 +211,20 @@ function AppInner() {
     navigate(`/school/${school.id}`, { replace: true });
   }, [stage, userRole, schoolId, schools, navigate]);
 
+  // ── DE-role home: send DE users to the analytics dashboard once per session ──
+  useEffect(() => {
+    if (stage !== 'ready' || !userRole) return;
+    if (getRoleGroup(userRole) !== 'de') {
+      deHomeAppliedRef.current = null;
+      return;
+    }
+    if (deHomeAppliedRef.current === userRole) return;
+    deHomeAppliedRef.current = userRole;
+    if (window.location.pathname === '/' || window.location.pathname === '/dashboard') {
+      navigate('/de/analytics', { replace: true });
+    }
+  }, [stage, userRole, navigate]);
+
   const shellOutletContext: AppShellOutletContext = useMemo(
     () => ({
       students,
@@ -207,11 +240,7 @@ function AppInner() {
 
   // ── Auth gates ────────────────────────────────────────────────────────────
   if (stage === 'loading') {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-      </div>
-    );
+    return <EmciLoadingScreen />;
   }
 
   if (stage === 'unauthenticated' || stage === 'mfa_required' || stage === 'mfa_enroll' || stage === 'no_role') {
@@ -238,23 +267,16 @@ function AppInner() {
 
   const impersonationPad = isImpersonating ? 34 : 0;
 
-  if (isConnectingToPlatform) {
+  const isInitialDataLoad = dataLoading && !hasLoadedRef.current;
+  if (isConnectingToPlatform || isInitialDataLoad) {
     return (
       <>
         {ImpersonationBanner}
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50" style={{ paddingTop: impersonationPad }}>
-          <div
-            className="flex items-center gap-4 max-w-md px-6"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-          >
-            <Loader2 className="w-10 h-10 text-primary animate-spin shrink-0" aria-hidden />
-            <p className="text-base font-medium text-slate-600 leading-snug">
-              Connecting to EMCI Student Management Platform…
-            </p>
-          </div>
-        </div>
+        <EmciLoadingScreen
+          message={isConnectingToPlatform
+            ? 'Connecting to the Student Management Platform…'
+            : 'Loading programme data…'}
+        />
       </>
     );
   }
@@ -331,6 +353,14 @@ function AppInner() {
                     </RequirePage>
                   )}
                 />
+                <Route
+                  path="/de/analytics"
+                  element={(
+                    <RequirePage page="de_analytics">
+                      <DeAnalyticsRoute />
+                    </RequirePage>
+                  )}
+                />
                 <Route path="/student/:studentId" element={<StudentJourneyRoute />} />
               </Route>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -338,7 +368,7 @@ function AppInner() {
             </Route>
           </Routes>
         </div>
-        {dataLoading && (
+        {dataLoading && hasLoadedRef.current && (
           <div
             className="absolute inset-0 z-[120] bg-slate-50/95 backdrop-blur-[2px] overflow-hidden"
             aria-busy="true"

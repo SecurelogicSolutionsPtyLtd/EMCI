@@ -150,11 +150,11 @@ export function LoginPage() {
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
         ) : mfaQrCode ? (
           <div className="space-y-5">
-            <div className="flex justify-center bg-white rounded-xl p-4 border border-slate-100">
+            <div className="flex justify-center bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm shadow-slate-900/[0.04]">
               <img src={mfaQrCode} alt="MFA QR Code" className="w-44 h-44" />
             </div>
             {mfaSecret && (
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 shadow-sm shadow-slate-900/[0.03]">
                 <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Manual entry key</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs text-slate-700 font-mono break-all">{mfaSecret}</code>
@@ -174,14 +174,14 @@ export function LoginPage() {
                   placeholder="000 000"
                   value={mfaCode}
                   onChange={e => setMfaCode(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 text-center text-lg font-mono tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  className={`${INPUT_CLASS} px-4 py-3 text-center text-lg font-mono tracking-[0.3em]`}
                   required
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || mfaCode.replace(/\s/g, '').length < 6}
-                className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-primary hover:bg-primary/90 active:scale-[0.98] text-white rounded-xl font-semibold text-sm transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                className={BTN_PRIMARY}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Verify and continue
@@ -213,14 +213,14 @@ export function LoginPage() {
               placeholder="000 000"
               value={mfaCode}
               onChange={e => setMfaCode(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 text-center text-2xl font-mono tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+              className={`${INPUT_CLASS} px-4 py-3 text-center text-2xl font-mono tracking-[0.4em]`}
               required
               autoFocus
             />
             <button
               type="submit"
               disabled={loading || mfaCode.replace(/\s/g, '').length < 6}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-primary hover:bg-primary/90 active:scale-[0.98] text-white rounded-xl font-semibold text-sm transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className={BTN_PRIMARY}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Verify
@@ -248,16 +248,19 @@ export function LoginPage() {
           title="Access pending"
           subtitle="Your account has been authenticated but has not yet been granted access to the EMCI platform."
         />
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-sm text-amber-800 leading-relaxed">
+        <div className="bg-amber-50/90 border border-amber-200/80 rounded-xl px-4 py-4 text-sm text-amber-800 leading-relaxed shadow-sm shadow-amber-900/[0.04]">
           Please contact your EMCI platform administrator to have your access configured. Once your role is assigned, refresh this page.
         </div>
-        <button
+        <motion.button
+          type="button"
           onClick={() => void refresh()}
-          className="w-full flex items-center justify-center gap-2 mt-2 px-5 py-3 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.99 }}
+          className="w-full flex items-center justify-center gap-2 mt-2 px-5 py-3 text-sm font-semibold text-slate-600 border border-slate-200/80 rounded-xl bg-white shadow-sm shadow-slate-900/[0.04] hover:bg-slate-50 hover:shadow-md transition-all duration-300"
         >
           <RefreshCw className="w-4 h-4" />
           Check access again
-        </button>
+        </motion.button>
       </AuthShell>
     );
   }
@@ -267,16 +270,31 @@ export function LoginPage() {
   return (
     <AuthShell>
       {/* Tab switcher */}
-      <div className="flex rounded-xl bg-slate-100 p-1 mb-6">
+      <div className="relative flex rounded-xl bg-slate-100/90 p-1 mb-6 shadow-inner shadow-slate-900/[0.04]">
+        <motion.div
+          layoutId="login-tab-pill"
+          className="absolute inset-y-1 rounded-lg bg-white shadow-md shadow-slate-900/[0.08] ring-1 ring-slate-900/[0.04]"
+          style={{
+            width: 'calc(50% - 4px)',
+            left: tab === 'microsoft' ? 4 : 'calc(50%)',
+          }}
+          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+        />
         <button
+          type="button"
           onClick={() => { setTab('microsoft'); setError(null); }}
-          className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${tab === 'microsoft' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`relative z-10 flex-1 py-2.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${
+            tab === 'microsoft' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
           ACCE Staff
         </button>
         <button
+          type="button"
           onClick={() => { setTab('email'); setError(null); }}
-          className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${tab === 'email' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`relative z-10 flex-1 py-2.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${
+            tab === 'email' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
           School / DE Login
         </button>
@@ -286,14 +304,17 @@ export function LoginPage() {
 
       <AnimatePresence mode="wait">
         {tab === 'microsoft' ? (
-          <motion.div key="microsoft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+          <motion.div key="microsoft" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
               Sign in with your SecureLogic Microsoft account to access the EMCI programme dashboard.
             </p>
-            <button
+            <motion.button
+              type="button"
               onClick={handleMicrosoftSignIn}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-[#2F2F2F] hover:bg-[#1a1a1a] active:scale-[0.98] text-white rounded-xl font-semibold text-sm transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.99, y: 0 }}
+              className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-[#2F2F2F] hover:bg-[#1a1a1a] text-white rounded-xl font-semibold text-sm transition-colors duration-300 shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/25 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-lg"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -306,10 +327,10 @@ export function LoginPage() {
                 </svg>
               )}
               {loading ? 'Redirecting to Microsoft…' : 'Sign in with Microsoft'}
-            </button>
+            </motion.button>
           </motion.div>
         ) : (
-          <motion.div key="email" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+          <motion.div key="email" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
             <p className="text-sm text-slate-500 mb-5 leading-relaxed">
               School administrators, principals, and Department of Education users sign in below. MFA is required.
             </p>
@@ -323,7 +344,7 @@ export function LoginPage() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="you@organisation.edu.au"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                    className={`${INPUT_CLASS} pl-10 pr-4 py-3 text-sm`}
                     required
                     autoComplete="email"
                   />
@@ -338,7 +359,7 @@ export function LoginPage() {
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                    className={`${INPUT_CLASS} pl-10 pr-10 py-3 text-sm`}
                     required
                     autoComplete="current-password"
                   />
@@ -351,14 +372,16 @@ export function LoginPage() {
                   </button>
                 </div>
               </div>
-              <button
+              <motion.button
                 type="submit"
                 disabled={loading || !email || !password}
-                className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-primary hover:bg-primary/90 active:scale-[0.98] text-white rounded-xl font-semibold text-sm transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+                whileHover={{ y: loading || !email || !password ? 0 : -2 }}
+                whileTap={{ scale: 0.99, y: 0 }}
+                className={`${BTN_PRIMARY} mt-1`}
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {loading ? 'Signing in…' : 'Sign in'}
-              </button>
+              </motion.button>
             </form>
           </motion.div>
         )}
@@ -378,64 +401,117 @@ export function LoginPage() {
 
 // ── Shared layout components ───────────────────────────────────────────────────
 
+const INPUT_CLASS =
+  'w-full rounded-xl border border-slate-200/80 bg-white text-slate-900 shadow-sm shadow-slate-900/[0.04] ' +
+  'transition-all duration-300 ease-out focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/10 ' +
+  'focus:shadow-md focus:shadow-primary/10 hover:border-slate-300';
+
+const BTN_PRIMARY =
+  'w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-primary text-white rounded-xl font-semibold text-sm ' +
+  'shadow-lg shadow-primary/20 transition-all duration-300 ease-out hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 ' +
+  'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-lg';
+
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#F8FAFC] overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full bg-primary/5" />
-        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/5" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full border border-slate-200/60" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-slate-200/60" />
-      </div>
-      <div className="flex-1 flex items-center justify-center px-4">
+    <div className="relative h-screen w-screen flex flex-col overflow-hidden bg-[#F4F6F9]">
+      {/* Ambient background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-[#F8FAFC] to-slate-100" />
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="relative bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-sm overflow-hidden"
+          animate={{ scale: [1, 1.08, 1], opacity: [0.45, 0.65, 0.45] }}
+          transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -top-40 -right-40 w-[640px] h-[640px] rounded-full bg-primary/[0.07] blur-3xl"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.06, 1], opacity: [0.35, 0.55, 0.35] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+          className="absolute -bottom-48 -left-48 w-[560px] h-[560px] rounded-full bg-slate-900/[0.04] blur-3xl"
+        />
+        <motion.div
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 120, repeat: Infinity, ease: 'linear' }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[920px] h-[920px] rounded-full border border-slate-200/40"
+        />
+        <motion.div
+          animate={{ rotate: [360, 0] }}
+          transition={{ duration: 90, repeat: Infinity, ease: 'linear' }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[620px] h-[620px] rounded-full border border-slate-200/30"
+        />
+      </div>
+
+      <div className="relative flex-1 flex items-center justify-center px-4 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 28, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+          className="relative w-full max-w-sm"
         >
-          <div className="h-1.5 w-full bg-gradient-to-r from-primary via-primary/80 to-primary/40" />
-          <div className="px-8 py-8">
-            <div className="flex items-center gap-3 mb-7">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                <div className="grid grid-cols-2 gap-0.5 w-5 h-5">
-                  {[...Array(4)].map((_, i) => <div key={i} className="bg-white rounded-[2px]" />)}
-                </div>
-              </div>
-              <div>
-                <p className="text-base font-black tracking-tight text-slate-900 leading-none">EMCI</p>
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold leading-tight mt-0.5">Student Management Platform</p>
-              </div>
+          {/* Card glow */}
+          <div className="absolute -inset-px rounded-[1.35rem] bg-gradient-to-b from-white/80 via-slate-200/40 to-slate-300/30 blur-sm" />
+          <div className="relative overflow-hidden rounded-[1.25rem] border border-white/60 bg-white/90 backdrop-blur-xl shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.08),0_32px_64px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/[0.04]">
+            <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/80 to-primary/30" />
+            <div className="px-8 py-8">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                className="flex justify-center mb-7"
+              >
+                <img
+                  src="/emci-logo-lockup.png"
+                  alt="EMCI"
+                  className="h-11 w-auto object-contain drop-shadow-sm"
+                  draggable={false}
+                />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {children}
+              </motion.div>
             </div>
-            {children}
           </div>
         </motion.div>
       </div>
-      <div className="shrink-0 text-center py-4 text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.35 }}
+        className="relative shrink-0 text-center py-5 text-[10px] text-slate-400 uppercase tracking-widest font-semibold"
+      >
         EMCI Student Management Platform · SecureLogic Solutions · {new Date().getFullYear()}
-      </div>
+      </motion.div>
     </div>
   );
 }
 
 function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   return (
-    <div className="mb-6">
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="mb-6"
+    >
       <div className="flex items-center gap-2 mb-2">
         {icon}
         <h1 className="text-lg font-black text-slate-900 tracking-tight">{title}</h1>
       </div>
       <p className="text-sm text-slate-500 leading-relaxed">{subtitle}</p>
-    </div>
+    </motion.div>
   );
 }
 
 function ErrorBanner({ message }: { message: string }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4"
+      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="flex items-start gap-2.5 bg-red-50/90 border border-red-200/80 rounded-xl px-4 py-3 mb-4 shadow-sm shadow-red-900/[0.06]"
     >
       <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
       <p className="text-xs text-red-700 leading-relaxed">{message}</p>

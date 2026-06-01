@@ -20,7 +20,8 @@ export type Page =
   | 'devlab'
   | 'surveysearch'
   | 'studentsearch'
-  | 'team';
+  | 'team'
+  | 'de_analytics';
 
 // ── Group helpers ─────────────────────────────────────────────────────────────
 
@@ -68,6 +69,8 @@ export function canAccessPage(role: AppRole, page: Page): boolean {
     case 'surveysearch':  return group === 'acce';
     case 'studentsearch': return group === 'acce';
     case 'team':          return isAdminRole(role);
+    // Aggregated, de-identified analytics for DE oversight (ACCE can preview).
+    case 'de_analytics':  return group === 'de' || group === 'acce';
   }
 }
 

@@ -13,7 +13,6 @@ import type { SurveyField } from '../services/surveyFields';
 interface TimelineCoreProps {
   student: Student | null;
   events?: TimelineEvent[];
-  onSelectEvent: (event: any) => void;
 }
 
 // Stage 1 covers both stageProgress 1 (referral) and 2 (consent).
@@ -34,7 +33,7 @@ const typeBadgeColor: Record<string, string> = {
 
 const typeIconBg = 'bg-slate-100 text-slate-500';
 
-export function TimelineCore({ student, events: propEvents, onSelectEvent }: TimelineCoreProps) {
+export function TimelineCore({ student, events: propEvents }: TimelineCoreProps) {
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [modalEvent, setModalEvent]   = useState<any | null>(null);
 
@@ -427,6 +426,29 @@ export function TimelineCore({ student, events: propEvents, onSelectEvent }: Tim
                       </div>
                     ))}
                   </div>
+                ) : modalEvent.relatedSession ? (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      Survey responses not yet recorded. Session context from the related counselling session:
+                    </p>
+                    <div className="flex flex-col gap-3 bg-primary/5 rounded-xl p-4 border border-primary/15">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-primary">
+                          Related Session
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">{modalEvent.relatedSession.title}</span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {format(parseISO(modalEvent.relatedSession.date), 'dd MMM yyyy')}
+                        </span>
+                      </div>
+                      {modalEvent.relatedSession.fields.map((field, i) => (
+                        <div key={i} className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{field.label}</span>
+                          <span className="text-sm text-slate-700 leading-relaxed">{field.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
                   /* No structured fields — show description or empty state */
                   modalEvent.description && modalEvent.description !== 'No survey responses recorded yet.' ? (
@@ -456,16 +478,6 @@ export function TimelineCore({ student, events: propEvents, onSelectEvent }: Tim
                     <span className="font-mono">{format(parseISO(modalEvent.modifiedDate ?? modalEvent.date), 'dd MMM yyyy')}</span>
                   </div>
                 </div>
-              </div>
-
-              {/* Modal footer */}
-              <div className="px-6 py-4 border-t border-slate-100">
-                <button
-                  onClick={() => { onSelectEvent(modalEvent); setModalEvent(null); }}
-                  className="w-full py-2.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-xl transition-colors"
-                >
-                  Open in Context Panel
-                </button>
               </div>
             </motion.div>
           </>

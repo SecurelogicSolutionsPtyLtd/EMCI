@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
-import { ProfileSnapshot } from '../components/ProfileSnapshot';
-import { TimelineCore } from '../components/TimelineCore';
-import { ContextPanel } from '../components/ContextPanel';
+import { AnimatePresence } from 'motion/react';
+import { ChevronRight, Eye, FileDown } from 'lucide-react';
+import { StudentJourneySummary } from '../components/StudentJourneySummary';
+import { StudentJourneyModal } from '../components/StudentJourneyModal';
 import { useAuth } from '../context/AuthContext';
 import { canAccessPage, canSeeStudentNames, getRoleGroup } from '../types/roles';
 import type { AppShellOutletContext } from './shellContext';
@@ -20,10 +20,18 @@ export function StudentJourneyRoute() {
   const { students, schools, userRole, studentEventsMap } =
     useOutletContext<AppShellOutletContext>();
   const { schoolId: authSchoolId } = useAuth();
-  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll to the top whenever the viewed student changes — the route's
+  // scroll container is reused across `/student/:studentId` navigations, so
+  // without this the next student opens scrolled down and the header card
+  // (name + progress stepper) appears "missing".
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [studentIdParam]);
 
   const hidePii = !canSeeStudentNames(userRole);
-  const canOpenSchool = canAccessPage(userRole, 'school');
 
   const selectedStudent = useMemo(() => {
     if (!isPlausibleRecordIdParam(studentIdParam)) return null;
@@ -78,86 +86,76 @@ export function StudentJourneyRoute() {
 
   return (
     <div className="h-full min-h-0 w-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+
+      {/* ── Header bar (fixed — never scrolls) ── */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-8 py-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors font-medium group shrink-0"
+            onClick={() => navigate('/students')}
+            className="text-sm text-slate-500 hover:text-primary transition-colors font-medium shrink-0 cursor-pointer"
           >
-            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            Dashboard
+            Students
           </button>
           <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-          {canOpenSchool ? (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  selectedSchoolForStudent
-                    ? navigate(`/school/${selectedSchoolForStudent.id}`)
-                    : navigate('/schools')
-                }
-                className="text-sm text-slate-500 hover:text-primary transition-colors font-medium truncate"
-              >
-                {selectedSchoolForStudent?.name ?? 'School'}
-              </button>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => navigate('/students')}
-                className="text-sm text-slate-500 hover:text-primary transition-colors font-medium truncate"
-              >
-                Students
-              </button>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-            </>
-          )}
-          <span className="text-sm text-slate-800 font-semibold truncate">
+          <span className="text-sm text-slate-700 font-medium truncate">
             {breadcrumbStudentLabel}
           </span>
+          {selectedStudent?.yearLevelLabel && (
+            <>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+              <span className="text-sm text-slate-500 truncate">
+                {selectedStudent.yearLevelLabel}
+              </span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 active:scale-95 transition-all rounded-lg cursor-pointer"
+          >
+            <Eye className="w-4 h-4" />
+            View Details
+          </button>
           {canAccessPage(userRole, 'pdf') && selectedStudent && (
             <button
               type="button"
               onClick={() => navigate(`/student/${selectedStudent.id}/pdf`)}
-              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-lg shadow-sm"
+              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-lg shadow-sm cursor-pointer"
             >
               <FileDown className="w-4 h-4" />
-              Export to PDF
+              Export PDF
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
-        <div className="w-72 shrink-0 border-r border-slate-200 flex flex-col min-h-0 bg-white">
-          <ProfileSnapshot
+      {/* ── Scrollable content (header card + analysis + timeline) ── */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto">
+        {displayStudent && (
+          <StudentJourneySummary
             student={displayStudent}
+            events={studentEvents}
             schoolName={studentSchoolName}
             hidePii={hidePii}
           />
-        </div>
-        <div className="flex-1 flex flex-col relative overflow-hidden min-h-0 min-w-0">
-          <TimelineCore
-            student={displayStudent}
-            events={studentEvents}
-            onSelectEvent={setSelectedEvent}
-          />
-        </div>
-        <div className="w-[380px] shrink-0 border-l border-slate-200 flex flex-col min-h-0 bg-white">
-          <ContextPanel
-            student={selectedStudent}
-            selectedEvent={selectedEvent}
-            onClose={() => setSelectedEvent(null)}
-            hidePii={hidePii}
-          />
-        </div>
+        )}
       </div>
+
+      {/* ── Details modal ── */}
+      <AnimatePresence>
+        {showModal && displayStudent && (
+          <StudentJourneyModal
+            key="journey-modal"
+            displayStudent={displayStudent}
+            schoolName={studentSchoolName}
+            hidePii={hidePii}
+            onClose={() => setShowModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

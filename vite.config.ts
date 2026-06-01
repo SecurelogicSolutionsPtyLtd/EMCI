@@ -14,11 +14,18 @@ export default defineConfig(({ mode }) => {
   const CLIENT_SECRET = env.CLIENT_SECRET ?? env.VITE_CLIENT_SECRET ?? '';
   const TOKEN_SCOPE   = env.TOKEN_SCOPE   ?? env.VITE_TOKEN_SCOPE   ?? '';
   const MS_TOKEN_URL  = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+  const SITE_URL      = (env.VITE_SITE_URL ?? '').replace(/\/$/, '');
 
   return {
     plugins: [
       react(),
       tailwindcss(),
+      {
+        name: 'html-meta-site-url',
+        transformIndexHtml(html) {
+          return html.replaceAll('{{SITE_URL}}', SITE_URL);
+        },
+      },
       {
         name: 'dataverse-token-server',
         configureServer(server) {
