@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   Check, Sparkles, AlertTriangle, RotateCcw, Loader2,
-  UserPlus, Compass, Flag, type LucideIcon,
+  ClipboardCheck, Compass, Flag, type LucideIcon,
 } from 'lucide-react';
 import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
@@ -16,11 +16,12 @@ import { StudentTimeline } from './StudentTimeline';
 import { StudentRatingBadge } from './StudentRatingBadge';
 import { StudentRatingBreakdown } from './StudentRatingBreakdown';
 import { StudentWatchouts } from './StudentWatchouts';
+import { StudentSentimentCard } from './StudentSentimentCard';
 
 // ── Stepper ──────────────────────────────────────────────────────────────────
 
 const STEPS: { key: string; label: string; Icon: LucideIcon }[] = [
-  { key: 'referral',        label: 'Referral',        Icon: UserPlus },
+  { key: 'consent',         label: 'Consent',         Icon: ClipboardCheck },
   { key: 'career_guidance', label: 'Career Guidance', Icon: Compass },
   { key: 'complete',        label: 'Complete',        Icon: Flag },
 ];
@@ -34,12 +35,12 @@ type StepStatus = 'done' | 'current' | 'pending';
  * renders consistently for every student — including completed and inactive
  * ones whose `currentStage` may be cleared.
  *
- * Progress scale: 0 not started · 1 referral · 2 consent · 3 career guidance · 4 complete.
- * "Consent" (2) is folded into the visual "Referral" step.
+ * Progress scale: 0 not started · 1–2 consent · 3 career guidance · 4 complete.
+ * The referral data stage (1) is folded into the visual "Consent" step.
  */
 function getStepStatus(stepKey: string, stageProgress: number): StepStatus {
   switch (stepKey) {
-    case 'referral':
+    case 'consent':
       if (stageProgress >= 3) return 'done';
       if (stageProgress >= 1) return 'current';
       return 'pending';
@@ -95,9 +96,9 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
 
   return (
     <div className="col-span-3 bg-white rounded-xl border border-slate-200 p-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-slate-900 tracking-tight flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
           Analysis Summary
         </h3>
         {displayState === 'current' && !hidePii && (
@@ -112,9 +113,9 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
       </div>
 
       {hidePii && (
-        <p className="text-sm text-slate-600 leading-relaxed">
-          {buildFallbackSummary(student)}
-        </p>
+          <p className="text-sm text-slate-700 leading-relaxed">
+            {buildFallbackSummary(student)}
+          </p>
       )}
 
       {!hidePii && displayState === 'too_early' && (
@@ -125,13 +126,13 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
             aria-hidden="true"
             className="w-28 h-28 mb-4 select-none pointer-events-none"
           />
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-base font-semibold text-slate-900">
             Analysis not yet available
           </p>
-          <p className="mt-1 text-sm text-slate-600 max-w-sm leading-relaxed">
-            This student is still in the referral stage. Only referral and consent
-            information is on record so far — an EMCI analysis will become available
-            once they enter Career Guidance.
+          <p className="mt-1.5 text-sm text-slate-600 max-w-sm leading-relaxed">
+            This student is still in the consent stage. Only consent information is
+            on record so far — an EMCI analysis will become available once they enter
+            Career Guidance.
           </p>
         </div>
       )}
@@ -144,10 +145,10 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
             aria-hidden="true"
             className="w-28 h-28 mb-4 select-none pointer-events-none"
           />
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-base font-semibold text-slate-900">
             No analysis generated yet
           </p>
-          <p className="mt-1 mb-5 text-sm text-slate-600 max-w-xs leading-relaxed">
+          <p className="mt-1.5 mb-5 text-sm text-slate-600 max-w-xs leading-relaxed">
             Generate an EMCI analysis to see insights about this student&apos;s
             strengths, wellbeing and engagement.
           </p>
@@ -189,10 +190,10 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
               aria-hidden="true"
               className="w-28 h-28 mb-4 select-none pointer-events-none"
             />
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-base font-semibold text-slate-900">
               Analysis needs to be regenerated
             </p>
-            <p className="mt-1 mb-5 text-sm text-slate-600 max-w-sm leading-relaxed">
+            <p className="mt-1.5 mb-5 text-sm text-slate-600 max-w-sm leading-relaxed">
               Student information has changed since this analysis was last generated.
             </p>
             <button
@@ -206,10 +207,10 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
           <div className="opacity-80">
             <AnalysisHighlights highlights={state.highlights} />
             <div className="px-4 py-4 rounded-xl bg-primary/5 border border-primary/15">
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+              <p className="text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
                 {state.analysis}
               </p>
-              <p className="text-[10px] text-slate-400 mt-3 uppercase tracking-wider">
+              <p className="text-[11px] text-slate-400 mt-3 uppercase tracking-wide">
                 AI-generated · Out of date · For guidance purposes only
               </p>
             </div>
@@ -221,10 +222,10 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
         <>
           <AnalysisHighlights highlights={state.highlights} />
           <div className="px-4 py-4 rounded-xl bg-primary/5 border border-primary/15">
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+            <p className="text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
               {state.analysis}
             </p>
-            <p className="text-[10px] text-slate-400 mt-3 uppercase tracking-wider">
+            <p className="text-[11px] text-slate-400 mt-3 uppercase tracking-wide">
               AI-generated · For guidance purposes only
             </p>
           </div>
@@ -253,9 +254,13 @@ export function StudentJourneySummary({
     ? studentPseudonym(student.id)
     : `${student.firstName} ${student.lastName}`;
 
-  const statusColor = student.status === 'Active' ? 'text-emerald-600' : 'text-slate-400';
-  const yearBadge   = formatYearLevelLine(student);
-  const insights    = useMemo(() => computeQuickInsights(student, events), [student, events]);
+  const statusStyles = student.status === 'Active'
+    ? { pill: 'bg-emerald-50/90 border-emerald-200/70 text-emerald-700', dot: 'bg-emerald-500' }
+    : student.status === 'Pending'
+    ? { pill: 'bg-amber-50/90 border-amber-200/70 text-amber-700', dot: 'bg-amber-500' }
+    : { pill: 'bg-slate-50 border-slate-200/80 text-slate-500', dot: 'bg-slate-400' };
+  const yearBadge = formatYearLevelLine(student);
+  const insights  = useMemo(() => computeQuickInsights(student, events), [student, events]);
   const { state: ratingState, generate: generateRating } = useStudentRating(
     hidePii ? null : student,
     events,
@@ -273,24 +278,30 @@ export function StudentJourneySummary({
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
 
         {/* Name + status + school */}
-        <div className="px-6 py-5">
-          <div className="flex items-start justify-between gap-3 mb-1.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">{displayName}</h1>
-              <span className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${statusColor}`}>
-                <span className="w-2 h-2 rounded-full bg-current" />
-                {student.status}
-              </span>
+        <div className="px-6 pt-6 pb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-3 min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 truncate">
+                {displayName}
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide ${statusStyles.pill}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusStyles.dot}`} />
+                  {student.status}
+                </span>
+                {schoolName && (
+                  <span className="text-sm font-medium text-slate-600">{schoolName}</span>
+                )}
+                {yearBadge !== '—' && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md border border-slate-200/80 bg-slate-50/80 text-xs font-medium text-slate-600">
+                    {yearBadge}
+                  </span>
+                )}
+              </div>
             </div>
             {!hidePii && <StudentRatingBadge state={ratingState} generate={generateRating} />}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            {schoolName && <span>{schoolName}</span>}
-            {yearBadge !== '—' && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary uppercase tracking-widest">
-                {yearBadge}
-              </span>
-            )}
           </div>
 
           {!hidePii && ratingState.status === 'success' && (
@@ -327,7 +338,7 @@ export function StudentJourneySummary({
                         strokeWidth={2.25}
                       />
                     </div>
-                    <span className={`text-[13px] font-medium tracking-tight transition-colors duration-300 ${
+                    <span className={`text-xs font-medium tracking-tight transition-colors duration-300 ${
                       status === 'pending'
                         ? 'text-slate-400'
                         : status === 'current'
@@ -361,6 +372,15 @@ export function StudentJourneySummary({
           <QuickInsightsPanel insights={insights} />
         </div>
       </div>
+
+      {/* ── Student Voice & Sentiment ── */}
+      {!hidePii && (
+        <StudentSentimentCard
+          student={student}
+          events={events}
+          schoolName={schoolName}
+        />
+      )}
 
       {/* ── Activity Timeline ── */}
       <StudentTimeline events={events} />

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
 import { supabase } from '../services/supabase';
-import { buildAnalysisSourceFingerprint } from '../lib/studentInsights';
+import { buildAnalysisSourceFingerprint, ANALYSIS_MIN_STAGE_PROGRESS } from '../lib/studentInsights';
 import {
   buildRatingPacket,
   finaliseRating,
@@ -33,9 +33,8 @@ interface CachedRating {
   rating:      StudentRating;
 }
 
-// v4: work experience now detected from sessions; part-time/researching are
-// AI-inferred from evidence (no brittle regex false positives).
-const CACHE_PREFIX = 'emci-rating:v4:';
+// v8: added dedicated Work Readiness category; weights now 25/20/20/15/20.
+const CACHE_PREFIX = 'emci-rating:v8:';
 
 function readCache(studentId: string, fingerprint: string): StudentRating | null {
   try {
@@ -120,12 +119,12 @@ export function useStudentRating(
     })();
   }, [student, events, fingerprint]);
 
-  // Auto-generate on load for Career Guidance students who have no stored score
-  // yet. Runs once per student/fingerprint; cached or other-stage students are
-  // left for the manual `generate()` trigger.
+  // Auto-generate on load for any student who has reached Career Guidance or
+  // beyond (stageProgress >= 3) and has no cached score for their current
+  // fingerprint. Runs once per student/fingerprint combination.
   useEffect(() => {
     if (!student || !fingerprint) return;
-    if (student.currentStage !== 'career_guidance') return;
+    if (student.stageProgress < ANALYSIS_MIN_STAGE_PROGRESS) return;
     if (readCache(student.id, fingerprint)) return;
     const key = `${student.id}:${fingerprint}`;
     if (autoTriggeredRef.current === key) return;

@@ -1,10 +1,10 @@
 /**
  * Deterministic Quick Insights + pilot survey shifts.
  *
- * Computes the categorised insight items shown alongside the AI Analysis
- * Summary (Career Action Plan, Morrisby Unpack, Morrisby Profile,
- * Work Experience, Absences) directly from the student's profile and
- * derived timeline events — no AI involvement.
+ * Computes the eight EMCI session intervention areas shown alongside the AI
+ * Analysis Summary (Unpack, CAP, Work Readiness, Industry Engagement,
+ * External Support, WEX Preparation, Introduction, Other) directly from
+ * counselling session records — no AI involvement.
  *
  * Also extracts start / mid / end pilot survey snapshots from the
  * timeline so the analyze-student edge function can narrate response
@@ -13,30 +13,38 @@
 
 import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
+import {
+  buildRedactionLiterals,
+  buildFuzzyNameTokens,
+  redactText,
+} from './studentRedaction';
 
 // ── Types ────────────────────────────────────────────────────────────────────
-
-export interface CountInsight {
-  count: number;
-  complete: boolean;
-}
 
 export interface YesNoInsight {
   yes: boolean;
 }
 
-export interface AbsenceInsight {
-  count: number;
-  flagged: boolean;
+export const QUICK_INSIGHT_AREAS = [
+  { key: 'unpack',             label: 'Unpack',              pattern: /\bunpack\b|morrisby/i },
+  { key: 'cap',                label: 'CAP',                 pattern: /career\s*action\s*plan|\bcap\b/i },
+  { key: 'workReadiness',      label: 'Work Readiness',      pattern: /work\s*readiness/i },
+  { key: 'industryEngagement', label: 'Industry Engagement', pattern: /industry\s*engagement|\bindustry\b/i },
+  { key: 'externalSupport',    label: 'External Support',    pattern: /external\s*support/i },
+  { key: 'wexPreparation',     label: 'WEX Preparation',     pattern: /wex\s*preparation|work\s*experience\s*prep|\bwex\b/i },
+  { key: 'introduction',       label: 'Introduction',        pattern: /\bintroduction\b/i },
+  { key: 'other',              label: 'Other',               pattern: /\bother\b/i },
+] as const;
+
+export type QuickInsightAreaKey = typeof QUICK_INSIGHT_AREAS[number]['key'];
+
+export interface QuickInsightCounts {
+  sessionCount:    number;
+  absenceCount:    number;
+  absencesFlagged: boolean;
 }
 
-export interface QuickInsights {
-  careerActionPlan: CountInsight;
-  morrisbyUnpack:   CountInsight;
-  morrisbyProfile:  YesNoInsight;
-  workExperience:   YesNoInsight;
-  absences:         AbsenceInsight;
-}
+export type QuickInsights = Record<QuickInsightAreaKey, YesNoInsight> & QuickInsightCounts;
 
 export type SurveyStage = 'start' | 'mid' | 'end';
 
@@ -55,42 +63,96 @@ export interface SessionDetail {
   fields:           Record<string, string>;
 }
 
+export interface TimelineNote {
+  date:  string;
+  type:  TimelineEvent['type'];
+  title: string;
+  note:  string;
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const ABSENCE_FLAG_THRESHOLD = 3;
 
-const CAP_PATTERN     = /career\s*action\s*plan|\bcap\b/i;
-const UNPACK_PATTERN  = /unpack|morrisby/i;
-const WORK_EXP_LABEL  = /work\s*experience/i;
-const AFFIRMATIVE     = /^(yes|true|completed|done|y)\b/i;
+const WORK_EXP_LABEL = /work\s*experience/i;
+const AFFIRMATIVE    = /^(yes|true|completed|done|y)\b/i;
+const NOTE_LABEL     = /note|support|comment|reflection|goal|next step/i;
+const MAX_TIMELINE_NOTES = 20;
+const MAX_TIMELINE_NOTE_CHARS = 1000;
+
+const PLACEHOLDER_NOTES = new Set([
+  '',
+  'Session notes not recorded.',
+]);
+
+const DEDICATED_FIELD_LABELS: Partial<Record<QuickInsightAreaKey, string>> = {
+  unpack:             'Morrisby Activities',
+  cap:                'Career Action Plan',
+  industryEngagement: 'Industry Engagement',
+  wexPreparation:     'Work Experience Prep',
+  workReadiness:      'Work Readiness',
+  externalSupport:    'External Support',
+  other:              'Other Intervention',
+};
+
+function emptyQuickInsights(): QuickInsights {
+  return Object.fromEntries(
+    QUICK_INSIGHT_AREAS.map(a => [a.key, { yes: false }]),
+  ) as QuickInsights;
+}
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
-function sessionMatches(ev: TimelineEvent, pattern: RegExp): boolean {
-  if (ev.type !== 'session') return false;
-  if (ev.interventionType && pattern.test(ev.interventionType)) return true;
+function sessionTextParts(ev: TimelineEvent): string[] {
+  if (ev.type !== 'session') return [];
+  const parts: string[] = [];
+  if (ev.interventionType) parts.push(ev.interventionType);
+  if (ev.description)      parts.push(ev.description);
   const linked = (ev as TimelineEvent & { linkedInterventions?: string[] }).linkedInterventions;
-  if (linked?.some(l => pattern.test(l))) return true;
-  return false;
+  if (linked) parts.push(...linked);
+  for (const f of ev.surveyFields ?? []) {
+    parts.push(f.label, f.value);
+  }
+  return parts;
 }
 
-function countSessions(events: TimelineEvent[], pattern: RegExp): number {
-  return events.reduce((n, ev) => (sessionMatches(ev, pattern) ? n + 1 : n), 0);
+function dedicatedFieldPresent(ev: TimelineEvent, key: QuickInsightAreaKey): boolean {
+  const label = DEDICATED_FIELD_LABELS[key];
+  if (!label) return false;
+  return (ev.surveyFields ?? []).some(
+    f => f.label === label && f.value.trim().length > 0,
+  );
 }
 
-function detectWorkExperience(events: TimelineEvent[]): boolean {
+function interventionAreasMatch(ev: TimelineEvent, pattern: RegExp): boolean {
+  const areas = (ev.surveyFields ?? []).find(f => f.label === 'Intervention Areas');
+  if (!areas?.value.trim()) return false;
+  return areas.value.split(';').some(token => pattern.test(token.trim()));
+}
+
+function sessionHasArea(ev: TimelineEvent, key: QuickInsightAreaKey, pattern: RegExp): boolean {
+  const haystack = sessionTextParts(ev).join(' ');
+  if (pattern.test(haystack)) return true;
+  if (interventionAreasMatch(ev, pattern)) return true;
+  return dedicatedFieldPresent(ev, key);
+}
+
+function detectInterventionAreas(events: TimelineEvent[]): QuickInsights {
+  const insights = emptyQuickInsights();
   for (const ev of events) {
-    // A counselling session whose intervention is work experience.
-    if (sessionMatches(ev, WORK_EXP_LABEL)) return true;
-    // Or a survey field that affirms work experience.
-    if (ev.type !== 'survey' || !ev.surveyFields) continue;
-    for (const field of ev.surveyFields) {
-      if (WORK_EXP_LABEL.test(field.label) && AFFIRMATIVE.test(field.value)) {
-        return true;
+    if (ev.type !== 'session') continue;
+    for (const area of QUICK_INSIGHT_AREAS) {
+      if (insights[area.key].yes) continue;
+      if (sessionHasArea(ev, area.key, area.pattern)) {
+        insights[area.key].yes = true;
       }
     }
   }
-  return false;
+  return insights;
+}
+
+function countSessions(events: TimelineEvent[]): number {
+  return events.reduce((n, ev) => (ev.type === 'session' ? n + 1 : n), 0);
 }
 
 function stageFromEvent(ev: TimelineEvent): SurveyStage | null {
@@ -103,22 +165,34 @@ function stageFromEvent(ev: TimelineEvent): SurveyStage | null {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
+/** Completed work experience — used by rating and DE analytics, separate from WEX prep. */
+export function detectWorkExperienceCompleted(events: TimelineEvent[]): boolean {
+  for (const ev of events) {
+    if (ev.type === 'session') {
+      const haystack = sessionTextParts(ev).join(' ');
+      if (WORK_EXP_LABEL.test(haystack) && !/prep/i.test(haystack)) return true;
+      if (WORK_EXP_LABEL.test(ev.interventionType ?? '')) return true;
+    }
+    if (ev.type !== 'survey' || !ev.surveyFields) continue;
+    for (const field of ev.surveyFields) {
+      if (WORK_EXP_LABEL.test(field.label) && AFFIRMATIVE.test(field.value)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function computeQuickInsights(
   student: Student,
   events:  TimelineEvent[],
 ): QuickInsights {
-  const capCount    = countSessions(events, CAP_PATTERN);
-  const unpackCount = countSessions(events, UNPACK_PATTERN);
-
+  const absenceCount = student.absenceCount;
   return {
-    careerActionPlan: { count: capCount,    complete: capCount    >= 1 },
-    morrisbyUnpack:   { count: unpackCount, complete: unpackCount >= 1 },
-    morrisbyProfile:  { yes: !!student.hasProfile },
-    workExperience:   { yes: detectWorkExperience(events) },
-    absences:         {
-      count:   student.absenceCount,
-      flagged: student.absenceCount > ABSENCE_FLAG_THRESHOLD,
-    },
+    ...detectInterventionAreas(events),
+    sessionCount:    countSessions(events),
+    absenceCount,
+    absencesFlagged: absenceCount > ABSENCE_FLAG_THRESHOLD,
   };
 }
 
@@ -153,6 +227,10 @@ export function buildSessionDetails(events: TimelineEvent[]): SessionDetail[] {
     ) {
       fields['Notes'] = ev.notes;
     }
+    // Per-session student feedback — read from dedicated event fields rather than
+    // surveyFields so the deterministic detectors never see (and mis-match) them.
+    if (ev.sessionSatisfaction) fields['Session Satisfaction'] = ev.sessionSatisfaction;
+    if (ev.sessionUseful)       fields['Found Useful']         = ev.sessionUseful;
     details.push({
       date:             ev.date,
       title:            ev.title,
@@ -163,6 +241,41 @@ export function buildSessionDetails(events: TimelineEvent[]): SessionDetail[] {
   }
   details.sort((a, b) => a.date.localeCompare(b.date));
   return details;
+}
+
+export function buildTimelineNotes(student: Student, events: TimelineEvent[]): TimelineNote[] {
+  const literals = buildRedactionLiterals(student);
+  const tokens   = buildFuzzyNameTokens(student);
+  const seen = new Set<string>();
+  const notes: TimelineNote[] = [];
+
+  const addNote = (ev: TimelineEvent, raw: string | null | undefined) => {
+    if (!raw?.trim()) return;
+    const redacted = redactText(raw, literals, tokens).slice(0, MAX_TIMELINE_NOTE_CHARS).trim();
+    if (PLACEHOLDER_NOTES.has(redacted)) return;
+    const key = `${ev.date}|${ev.type}|${ev.title}|${redacted}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    notes.push({
+      date:  ev.date,
+      type:  ev.type,
+      title: ev.title,
+      note:  redacted,
+    });
+  };
+
+  for (const ev of events) {
+    addNote(ev, ev.notes);
+    for (const field of ev.surveyFields ?? []) {
+      if (NOTE_LABEL.test(field.label)) {
+        addNote(ev, `${field.label}: ${field.value}`);
+      }
+    }
+  }
+
+  return notes
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-MAX_TIMELINE_NOTES);
 }
 
 /** Minimum stage progress before an EMCI analysis is meaningful (career guidance). */
@@ -179,6 +292,7 @@ export function buildAnalysisSourceFingerprint(
   const insights       = computeQuickInsights(student, events);
   const surveyShifts   = buildSurveyShifts(events);
   const sessionDetails = buildSessionDetails(events);
+  const timelineNotes  = buildTimelineNotes(student, events);
   const latestEventDate = events.reduce(
     (max, ev) => (ev.date && ev.date > max ? ev.date : max),
     '',
@@ -196,6 +310,7 @@ export function buildAnalysisSourceFingerprint(
     insights,
     surveyStages:   surveyShifts.map(s => s.stage),
     sessionDetails,
+    timelineNotes,
     eventCount:     events.length,
     latestEventDate,
   });

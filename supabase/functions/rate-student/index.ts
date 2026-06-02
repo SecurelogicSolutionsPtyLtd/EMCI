@@ -6,6 +6,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const CATEGORY_KEYS = [
   "engagement",
   "career_outcomes",
+  "work_readiness",
   "attendance_momentum",
   "growth_wellbeing",
 ] as const;
@@ -23,26 +24,31 @@ const SYSTEM_PROMPT = `You are a strict scoring engine for the EMCI (Enhanced My
 
 You are given a compact data packet about ONE student. Apply the rubric below EXACTLY and return JSON only. Use ONLY the provided data — never assume or invent. If a category has no supporting data in the packet, return null for that category's score.
 
-Score four categories, each 0–100, by summing the listed points (cap each at 100):
+The packet's "sessionDetails" array is the per-session record of what actually happened: session length, intervention type, the intervention areas covered (Morrisby, Career Action Plan, industry engagement, work-experience preparation, work readiness, other), and — where the student gave feedback — their satisfaction with the session ("Session Satisfaction") and what they found useful ("Found Useful"). The packet's "timelineNotes" array and "notesRedacted" string contain redacted notes from timeline activity records. Read these to corroborate ENGAGEMENT breadth and, especially, to inform the GROWTH_WELLBEING helpfulness/sentiment/wellbeing read. They never override the deterministic flags (interventionAreas, careerSignals, hasProfile) — those remain authoritative for their point awards.
+
+Score five categories, each 0–100, by summing the listed points (cap each at 100). Work-readiness signals are scored ONLY in WORK_READINESS so nothing is double-counted:
 
 ENGAGEMENT (sessions):
 - Session volume: min(sessionCount, 4) / 4 × 60
 - Intervention breadth: (distinct intervention areas among CAP, WEX prep, Morrisby, industry, work readiness) / 5 × 20
 - Interview conducted: 20 if interviewed else 0
 
-CAREER_OUTCOMES (CAP/WEX):
-- Career Action Plan (CAP) present: 30 (use interventionAreas.cap)
-- Work experience completed: 25 (use careerSignals.workExperienceCompleted)
-- Work experience preparation in sessions: 10 (use interventionAreas.wexPrep)
-- Morrisby profile available: 15 (use hasProfile)
-- Part-time/casual job: 10 — award ONLY if the notes or surveys clearly state the student holds a PAID part-time, casual or weekend job. Do NOT infer this from a work-experience placement, volunteering, or an industry/library visit.
-- Researching careers independently: 10 — award ONLY if the notes or surveys show the student actively researching or exploring careers on their own.
-The "reason" must only state facts supported by the packet evidence; never claim a part-time job, work experience or CAP that the evidence does not support.
+CAREER_OUTCOMES (planning & exploration):
+- Career Action Plan (CAP) present: 40 (use interventionAreas.cap)
+- Morrisby profile available: 25 (use hasProfile)
+- Researching careers independently: 20 — award ONLY if the notes or surveys show the student actively researching or exploring careers on their own.
+- Career conversation / interview conducted: 15 (use interviewed)
+The "reason" must only state facts supported by the packet evidence; never claim a CAP, Morrisby profile or career research that the evidence does not support.
+
+WORK_READINESS (work experience & employability):
+- Work experience completed (WEX): 40 (use careerSignals.workExperienceCompleted)
+- Part-time/casual job: 25 — award ONLY if the notes or surveys clearly state the student holds a PAID part-time, casual or weekend job. Do NOT infer this from a work-experience placement, volunteering, or an industry/library visit.
+- Work experience preparation in sessions: 20 (use interventionAreas.wexPrep)
+- Work-readiness intervention in sessions: 15 (use interventionAreas.workReadiness)
+The "reason" must only state facts supported by the packet evidence; never claim a part-time job or work experience that the evidence does not support. Fairness: if the student has had no work-experience opportunity yet (e.g. early Year 10) and no signal applies, return null for this category rather than a low score.
 
 ATTENDANCE_MOMENTUM:
-- Attendance: 0 absences=60, 1–2=45, 3–5=25, >5=10 (treat unexplained absences as the harsher end)
-- Recency: daysSinceLastActivity ≤30=40, ≤60=30, ≤120=20, >120=10, unknown=0
-- COMPLETION OVERRIDE: this applies ONLY when the packet field "programmeComplete" is exactly true. When programmeComplete is true, award full Recency (40) regardless of daysSinceLastActivity — inactivity after completing the programme is expected — and you may frame the reason as "completed". When programmeComplete is false, the student has NOT finished: score Recency normally from daysSinceLastActivity and NEVER describe the student as completed or finished. Do not infer completion from stageProgress, inactivity, or any other field.
+- Attendance only (score 0–100 from absence count in the packet): 0 absences=100, 1–2=75, 3–5=40, >5=15 (treat unexplained absences as the harsher end)
 
 GROWTH_WELLBEING (read the free-text notes & survey comments):
 - Preparedness + interests/strengths shift start→end: up to 40 (improvement high, no change ~20, decline low)
@@ -57,7 +63,6 @@ Rules:
 
 interface RatingPacket {
   stageProgress: number;
-  programmeComplete: boolean;
   status: string;
   interviewed: boolean;
   hasProfile: boolean;
@@ -68,8 +73,20 @@ interface RatingPacket {
   };
   insights: unknown;
   surveys: unknown;
+  sessionDetails: {
+    date: string;
+    title: string;
+    interventionType?: string;
+    sessionLength?: string;
+    fields: Record<string, string>;
+  }[];
+  timelineNotes: {
+    date: string;
+    type: string;
+    title: string;
+    note: string;
+  }[];
   careerSignals: { workExperienceCompleted: boolean };
-  daysSinceLastActivity: number | null;
   notesRedacted: string;
 }
 

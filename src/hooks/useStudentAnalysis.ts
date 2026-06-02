@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
@@ -6,6 +6,7 @@ import {
   computeQuickInsights,
   buildSurveyShifts,
   buildSessionDetails,
+  buildTimelineNotes,
   buildAnalysisSourceFingerprint,
   ANALYSIS_MIN_STAGE_PROGRESS,
   type QuickInsights,
@@ -62,6 +63,12 @@ export function useStudentAnalysis(
   schoolName?: string,
 ) {
   const [state, setState] = useState<AnalysisState>({ status: 'idle' });
+  // True once the initial DB cache check has resolved (hit or miss) so the
+  // auto-trigger below doesn't race with an in-flight RPC result.
+  const [dbChecked, setDbChecked] = useState(false);
+  // Tracks which student ID we've already auto-triggered for so we never call
+  // generate() more than once per student per session.
+  const autoTriggeredRef = useRef<string | null>(null);
 
   const sourceHash = useMemo(
     () => (student ? buildAnalysisSourceFingerprint(student, events) : ''),
@@ -72,11 +79,14 @@ export function useStudentAnalysis(
   useEffect(() => {
     if (!student) return;
     let cancelled = false;
+    setDbChecked(false);
 
     supabase
       .rpc('get_student_analysis_record', { p_student_id: student.id })
       .then(({ data }) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
+        setDbChecked(true);
+        if (!data) return;
         const record = data as StoredAnalysisRecord;
         if (!record.analysis) return;
         const { text, highlights } = parseStoredAnalysis(record.analysis);
@@ -98,6 +108,7 @@ export function useStudentAnalysis(
     const insights: QuickInsights = computeQuickInsights(student, events);
     const surveyShifts             = buildSurveyShifts(events);
     const sessionDetails           = buildSessionDetails(events);
+    const timelineNotes            = buildTimelineNotes(student, events);
     const fingerprint              = buildAnalysisSourceFingerprint(student, events);
 
     const { data, error } = await supabase.functions.invoke('analyze-student', {
@@ -117,6 +128,7 @@ export function useStudentAnalysis(
         insights,
         surveyShifts,
         sessionDetails,
+        timelineNotes,
       },
     });
 
@@ -148,6 +160,20 @@ export function useStudentAnalysis(
     () => deriveAnalysisDisplayState(student?.stageProgress ?? 0, state, sourceHash),
     [student?.stageProgress, state, sourceHash],
   );
+
+  // Auto-generate on page load once the DB cache check has resolved.
+  // Fires when there is no analysis yet ('ready') or when the stored one is
+  // out of date ('stale'). Skips students who already have a current result.
+  // Uses autoTriggeredRef so we only call generate() once per student per
+  // session, even if displayState briefly re-evaluates.
+  useEffect(() => {
+    if (!student) return;
+    if (!dbChecked) return;
+    if (displayState !== 'ready' && displayState !== 'stale') return;
+    if (autoTriggeredRef.current === student.id) return;
+    autoTriggeredRef.current = student.id;
+    generate();
+  }, [student, dbChecked, displayState, generate]);
 
   return { state, displayState, generate, sourceHash };
 }

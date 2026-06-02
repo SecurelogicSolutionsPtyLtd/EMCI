@@ -1,3 +1,9 @@
+/**
+ * EMCI Student Intelligence Interface — root application shell.
+ *
+ * @author Zac Swalling
+ */
+
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { CounsellorView } from './components/CounsellorView';
@@ -19,6 +25,8 @@ import {
   fetchEndOfPilotSurveysLegacy,
   fetchEndOfPilotSurveys2026,
   fetchMidPilotStudentSurveys,
+  fetchMidPilotStudentSurveys2026,
+  fetchAnnotations,
   enrichStudents,
   deriveStudentEvents,
   type TimelineEvent,
@@ -28,6 +36,8 @@ import {
   type RawEndOfPilotSurveyLegacy,
   type RawEndOfPilotSurvey2026,
   type RawMidPilotStudentSurvey,
+  type RawMidPilotStudentSurvey2026,
+  type RawAnnotation,
 } from './services/dataverse';
 import { getRoleGroup, ROLE_LABELS } from './types/roles';
 import { Eye, RotateCcw } from 'lucide-react';
@@ -98,6 +108,7 @@ function AppInner() {
       const [
         sessionsRes, absencesRes, initSurveysRes, initSurveys2026Res,
         endSurveysLegacyRes, endSurveys2026Res, midStudentSurveysRes,
+        midStudentSurveys2026Res, annotationsRes,
       ] = await Promise.allSettled([
         fetchSessions(tok),
         fetchAbsences(tok),
@@ -106,6 +117,8 @@ function AppInner() {
         fetchEndOfPilotSurveysLegacy(tok),
         fetchEndOfPilotSurveys2026(tok),
         fetchMidPilotStudentSurveys(tok),
+        fetchMidPilotStudentSurveys2026(tok),
+        fetchAnnotations(tok),
       ]);
 
       const sessions          = sessionsRes.status          === 'fulfilled' ? sessionsRes.value          : [] as RawSession[];
@@ -115,6 +128,8 @@ function AppInner() {
       const endSurveysLegacy  = endSurveysLegacyRes.status  === 'fulfilled' ? endSurveysLegacyRes.value  : [] as RawEndOfPilotSurveyLegacy[];
       const endSurveys2026    = endSurveys2026Res.status    === 'fulfilled' ? endSurveys2026Res.value    : [] as RawEndOfPilotSurvey2026[];
       const midStudentSurveys = midStudentSurveysRes.status === 'fulfilled' ? midStudentSurveysRes.value : [] as RawMidPilotStudentSurvey[];
+      const midStudentSurveys2026 = midStudentSurveys2026Res.status === 'fulfilled' ? midStudentSurveys2026Res.value : [] as RawMidPilotStudentSurvey2026[];
+      const annotations       = annotationsRes.status       === 'fulfilled' ? annotationsRes.value       : [] as RawAnnotation[];
 
       const enriched = enrichStudents(fetchedStudents, [], sessions, absences);
 
@@ -144,6 +159,10 @@ function AppInner() {
         );
         const matchesForStudent = (record: { [key: string]: unknown }) =>
           matchesStudent(record, sid, sessionIds);
+        const studentAnnotations = annotations.filter(
+          a => (a._objectid_value ?? '').toLowerCase() === sid.toLowerCase(),
+        );
+        const studentAbsences = absences.filter(matchesForStudent);
         eventsMap[sid] = deriveStudentEvents(
           student,
           studentSessions,
@@ -152,6 +171,9 @@ function AppInner() {
           endSurveysLegacy.filter(matchesForStudent),
           endSurveys2026.filter(matchesForStudent),
           midStudentSurveys.filter(matchesForStudent),
+          midStudentSurveys2026.filter(matchesForStudent),
+          studentAnnotations,
+          studentAbsences,
         );
       }
 

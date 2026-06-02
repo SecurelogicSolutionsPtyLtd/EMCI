@@ -1,10 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildRatingPacket,
   finaliseRating,
   deriveSupportNeed,
   type AiRating,
 } from './studentRating.js';
+import type { TimelineEvent } from '../services/dataverse.js';
 import type { Student } from '../data/studentsData.js';
 
 const baseStudent: Student = {
@@ -34,6 +36,7 @@ function ai(partial: Partial<AiRating>): AiRating {
     categories: [
       { key: 'engagement', score: 80, reason: '' },
       { key: 'career_outcomes', score: 80, reason: '' },
+      { key: 'work_readiness', score: 80, reason: '' },
       { key: 'attendance_momentum', score: 80, reason: '' },
       { key: 'growth_wellbeing', score: 80, reason: '' },
     ],
@@ -43,12 +46,47 @@ function ai(partial: Partial<AiRating>): AiRating {
   };
 }
 
+function timelineNote(note: string): TimelineEvent {
+  return {
+    type: 'session',
+    id: 'session-note',
+    date: '2026-01-01T00:00:00Z',
+    modifiedDate: '2026-01-01T00:00:00Z',
+    title: 'Work readiness',
+    status: 'Completed',
+    by: 'Alex Counsellor',
+    description: 'Career guidance session.',
+    notes: note,
+    track: 'above',
+    interventionType: 'Work Readiness',
+    surveyFields: [],
+  };
+}
+
 describe('finaliseRating', () => {
   it('computes weighted overall and band from all categories', () => {
     const r = finaliseRating(ai({}), baseStudent);
     assert.equal(r.overall, 80);
     assert.equal(r.band, 'on_track');
-    assert.equal(r.categories.length, 4);
+    assert.equal(r.categories.length, 5);
+  });
+
+  it('weights categories per the rubric (engagement = 25%)', () => {
+    const r = finaliseRating(
+      ai({
+        categories: [
+          { key: 'engagement', score: 100, reason: '' },
+          { key: 'career_outcomes', score: 0, reason: '' },
+          { key: 'work_readiness', score: 0, reason: '' },
+          { key: 'attendance_momentum', score: 0, reason: '' },
+          { key: 'growth_wellbeing', score: 0, reason: '' },
+        ],
+      }),
+      baseStudent,
+    );
+    assert.equal(r.overall, 25);
+    const work = r.categories.find(c => c.key === 'work_readiness')!;
+    assert.equal(work.weight, 20);
   });
 
   it('re-normalises over present weights when a category is null', () => {
@@ -57,6 +95,7 @@ describe('finaliseRating', () => {
         categories: [
           { key: 'engagement', score: 60, reason: '' },
           { key: 'career_outcomes', score: 60, reason: '' },
+          { key: 'work_readiness', score: null, reason: '' },
           { key: 'attendance_momentum', score: null, reason: '' },
           { key: 'growth_wellbeing', score: null, reason: '' },
         ],
@@ -73,6 +112,7 @@ describe('finaliseRating', () => {
         categories: [
           { key: 'engagement', score: 150, reason: '' },
           { key: 'career_outcomes', score: -20, reason: '' },
+          { key: 'work_readiness', score: 50, reason: '' },
           { key: 'attendance_momentum', score: 100, reason: '' },
           { key: 'growth_wellbeing', score: 0, reason: '' },
         ],
@@ -91,6 +131,7 @@ describe('finaliseRating', () => {
         categories: [
           { key: 'engagement', score: null, reason: '' },
           { key: 'career_outcomes', score: null, reason: '' },
+          { key: 'work_readiness', score: null, reason: '' },
           { key: 'attendance_momentum', score: null, reason: '' },
           { key: 'growth_wellbeing', score: null, reason: '' },
         ],
@@ -125,5 +166,18 @@ describe('deriveSupportNeed', () => {
     const priority = finaliseRating(ai({}), { ...baseStudent, studentType: 'Disability' });
     assert.equal(priority.overall, 80);
     assert.equal(priority.supportNeed, 'elevated');
+  });
+});
+
+describe('buildRatingPacket', () => {
+  it('includes redacted timeline notes for scoring context', () => {
+    const packet = buildRatingPacket(baseStudent, [
+      timelineNote('James reported feeling more confident after resume work.'),
+    ]);
+
+    assert.equal(packet.timelineNotes.length, 1);
+    assert.equal(packet.timelineNotes[0].note.includes('James'), false);
+    assert.equal(packet.timelineNotes[0].note.includes('[Redacted]'), true);
+    assert.match(packet.notesRedacted, /more confident/);
   });
 });

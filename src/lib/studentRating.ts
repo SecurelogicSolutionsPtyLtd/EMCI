@@ -12,20 +12,21 @@ import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
 import {
   computeQuickInsights,
+  detectWorkExperienceCompleted,
   buildSurveyShifts,
+  buildSessionDetails,
+  buildTimelineNotes,
   type QuickInsights,
+  type SessionDetail,
+  type TimelineNote,
 } from './studentInsights';
-import {
-  buildRedactionLiterals,
-  buildFuzzyNameTokens,
-  redactText,
-} from './studentRedaction';
 
 // ── AI output (mirrors the edge function schema) ───────────────────────────────
 
 export const RATING_CATEGORY_KEYS = [
   'engagement',
   'career_outcomes',
+  'work_readiness',
   'attendance_momentum',
   'growth_wellbeing',
 ] as const;
@@ -79,15 +80,17 @@ export interface StudentRating {
 // ── Rubric weights (must sum to 100) ───────────────────────────────────────────
 
 const CATEGORY_WEIGHTS: Record<RatingCategoryKey, number> = {
-  engagement:           30,
-  career_outcomes:      30,
-  attendance_momentum:  20,
+  engagement:           25,
+  career_outcomes:      20,
+  work_readiness:       20,
+  attendance_momentum:  15,
   growth_wellbeing:     20,
 };
 
 const CATEGORY_LABELS: Record<RatingCategoryKey, string> = {
   engagement:          'Engagement',
   career_outcomes:     'Career outcomes',
+  work_readiness:      'Work readiness',
   attendance_momentum: 'Attendance & momentum',
   growth_wellbeing:    'Growth & wellbeing',
 };
@@ -96,7 +99,6 @@ const CATEGORY_LABELS: Record<RatingCategoryKey, string> = {
 
 export interface RatingPacket {
   stageProgress:    number;
-  programmeComplete: boolean;
   status:           string;
   interviewed:      boolean;
   hasProfile:       boolean;
@@ -107,20 +109,15 @@ export interface RatingPacket {
   };
   insights:        QuickInsights;
   surveys:         { stage: string; fields: Record<string, string> }[];
+  /** Full per-session intervention detail (length, type, multiselect areas,
+   *  student satisfaction, what the student found useful) — labels, not codes. */
+  sessionDetails:  SessionDetail[];
+  timelineNotes:   TimelineNote[];
   careerSignals:   { workExperienceCompleted: boolean };
-  daysSinceLastActivity: number | null;
   notesRedacted:   string;
 }
 
-const NOTE_LABEL        = /note|support|comment|reflection|goal|next step/i;
 const MAX_NOTES_CHARS   = 4000;
-
-function daysSince(iso: string | undefined | null): number | null {
-  if (!iso) return null;
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return null;
-  return Math.max(0, Math.round((Date.now() - then) / 86_400_000));
-}
 
 function detectInterventionAreas(events: TimelineEvent[]): RatingPacket['interventionAreas'] {
   const haystack = events
@@ -140,35 +137,14 @@ function detectInterventionAreas(events: TimelineEvent[]): RatingPacket['interve
   };
 }
 
-function collectRedactedNotes(student: Student, events: TimelineEvent[]): string {
-  const literals = buildRedactionLiterals(student);
-  const tokens   = buildFuzzyNameTokens(student);
-  const parts: string[] = [];
-  for (const ev of events) {
-    if (ev.notes) parts.push(ev.notes);
-    for (const f of ev.surveyFields ?? []) {
-      if (NOTE_LABEL.test(f.label) && f.value) parts.push(`${f.label}: ${f.value}`);
-    }
-  }
-  const redacted = parts
-    .map(p => redactText(p, literals, tokens))
-    .filter(Boolean)
-    .join('\n');
-  return redacted.slice(0, MAX_NOTES_CHARS);
-}
-
 export function buildRatingPacket(student: Student, events: TimelineEvent[]): RatingPacket {
   const insights = computeQuickInsights(student, events);
   const surveys  = buildSurveyShifts(events).map(s => ({ stage: s.stage, fields: s.fields }));
   const sessionCount = events.reduce((n, e) => (e.type === 'session' ? n + 1 : n), 0);
-  const latestEventDate = events.reduce(
-    (max, e) => (e.date && e.date > max ? e.date : max),
-    '',
-  );
+  const timelineNotes = buildTimelineNotes(student, events);
 
   return {
     stageProgress:    student.stageProgress,
-    programmeComplete: student.currentStage === 'complete',
     status:           student.status,
     interviewed:      !!student.interviewed,
     hasProfile:       !!student.hasProfile,
@@ -177,9 +153,10 @@ export function buildRatingPacket(student: Student, events: TimelineEvent[]): Ra
     interventionAreas: detectInterventionAreas(events),
     insights,
     surveys,
-    careerSignals:    { workExperienceCompleted: insights.workExperience.yes },
-    daysSinceLastActivity: daysSince(latestEventDate || student.lastActivity),
-    notesRedacted:    collectRedactedNotes(student, events),
+    sessionDetails:   buildSessionDetails(events),
+    timelineNotes,
+    careerSignals:    { workExperienceCompleted: detectWorkExperienceCompleted(events) },
+    notesRedacted:    timelineNotes.map(n => `${n.title}: ${n.note}`).join('\n').slice(0, MAX_NOTES_CHARS),
   };
 }
 

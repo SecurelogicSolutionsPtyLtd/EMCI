@@ -7,10 +7,11 @@
  * are inherited from RawActivity.
  *
  * Entity set reference:
- *   Initial Survey (Legacy)      cr89a_emcistudentinitialsurveies
- *   Initial Survey 2026          cr89a_emcistudentinitialsurvey2026s
- *   Mid-Pilot Student Survey     cr89a_emcimidpilotschoolinitialsurveies
- *   Mid-Pilot School Survey      cr89a_midpilotschoolsurveies
+ *   Initial Survey (Legacy)        cr89a_emcistudentinitialsurveies
+ *   Initial Survey 2026            cr89a_emcistudentinitialsurvey2026s
+ *   Mid-Pilot Student Survey (Legacy) cr89a_emcimidpilotschoolinitialsurveies
+ *   Mid-Pilot Student Survey 2026  cr89a_emcimidpilotsurvey2026s
+ *   Mid-Pilot School Survey        cr89a_midpilotschoolsurveies
  *   End-of-Pilot Survey (Legacy) cr89a_emciendofpilotstudentsurveies
  *   End-of-Pilot Survey 2026     cr89a_emcistudentendofpilotsurvey2026s
  */
@@ -71,6 +72,11 @@ export interface RawMidPilotStudentSurvey extends RawActivity {
   'cr89a_programmeimpactonstudentattendanceengagementname'?: string | null;
   cr89a_suggestionstohelpimproveourprogrammein2025?: string | null;
 }
+
+// ── Mid-Pilot Student Survey 2026 (cr89a_emcimidpilotsurvey2026s) ───────────
+// 2026 student-level mid-programme check-in. The field shape mirrors the
+// legacy student mid-pilot form; non-matching fields simply render empty.
+export type RawMidPilotStudentSurvey2026 = RawMidPilotStudentSurvey;
 
 // ── Mid-Pilot School Survey (cr89a_midpilotschoolsurveies) ─────────────────
 // School-level survey — not linked to individual students.

@@ -28,6 +28,7 @@ const TYPE_LABEL: Record<EventType, string> = {
   session:  'Session',
   survey:   'Survey',
   absence:  'Absence',
+  note:     'Note',
 };
 
 const TYPE_DOT: Record<EventType, string> = {
@@ -36,6 +37,7 @@ const TYPE_DOT: Record<EventType, string> = {
   session:  'bg-primary',
   survey:   'bg-violet-500',
   absence:  'bg-amber-400',
+  note:     'bg-slate-400',
 };
 
 const TYPE_BADGE: Record<EventType, string> = {
@@ -44,17 +46,18 @@ const TYPE_BADGE: Record<EventType, string> = {
   session:  'bg-primary/8 text-primary',
   survey:   'bg-violet-50 text-violet-700',
   absence:  'bg-amber-50 text-amber-700',
+  note:     'bg-slate-100 text-slate-600',
 };
 
 // ── Filter tabs ───────────────────────────────────────────────────────────────
 
 const FILTER_OPTIONS: { label: string; value: EventType | 'all' }[] = [
   { label: 'All',      value: 'all' },
-  { label: 'Referral', value: 'referral' },
   { label: 'Consent',  value: 'consent' },
   { label: 'Sessions', value: 'session' },
   { label: 'Surveys',  value: 'survey' },
   { label: 'Absences', value: 'absence' },
+  { label: 'Notes',    value: 'note' },
 ];
 
 // ── Group events by Month Year ────────────────────────────────────────────────
@@ -106,8 +109,8 @@ function EventDrawer({ event, onClose }: DrawerProps) {
           <div className="flex items-start gap-3 min-w-0">
             <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[event.type]}`} />
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-slate-900 leading-snug">{event.title}</h3>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">
+              <h3 className="text-base font-semibold text-slate-900 leading-snug">{event.title}</h3>
+              <p className="text-xs text-slate-500 mt-1">
                 {safeFormat(event.date, 'dd MMM yyyy')}
               </p>
             </div>
@@ -137,7 +140,7 @@ function EventDrawer({ event, onClose }: DrawerProps) {
           {/* Recorded by */}
           {event.by && (
             <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Recorded by</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recorded by</span>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
                   <User className="w-3 h-3 text-slate-500" />
@@ -152,22 +155,22 @@ function EventDrawer({ event, onClose }: DrawerProps) {
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5">
                 <AlignLeft className="w-3 h-3 text-slate-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Description</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Description</span>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">{event.description}</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{event.description}</p>
             </div>
           )}
 
           {/* Survey / session fields */}
           {event.surveyFields && event.surveyFields.length > 0 ? (
             <div className="flex flex-col gap-3 bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {event.type === 'session' ? 'Session Details' : 'Survey Responses'}
               </span>
               {(event.surveyFields as SurveyField[]).map((field, i) => (
-                <div key={i} className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{field.label}</span>
-                  <span className="text-sm text-slate-700 leading-relaxed">{field.value}</span>
+                <div key={i} className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-slate-500">{field.label}</span>
+                  <span className="text-sm text-slate-800 leading-relaxed">{field.value}</span>
                 </div>
               ))}
             </div>
@@ -178,18 +181,18 @@ function EventDrawer({ event, onClose }: DrawerProps) {
               </p>
               <div className="flex flex-col gap-3 bg-primary/5 rounded-lg p-4 border border-primary/15">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
                     Related Session
                   </span>
-                  <span className="text-sm font-semibold text-slate-800">{event.relatedSession.title}</span>
-                  <span className="text-xs text-slate-400 font-mono">
+                  <span className="text-sm font-semibold text-slate-900">{event.relatedSession.title}</span>
+                  <span className="text-xs text-slate-500">
                     {safeFormat(event.relatedSession.date, 'dd MMM yyyy')}
                   </span>
                 </div>
                 {event.relatedSession.fields.map((field, i) => (
-                  <div key={i} className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{field.label}</span>
-                    <span className="text-sm text-slate-700 leading-relaxed">{field.value}</span>
+                  <div key={i} className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">{field.label}</span>
+                    <span className="text-sm text-slate-800 leading-relaxed">{field.value}</span>
                   </div>
                 ))}
               </div>
@@ -197,8 +200,8 @@ function EventDrawer({ event, onClose }: DrawerProps) {
           ) : (
             event.notes && (
               <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Notes</span>
-                <p className="text-sm text-slate-600 leading-relaxed">{event.notes}</p>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes</span>
+                <p className="text-sm text-slate-700 leading-relaxed">{event.notes}</p>
               </div>
             )
           )}
@@ -233,7 +236,9 @@ export function StudentTimeline({ events }: StudentTimelineProps) {
   const [activeEvent, setActiveEvent] = useState<TimelineEvent | null>(null);
 
   const sorted = useMemo(
-    () => [...events].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
+    () => [...events]
+      .filter(e => e.type !== 'referral')
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
     [events],
   );
 
@@ -245,8 +250,8 @@ export function StudentTimeline({ events }: StudentTimelineProps) {
   const groups = useMemo(() => groupByMonth(filtered), [filtered]);
 
   const availableTypes = useMemo(
-    () => new Set(events.map(e => e.type)),
-    [events],
+    () => new Set(sorted.map(e => e.type)),
+    [sorted],
   );
 
   const visibleFilters = FILTER_OPTIONS.filter(
@@ -258,10 +263,10 @@ export function StudentTimeline({ events }: StudentTimelineProps) {
       <div className="bg-white rounded-xl border border-slate-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
             Activity Timeline
           </h3>
-          <span className="text-[10px] font-medium text-slate-400">
+          <span className="text-xs text-slate-500">
             {filtered.length} event{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -299,7 +304,7 @@ export function StudentTimeline({ events }: StudentTimelineProps) {
               {groups.map(group => (
                 <div key={group.label}>
                   {/* Month label */}
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
                     {group.label}
                   </p>
 
@@ -321,20 +326,20 @@ export function StudentTimeline({ events }: StudentTimelineProps) {
                             onClick={() => setActiveEvent(event)}
                             className={`flex-1 flex items-baseline justify-between gap-3 text-left transition-opacity cursor-pointer ${isLast ? 'pb-0' : 'pb-5'} hover:opacity-75`}
                           >
-                            <div className="flex items-baseline gap-2 min-w-0">
-                              <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${TYPE_BADGE[event.type]} px-1.5 py-0.5 rounded`}>
+                            <div className="flex items-baseline gap-2.5 min-w-0">
+                              <span className={`text-[10px] font-semibold uppercase tracking-wide shrink-0 ${TYPE_BADGE[event.type]} px-1.5 py-0.5 rounded`}>
                                 {TYPE_LABEL[event.type]}
                               </span>
-                              <span className="text-sm text-slate-700 font-medium truncate">
+                              <span className="text-sm font-semibold text-slate-900 truncate">
                                 {event.title}
                               </span>
                               {event.by && (
-                                <span className="text-xs text-slate-400 truncate hidden sm:block">
+                                <span className="text-xs text-slate-500 truncate hidden sm:block">
                                   · {event.by}
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs font-mono text-slate-400 shrink-0">
+                            <span className="text-xs text-slate-500 shrink-0 tabular-nums">
                               {safeFormat(event.date, 'd MMM')}
                             </span>
                           </button>

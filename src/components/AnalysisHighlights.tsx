@@ -75,10 +75,10 @@ export function AnalysisHighlights({ highlights }: AnalysisHighlightsProps) {
               <Icon className="w-3.5 h-3.5" strokeWidth={2.25} />
             </span>
             <span className="flex flex-col leading-tight">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+              <span className="text-[11px] font-medium text-slate-500">
                 {h.label}
               </span>
-              <span className="text-xs font-semibold text-slate-800">
+              <span className="text-sm font-semibold text-slate-900">
                 {h.value}
               </span>
             </span>

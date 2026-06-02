@@ -47,37 +47,45 @@ A compact JSON object — no raw entities, no PII names:
 - `absenceCount`, `absencesExplained`
 - `surveys`: start / mid / end Likert values + deltas (preparedness, interests & strengths, helpfulness)
 - `careerSignals`: workExperienceCompleted, partTimeJob, researchingCareers
-- `daysSinceLastActivity`, `daysInCurrentStage`, `yearLevel`
+- `yearLevel`
 - `notes`: concatenated, HTML-stripped, **name-redacted** counsellor internal notes + absence reasons + survey comments
 
 ---
 
 ## 4. The fixed rubric (what the AI must apply)
 
-Four categories, each scored **0–100** strictly by these point allocations.
+Five categories, each scored **0–100** strictly by these point allocations. Each
+category's signals sum to 100; the category weights (below, totalling 100) decide how
+much each contributes to the overall. Work-readiness signals are scored **only** in the
+Work Readiness category so nothing is double-counted.
 
-**Engagement (weight 30)**
+**Engagement (weight 25)**
 | Signal | Pts |
 |--------|:--:|
 | Sessions: `min(count,4)/4 × 60` | 0–60 |
 | Intervention breadth: areas touched /5 × 20 | 0–20 |
 | Interview conducted | 20 |
 
-**Career Outcomes — CAP/WEX (weight 30)**
+**Career Outcomes — planning & exploration (weight 20)**
 | Signal | Pts |
 |--------|:--:|
-| Career Action Plan (CAP) present | 30 |
-| Work experience completed (WEX) | 25 |
-| WEX preparation in sessions | 10 |
-| Morrisby profile | 15 |
-| Part-time job | 10 |
-| Researching careers | 10 |
+| Career Action Plan (CAP) present | 40 |
+| Morrisby profile | 25 |
+| Researching careers | 20 |
+| Career conversation / interview conducted | 15 |
 
-**Attendance & Momentum (weight 20)**
+**Work Readiness (weight 20)**
 | Signal | Pts |
 |--------|:--:|
-| Attendance: 0 abs=60, 1–2=45, 3–5=25, >5=10 (unexplained harsher) | 0–60 |
-| Recency: ≤30d=40, ≤60d=30, ≤120d=20, >120d=10, none=0 | 0–40 |
+| Work experience completed (WEX) | 40 |
+| Part-time job | 25 |
+| WEX preparation in sessions | 20 |
+| Work-readiness intervention in sessions | 15 |
+
+**Attendance & Momentum (weight 15)**
+| Signal | Pts |
+|--------|:--:|
+| Attendance: 0 abs=100, 1–2=75, 3–5=40, >5=15 (unexplained harsher) | 0–100 |
 
 **Growth & Wellbeing (weight 20)** — *the AI-judgement category*
 | Signal | Pts |
@@ -86,7 +94,7 @@ Four categories, each scored **0–100** strictly by these point allocations.
 | Helpfulness / positive sentiment | 0–30 |
 | Wellbeing read of notes & comments (concern lowers, positive raises) | 0–30 |
 
-If a category has no supporting data, the AI returns `null` for that category (omitted from the weighted average — see §6 confidence).
+If a category has no supporting data, the AI returns `null` for that category (omitted from the weighted average — see §6 confidence). **Fairness note:** a student with no work-experience opportunity yet (e.g. early Year 10) should return `null` for Work Readiness rather than a low score, so the missing opportunity does not penalise them — the weight is renormalised across the remaining categories.
 
 ---
 
@@ -98,6 +106,7 @@ If a category has no supporting data, the AI returns `null` for that category (o
     "categories": [
       { "key": "engagement",        "score": 0-100|null, "reason": "≤12 words" },
       { "key": "career_outcomes",   "score": 0-100|null, "reason": "≤12 words" },
+      { "key": "work_readiness",    "score": 0-100|null, "reason": "≤12 words" },
       { "key": "attendance_momentum","score": 0-100|null, "reason": "≤12 words" },
       { "key": "growth_wellbeing",  "score": 0-100|null, "reason": "≤12 words" }
     ],
@@ -107,7 +116,7 @@ If a category has no supporting data, the AI returns `null` for that category (o
 }
 ```
 
-Constraints: fixed 4 keys in fixed order; integer scores 0–100 or null; reasons capped;
+Constraints: fixed 5 keys in fixed order; integer scores 0–100 or null; reasons capped;
 flags from the enum, max 3; **no names/PII** in any string; nothing outside the schema.
 
 ---
@@ -115,7 +124,7 @@ flags from the enum, max 3; **no names/PII** in any string; nothing outside the 
 ## 6. Code finalisation (deterministic, no AI)
 
 1. **Clamp** every score to 0–100; drop invalid flags.
-2. **Overall** = weighted average over non-null categories with weights {30,30,20,20}, renormalised.
+2. **Overall** = weighted average over non-null categories with weights {engagement 25, career_outcomes 20, work_readiness 20, attendance_momentum 15, growth_wellbeing 20}, renormalised over whichever categories are non-null.
 3. **Band** from overall: ≥80 On Track · 65–79 Progressing · 45–64 Monitoring · <45 Needs Attention.
 4. **Support Need** (pure code, from context — never lowers the score): priority-cohort tags (Disability/Koorie/OOHC/Youth Justice) + Year 10 runway → Standard / Elevated / High.
 5. **Triage** = matrix of Band × Support Need → OK / Watch / Follow up / Priority / Urgent.
@@ -141,7 +150,7 @@ never reduce the score. Notes are name-redacted before reaching the AI and respe
 ---
 
 ## 9. Open decisions
-1. Rubric point values (§4) and category weights {30/30/20/20}.
+1. Rubric point values (§4) and category weights {25/20/20/15/20}.
 2. Band thresholds (80/65/45) and Triage matrix (§6).
 3. Flag enum (§5) and the wellbeing concern/positive cues the AI keys on.
 4. Session target (4) for full engagement volume.

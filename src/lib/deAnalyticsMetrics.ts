@@ -11,7 +11,7 @@
 import type { Student } from '../data/studentsData';
 import type { School } from '../data/networkData';
 import type { TimelineEvent } from '../services/dataverse';
-import { computeQuickInsights } from './studentInsights';
+import { computeQuickInsights, detectWorkExperienceCompleted } from './studentInsights';
 
 // ── Cohorts ────────────────────────────────────────────────────────────────
 
@@ -189,9 +189,9 @@ export function buildCohortOutcomes(
     let cap = 0, wex = 0, morrisby = 0;
     for (const s of members) {
       const insights = computeQuickInsights(s, eventsMap[s.id] ?? []);
-      if (insights.careerActionPlan.complete) cap++;
-      if (insights.workExperience.yes)        wex++;
-      if (insights.morrisbyProfile.yes)       morrisby++;
+      if (insights.cap.yes) cap++;
+      if (detectWorkExperienceCompleted(eventsMap[s.id] ?? [])) wex++;
+      if (s.hasProfile) morrisby++;
     }
     return {
       cohort,

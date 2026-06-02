@@ -2,19 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 
-// Fixed allowlist of highlight icons. Must stay in sync with the frontend map
-// in src/lib/analysisHighlights.ts.
-const HIGHLIGHT_ICONS = [
-  "briefcase", "graduation-cap", "target", "compass", "sparkles", "star",
-  "music", "palette", "camera", "pen-tool", "mic", "gamepad",
-  "dumbbell", "trophy", "utensils", "chef-hat", "coffee", "shopping-bag",
-  "flame", "stethoscope", "heart-pulse", "laptop", "code", "cpu",
-  "hammer", "wrench", "hard-hat", "paw-print", "flask", "microscope",
-  "leaf", "sprout", "car", "truck", "plane", "banknote", "calculator",
-  "scale", "scissors", "book-open", "baby", "newspaper",
-] as const;
-
-const SYSTEM_PROMPT = `You are a professional career counsellor working within the Enhanced My Career Insights (EMCI) program in Victoria, Australia.
+const SYSTEM_PROMPT = `You are the EMCI Assistant — a professional career-counselling co-pilot embedded in the Enhanced My Career Insights (EMCI) program in Victoria, Australia.
 
 EMCI supports Year 9 and 10 students from priority cohorts — Koorie students, students in out-of-home care, students engaged with Youth Justice, and students with disabilities who experience significant disadvantage. The program connects these students with additional career guidance supports and work-based learning opportunities through ACCE (Australian Centre for Career Education).
 
@@ -24,37 +12,33 @@ The program stages are:
 3. Career Guidance — student is actively engaged in career consultations, Morrisby profiling, and work readiness activities
 4. Complete — student has finished the EMCI programme
 
-You must return a JSON object with two fields: "analysis" and "highlights".
+You are answering questions for a school-based career practitioner or ACCE consultant about the ONE student described in the context block below.
 
-"analysis" — a concise, professional analysis (4–6 sentences) of the student's current EMCI engagement for school-based career practitioners and ACCE consultants. Requirements:
-- Refer to "the student" or "they" — never use the student's name.
-- Reference the Quick Insight categories (Career Action Plan, Morrisby Unpack, Morrisby Profile, Work Experience, Absences) where they meaningfully inform the picture. Explicitly flag absences when the absences entry is flagged.
-- When pilot survey data is provided for more than one stage (start / mid / end), describe how the student's responses shifted across those stages — focus on perceptions like preparedness, understanding of interests and strengths, programme helpfulness, work-experience exposure, and any change in focus.
-- Use the timeline notes when they clarify engagement, barriers, goals, wellbeing, or recommended next steps. Do not invent detail beyond those notes.
-- Be direct, positive where appropriate, and clearly flag any areas needing attention.
-- Do not include sensitive personal information beyond what is provided.
+Rules:
+- Ground every answer in the provided student context. Do not invent sessions, surveys, or facts that are not present.
+- If the context does not contain the answer, say so plainly and suggest what record would be needed.
+- Never use or guess the student's name — refer to "the student" or "they". The context intentionally omits identifying details.
+- Be concise and practical: prefer short paragraphs and tight bullet points. Lead with the direct answer.
+- Where helpful, reference the Quick Insight categories (Career Action Plan, Morrisby Unpack, Morrisby Profile, Work Experience, Absences) and any pilot-survey shifts across start / mid / end stages.
+- Use timeline notes when they answer the practitioner’s question or clarify engagement, barriers, goals, wellbeing, or next steps. Do not invent details beyond those notes.
+- Offer concrete, actionable next steps when asked for recommendations.
+- Do not include sensitive personal information beyond what is provided. This guidance supports — never replaces — professional judgement.
 
-"highlights" — an array of AT MOST 3 at-a-glance highlight chips that let a practitioner instantly recognise the student. Only include a highlight when it is clearly supported by the provided data (especially the pilot survey fields). Prefer these three categories, in priority order, and omit any that are unknown (return an empty array if none apply):
-1. Career Interest — the job, industry, or aspiration the student is drawn to (e.g. "Firefighter", "Nursing", "Trades").
-2. Strength — a talent, subject, or interest the student identifies with (e.g. "Music", "Sport", "Art").
-3. Current Work — a part-time job or completed work experience (e.g. "KFC", "Retail", "Hospitality").
-Rules for highlights:
-- "label" is the short category name (e.g. "Career Interest", "Strength", "Current Work").
-- "value" is a SHORT 1–3 word value. Never include names, addresses, or other sensitive identifiers.
-- "icon" MUST be exactly one key from this allowlist, choosing the best visual fit: ${HIGHLIGHT_ICONS.join(", ")}.`;
+Respond with a JSON object containing two fields:
+- "reply": your answer, written in concise GitHub-flavoured markdown (headings, bold, and bullet lists are encouraged where they aid scanning).
+- "followUps": an array of 0–3 SHORT follow-up questions the practitioner is most likely to ask next, written from their perspective (e.g. "What work experience would suit them?", "How do I support their attendance?"). Each must be a single question under ~10 words, answerable from this student's context. Omit anything you already covered, and return an empty array when no useful follow-up remains.`;
 
 interface StudentInput {
-  stage:          string | null;
-  stageProgress:  number;
-  status:         string;
-  absenceCount:   number;
-  interviewed:    boolean;
-  hasProfile:     boolean;
-  studentType:    string;
-  yearLevel:      number;
+  stage:           string | null;
+  stageProgress:   number;
+  status:          string;
+  absenceCount:    number;
+  interviewed:     boolean;
+  hasProfile:      boolean;
+  studentType:     string;
+  yearLevel:       number;
   yearLevelLabel?: string;
-  counsellor?:    string;
-  schoolName?:    string;
+  schoolName?:     string;
 }
 
 interface InsightsInput {
@@ -79,11 +63,11 @@ interface SurveyShiftInput {
 }
 
 interface SessionDetailInput {
-  date:             string;
-  title:            string;
+  date:              string;
+  title:             string;
   interventionType?: string;
-  sessionLength?:   string;
-  fields:           Record<string, string>;
+  sessionLength?:    string;
+  fields:            Record<string, string>;
 }
 
 interface TimelineNoteInput {
@@ -91,6 +75,11 @@ interface TimelineNoteInput {
   type:  string;
   title: string;
   note:  string;
+}
+
+interface ChatMessageInput {
+  role:    "user" | "assistant";
+  content: string;
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -107,7 +96,7 @@ const STAGE_NAME: Record<SurveyShiftInput["stage"], string> = {
 };
 
 function formatInsights(i: InsightsInput): string {
-  const lines = [
+  return [
     `- Counselling sessions: ${i.sessionCount}`,
     `- Absences: ${i.absenceCount}${i.absencesFlagged ? " (FLAGGED — exceeds attendance threshold)" : ""}`,
     `- Unpack: ${i.unpack.yes ? "Yes" : "No"}`,
@@ -118,8 +107,7 @@ function formatInsights(i: InsightsInput): string {
     `- WEX Preparation: ${i.wexPreparation.yes ? "Yes" : "No"}`,
     `- Introduction: ${i.introduction.yes ? "Yes" : "No"}`,
     `- Other: ${i.other.yes ? "Yes" : "No"}`,
-  ];
-  return lines.join("\n");
+  ].join("\n");
 }
 
 function formatSurveyShifts(shifts: SurveyShiftInput[]): string {
@@ -143,12 +131,7 @@ function formatSurveyShifts(shifts: SurveyShiftInput[]): string {
     }
     blocks.push(`  ${STAGE_NAME[stage]}:\n${fieldLines.join("\n") || "    • (no fields recorded)"}`);
   }
-
-  const distinctStages = blocks.length;
-  const header = distinctStages > 1
-    ? `Pilot survey snapshots across ${distinctStages} stage(s) — describe how the student's responses shifted:`
-    : `Pilot survey snapshot (single stage available — no shift to compare):`;
-  return `${header}\n${blocks.join("\n")}`;
+  return `Pilot survey snapshots:\n${blocks.join("\n")}`;
 }
 
 function formatSessionDetails(sessions: SessionDetailInput[]): string {
@@ -165,7 +148,7 @@ function formatSessionDetails(sessions: SessionDetailInput[]): string {
     return `${header}\n${fieldLines || "    • (no detail recorded)"}`;
   });
 
-  return `Counselling session intervention detail (${sessions.length} session(s) — what actually happened in sessions):\n${blocks.join("\n")}`;
+  return `Counselling session intervention detail (${sessions.length} session(s)):\n${blocks.join("\n")}`;
 }
 
 function formatTimelineNotes(notes: TimelineNoteInput[]): string {
@@ -178,7 +161,7 @@ function formatTimelineNotes(notes: TimelineNoteInput[]): string {
   return `Timeline notes from activity records (${notes.length} note(s)):\n${lines.join("\n")}`;
 }
 
-function buildUserPrompt(
+function buildContextBlock(
   s:        StudentInput,
   insights: InsightsInput | undefined,
   shifts:   SurveyShiftInput[] | undefined,
@@ -189,7 +172,7 @@ function buildUserPrompt(
   const yearStr  = s.yearLevelLabel?.trim() || `Year ${s.yearLevel}`;
 
   const sections: string[] = [
-    `Student programme data:`,
+    `STUDENT CONTEXT (the only student this conversation is about):`,
     `- Programme stage: ${stageStr}`,
     `- Stage progress score: ${s.stageProgress}/4`,
     `- Enrolment status: ${s.status}`,
@@ -202,30 +185,20 @@ function buildUserPrompt(
   if (insights) {
     sections.push("", "Quick Insight categories (deterministic):", formatInsights(insights));
   }
-
   if (sessions && sessions.length) {
     sections.push("", formatSessionDetails(sessions));
   }
-
   if (shifts && shifts.length) {
     sections.push("", formatSurveyShifts(shifts));
   }
-
   if (notes && notes.length) {
     sections.push("", formatTimelineNotes(notes));
   }
-
-  sections.push(
-    "",
-    `Please write a brief professional counsellor note about this student's EMCI programme engagement, progress, recommended next steps, and any pilot-survey shifts observed. Draw on the counselling session intervention detail and timeline notes where they inform the picture.`,
-  );
-
   return sections.join("\n");
 }
 
 // CORS headers must be present on EVERY response (including errors) — without
-// them the browser surfaces any non-2xx as an opaque "CORS policy" failure
-// that hides the real error.
+// them the browser surfaces any non-2xx as an opaque "CORS policy" failure.
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -239,15 +212,15 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
+const MAX_HISTORY = 12;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
   }
-
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
-
   if (!OPENAI_API_KEY) {
     return jsonResponse({ error: "OpenAI API key not configured" }, 500);
   }
@@ -259,6 +232,7 @@ Deno.serve(async (req) => {
     surveyShifts?:   SurveyShiftInput[];
     sessionDetails?: SessionDetailInput[];
     timelineNotes?:  TimelineNoteInput[];
+    messages?:       ChatMessageInput[];
   };
   try {
     body = await req.json();
@@ -266,13 +240,22 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
+  const history = Array.isArray(body.messages)
+    ? body.messages
+        .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+        .slice(-MAX_HISTORY)
+    : [];
+
+  if (!history.length || history[history.length - 1].role !== "user") {
+    return jsonResponse({ error: "A trailing user message is required" }, 400);
+  }
+
   try {
     const input: StudentInput = {
       ...body.student,
       schoolName: body.schoolName ?? body.student?.schoolName,
     };
-
-    const userPrompt = buildUserPrompt(input, body.insights, body.surveyShifts, body.sessionDetails, body.timelineNotes);
+    const contextBlock = buildContextBlock(input, body.insights, body.surveyShifts, body.sessionDetails, body.timelineNotes);
 
     const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -282,37 +265,26 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model:       "gpt-4o-mini",
-        max_tokens:  500,
-        temperature: 0.3,
+        max_tokens:  700,
+        temperature: 0.4,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user",   content: userPrompt },
+          { role: "system", content: contextBlock },
+          ...history.map(m => ({ role: m.role, content: m.content })),
         ],
         response_format: {
           type: "json_schema",
           json_schema: {
-            name:   "emci_student_analysis",
+            name:   "emci_assistant_reply",
             strict: true,
             schema: {
               type: "object",
               additionalProperties: false,
               properties: {
-                analysis: { type: "string" },
-                highlights: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                      label: { type: "string" },
-                      value: { type: "string" },
-                      icon:  { type: "string", enum: [...HIGHLIGHT_ICONS] },
-                    },
-                    required: ["label", "value", "icon"],
-                  },
-                },
+                reply:     { type: "string" },
+                followUps: { type: "array", items: { type: "string" } },
               },
-              required: ["analysis", "highlights"],
+              required: ["reply", "followUps"],
             },
           },
         },
@@ -327,20 +299,26 @@ Deno.serve(async (req) => {
     const json = await openAiRes.json();
     const raw: string = json.choices?.[0]?.message?.content ?? "";
 
-    let analysis = "";
-    let highlights: { label: string; value: string; icon: string }[] = [];
+    let reply = "";
+    let followUps: string[] = [];
     try {
       const parsed = JSON.parse(raw);
-      analysis   = typeof parsed.analysis === "string" ? parsed.analysis : "";
-      highlights = Array.isArray(parsed.highlights) ? parsed.highlights.slice(0, 3) : [];
+      reply     = typeof parsed.reply === "string" ? parsed.reply : "";
+      followUps = Array.isArray(parsed.followUps)
+        ? parsed.followUps.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0).slice(0, 3)
+        : [];
     } catch {
-      // Fall back to treating the whole response as prose if parsing fails.
-      analysis = raw;
+      // Fall back to treating the whole response as the reply prose.
+      reply = raw;
     }
 
-    return jsonResponse({ analysis, highlights }, 200);
+    if (!reply.trim()) {
+      return jsonResponse({ error: "No reply returned from service." }, 502);
+    }
+
+    return jsonResponse({ reply, followUps }, 200);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unexpected error";
-    return jsonResponse({ error: `analyze-student failed: ${message}` }, 500);
+    return jsonResponse({ error: `chat-student failed: ${message}` }, 500);
   }
 });

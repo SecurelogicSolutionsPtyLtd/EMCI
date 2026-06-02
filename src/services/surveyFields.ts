@@ -7,10 +7,11 @@
  *
  * Supported survey types:
  *   Session                      cr89a_wlpcsessions
- *   Initial Survey (Legacy)      cr89a_emcistudentinitialsurveies
- *   Initial Survey 2026          cr89a_emcistudentinitialsurvey2026s
- *   Mid-Pilot Student Survey     cr89a_emcimidpilotschoolinitialsurveies
- *   End-of-Pilot Survey (Legacy) cr89a_emciendofpilotstudentsurveies
+ *   Initial Survey (Legacy)           cr89a_emcistudentinitialsurveies
+ *   Initial Survey 2026               cr89a_emcistudentinitialsurvey2026s
+ *   Mid-Pilot Student Survey (Legacy) cr89a_emcimidpilotschoolinitialsurveies
+ *   Mid-Pilot Student Survey 2026     cr89a_emcimidpilotsurvey2026s
+ *   End-of-Pilot Survey (Legacy)      cr89a_emciendofpilotstudentsurveies
  *   End-of-Pilot Survey 2026     cr89a_emcistudentendofpilotsurvey2026s
  */
 

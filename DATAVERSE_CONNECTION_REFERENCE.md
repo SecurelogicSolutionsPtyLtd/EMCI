@@ -35,11 +35,12 @@ Prefer:           odata.include-annotations="*"
 |---|---|---|---|---|
 | WLPC Student | `cr89a_wlpcstudent` | `cr89a_wlpcstudents` | `cr89a_wlpcstudentid` | Core student records |
 | WLPC School | `cr89a_wlpcschool` | `cr89a_wlpcschools` | `cr89a_wlpcschoolid` | School records |
-| WLPC Session | `cr89a_wlpcsession` | `cr89a_wlpcsessions` | `activityid` | Counselling sessions |
+| EMCI Session | `cr89a_wlpcsession` | `cr89a_wlpcsessions` | `activityid` | Counselling sessions |
 | EMCI Student Absence | `cr89a_emcistudentabsence` | `cr89a_emcistudentabsences` | `activityid` | Absence records |
 | EMCI Initial Survey (Legacy) | `cr89a_emcistudentinitialsurvey` | `cr89a_emcistudentinitialsurveies` | `activityid` | Pre-2026 initial survey |
 | EMCI Initial Survey 2026 | `cr89a_emcistudentinitialsurvey2026` | `cr89a_emcistudentinitialsurvey2026s` | `activityid` | 2026 initial survey |
-| EMCI Mid-Pilot Student Survey | `cr89a_emcimidpilotschoolinitialsurvey` | `cr89a_emcimidpilotschoolinitialsurveies` | `activityid` | Student mid-pilot check-in |
+| EMCI Mid-Pilot Student Survey (Legacy) | `cr89a_emcimidpilotschoolinitialsurvey` | `cr89a_emcimidpilotschoolinitialsurveies` | `activityid` | Student mid-pilot check-in (pre-2026) |
+| EMCI Student Mid Pilot Survey (2026) | `cr89a_emcimidpilotsurvey2026` | `cr89a_emcimidpilotsurvey2026s` | `activityid` | 2026 student mid-pilot check-in |
 | Mid-Pilot School Survey | `cr89a_midpilotschoolsurvey` | `cr89a_midpilotschoolsurveies` | `activityid` | School-level mid-pilot survey |
 | EMCI End of Pilot Survey (Legacy) | `cr89a_emciendofpilotstudentsurvey` | `cr89a_emciendofpilotstudentsurveies` | `activityid` | Pre-2026 end-of-pilot survey |
 | EMCI End of Pilot Survey 2026 | `cr89a_emcistudentendofpilotsurvey2026` | `cr89a_emcistudentendofpilotsurvey2026s` | `activityid` | 2026 end-of-pilot survey |

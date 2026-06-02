@@ -29,6 +29,7 @@ const typeBadgeColor: Record<string, string> = {
   consent:  'bg-emerald-50 text-emerald-700 border-emerald-200',
   session:  'bg-primary/10 text-primary border-primary/20',
   survey:   'bg-emerald-50 text-emerald-700 border-emerald-200',
+  absence:  'bg-amber-50 text-amber-700 border-amber-200',
 };
 
 const typeIconBg = 'bg-slate-100 text-slate-500';

@@ -126,7 +126,7 @@ export function computeWatchouts(
   // 3. Completed without the expected outcomes.
   if (student.currentStage === 'complete') {
     const missing: string[] = [];
-    if (!insights.careerActionPlan.complete) missing.push('a Career Action Plan');
+    if (!insights.cap.yes) missing.push('a Career Action Plan');
     if (!student.hasProfile)                 missing.push('a Morrisby profile');
     if (!student.interviewed)                missing.push('an interview');
     if (missing.length > 0) {
@@ -186,7 +186,7 @@ export function computeWatchouts(
   if (
     student.currentStage === 'career_guidance' &&
     sessions > 0 &&
-    !insights.careerActionPlan.complete
+    !insights.cap.yes
   ) {
     out.push({
       id: 'no-career-plan',

@@ -5,6 +5,7 @@ export type {
   RawInitialSurvey,
   RawInitialSurvey2026,
   RawMidPilotStudentSurvey,
+  RawMidPilotStudentSurvey2026,
   RawMidPilotSchoolSurvey,
   RawEndOfPilotSurveyLegacy,
   RawEndOfPilotSurvey2026,
@@ -13,6 +14,7 @@ import type {
   RawInitialSurvey,
   RawInitialSurvey2026,
   RawMidPilotStudentSurvey,
+  RawMidPilotStudentSurvey2026,
   RawMidPilotSchoolSurvey,
   RawEndOfPilotSurveyLegacy,
   RawEndOfPilotSurvey2026,
@@ -177,6 +179,13 @@ export interface RawSession extends RawActivity {
   'cr89a_interventionworkreadiness_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
   cr89a_interventionother_ms: string | null;
   'cr89a_interventionother_ms@OData.Community.Display.V1.FormattedValue'?: string | null;
+  // Per-session student feedback — picklist code + semicolon-delimited labels in
+  // the @FormattedValue annotation. Surfaced to the AI only (never to the
+  // deterministic detectors, whose keyword matching these values would corrupt).
+  cr89a_studentsatisfactiontodayssession: number | null;
+  'cr89a_studentsatisfactiontodayssession@OData.Community.Display.V1.FormattedValue'?: string | null;
+  cr89a_whatdidyoufindusefulintodayssession: string | null;
+  'cr89a_whatdidyoufindusefulintodayssession@OData.Community.Display.V1.FormattedValue'?: string | null;
 }
 
 // cr89a_emcistudentabsence specific fields
@@ -190,6 +199,20 @@ export interface RawAbsence extends RawActivity {
 
 // Survey type interfaces have been moved to ./surveyTypes.ts for readability.
 // They are imported and re-exported at the top of this file.
+
+// Dataverse Notes (annotation entity) attached to a student record.
+// Linked to the student via _objectid_value when objecttypecode is the student entity.
+export interface RawAnnotation {
+  annotationid: string;
+  subject: string | null;
+  notetext: string | null;
+  _objectid_value: string | null;
+  '_objectid_value@Microsoft.Dynamics.CRM.lookuplogicalname'?: string | null;
+  '_ownerid_value@OData.Community.Display.V1.FormattedValue'?: string | null;
+  objecttypecode: string | null;
+  createdon: string | null;
+  modifiedon: string | null;
+}
 
 // cr89a_wlpcstudentjourney — a Business Process Flow instance
 export interface RawJourney {
@@ -423,9 +446,14 @@ export async function fetchEndOfPilotSurveys2026(token: string): Promise<RawEndO
   return fetchActivity<RawEndOfPilotSurvey2026>(token, 'cr89a_emcistudentendofpilotsurvey2026s', 'EndOfPilotSurveys2026', false);
 }
 
-// ── Fetch mid-pilot student surveys (student-level) ───────────────
+// ── Fetch mid-pilot student surveys (student-level, legacy) ───────
 export async function fetchMidPilotStudentSurveys(token: string): Promise<RawMidPilotStudentSurvey[]> {
   return fetchActivity<RawMidPilotStudentSurvey>(token, 'cr89a_emcimidpilotschoolinitialsurveies', 'MidPilotStudentSurveys', false);
+}
+
+// ── Fetch mid-pilot student surveys (student-level, 2026) ─────────
+export async function fetchMidPilotStudentSurveys2026(token: string): Promise<RawMidPilotStudentSurvey2026[]> {
+  return fetchActivity<RawMidPilotStudentSurvey2026>(token, 'cr89a_emcimidpilotsurvey2026s', 'MidPilotStudentSurveys2026', false);
 }
 
 // ── Fetch mid-pilot school surveys (school-level, not student-level)
@@ -444,6 +472,31 @@ export async function fetchJourneys(token: string): Promise<RawJourney[]> {
   }
   const data = await res.json() as { value: RawJourney[] };
   return (data.value ?? []).filter(j => j._bpf_cr89a_wlpcstudentid_value != null);
+}
+
+// ── Fetch Dataverse Notes (annotations) attached to students ───────
+// These are the free-text notes shown in the Dataverse "Notes" timeline
+// (e.g. "Email from Principal…", "Scott absent due to YJ factors").
+export async function fetchAnnotations(token: string): Promise<RawAnnotation[]> {
+  const select = 'annotationid,subject,notetext,_objectid_value,objecttypecode,createdon,modifiedon';
+  const filter = "objecttypecode eq 'cr89a_wlpcstudent'";
+  const all: RawAnnotation[] = [];
+  let url: string | undefined =
+    `${BASE_URL}/annotations?$select=${select}&$filter=${encodeURIComponent(filter)}`;
+
+  while (url) {
+    const res: Response = await fetch(url, { headers: dvHeaders(token) });
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`[EMCI] Annotations fetch failed (${res.status}): ${text.slice(0, 200)}`);
+      return all;
+    }
+    const data = await res.json() as { value: RawAnnotation[]; '@odata.nextLink'?: string };
+    all.push(...(data.value ?? []));
+    url = data['@odata.nextLink'];
+  }
+
+  return all.filter(a => a._objectid_value != null && (a.notetext ?? a.subject));
 }
 
 // ── Enrich students with data from all related tables ─────────────
@@ -527,7 +580,7 @@ export interface TimelineEvent {
   id: string;
   date: string;
   modifiedDate: string;
-  type: 'referral' | 'consent' | 'session' | 'survey' | 'absence';
+  type: 'referral' | 'consent' | 'session' | 'survey' | 'absence' | 'note';
   title: string;
   status: string;
   by: string;
@@ -536,6 +589,10 @@ export interface TimelineEvent {
   track: string;
   sessionLength?: string;
   interventionType?: string;
+  /** Student's satisfaction with the session (e.g. "Very Helpful") — AI context only. */
+  sessionSatisfaction?: string;
+  /** What the student found useful in the session (semicolon-delimited) — AI context only. */
+  sessionUseful?: string;
   surveyFields?: SurveyField[];
   /** Counselling session context for end surveys awaiting student responses. */
   relatedSession?: RelatedSessionContext;
@@ -546,7 +603,7 @@ function isRealSessionEvent(ev: TimelineEvent): boolean {
 }
 
 function isEndSurveyEvent(ev: TimelineEvent): boolean {
-  return ev.type === 'survey' && (ev.id.startsWith('end-survey-') || ev.id === 'step-4');
+  return ev.type === 'survey' && ev.id.startsWith('end-survey-');
 }
 
 function endSurveyNeedsSessionContext(ev: TimelineEvent): boolean {
@@ -590,6 +647,9 @@ export function deriveStudentEvents(
   endOfPilotSurveysLegacy?: RawEndOfPilotSurveyLegacy[],
   endOfPilotSurveys2026?: RawEndOfPilotSurvey2026[],
   midStudentSurveys?: RawMidPilotStudentSurvey[],
+  midStudentSurveys2026?: RawMidPilotStudentSurvey2026[],
+  annotations?: RawAnnotation[],
+  absences?: RawAbsence[],
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   const displayName = `${student.firstName} ${student.lastName}`.trim() || 'Student';
@@ -650,6 +710,12 @@ export function deriveStudentEvents(
       const interventionType =
         (s['cr89a_typeofintervention@OData.Community.Display.V1.FormattedValue'] as string | undefined)
         ?? undefined;
+      const sessionSatisfaction =
+        (s['cr89a_studentsatisfactiontodayssession@OData.Community.Display.V1.FormattedValue'] as string | undefined)
+        ?? undefined;
+      const sessionUseful =
+        (s['cr89a_whatdidyoufindusefulintodayssession@OData.Community.Display.V1.FormattedValue'] as string | undefined)
+        ?? undefined;
       const ownerName =
         (s['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
         ?? counsellor;
@@ -662,7 +728,7 @@ export function deriveStudentEvents(
         date:            s.createdon ?? fallbackDate,
         modifiedDate:    s.modifiedon ?? s.createdon ?? fallbackDate,
         type:            'session',
-        title:           s.subject ?? 'EMCI Session',
+        title:           interventionType ?? s.subject ?? 'EMCI Session',
         status:          s.statecode === 0 ? 'Active' : 'Completed',
         by:              ownerName,
         description:     s.cr89a_externalsupportdetails ?? interventionType ?? 'Career guidance session.',
@@ -670,6 +736,8 @@ export function deriveStudentEvents(
         track:           'above',
         sessionLength,
         interventionType,
+        sessionSatisfaction,
+        sessionUseful,
         surveyFields: buildSessionFields(s, sessionLength, interventionType),
       });
     });
@@ -719,7 +787,7 @@ export function deriveStudentEvents(
       date:         s.createdon ?? fallbackDate,
       modifiedDate: s.modifiedon ?? s.createdon ?? fallbackDate,
       type:         'survey',
-      title:        s.subject ?? 'EMCI Initial Survey (Legacy)',
+      title:        'EMCI Initial Survey (Legacy)',
       status:       s.statecode === 0 ? 'Active' : 'Completed',
       by:           ownerName,
       description,
@@ -749,7 +817,7 @@ export function deriveStudentEvents(
       date:         s.createdon ?? fallbackDate,
       modifiedDate: s.modifiedon ?? s.createdon ?? fallbackDate,
       type:         'survey',
-      title:        s.subject ?? 'EMCI Initial Survey 2026',
+      title:        'EMCI Initial Survey 2026',
       status:       s.statecode === 0 ? 'Active' : 'Completed',
       by:           ownerName,
       description,
@@ -779,7 +847,37 @@ export function deriveStudentEvents(
       date:         s.createdon ?? fallbackDate,
       modifiedDate: s.modifiedon ?? s.createdon ?? fallbackDate,
       type:         'survey',
-      title:        s.subject ?? 'EMCI Mid-Pilot Survey',
+      title:        'EMCI Mid-Pilot Student Survey (Legacy)',
+      status:       s.statecode === 0 ? 'Active' : 'Completed',
+      by:           ownerName,
+      description,
+      notes,
+      track:        'above',
+      surveyFields: buildMidPilotStudentFields(mid),
+    });
+  }
+
+  // ── Mid-pilot student survey events (2026) ────────────────────
+  for (const s of ([...(midStudentSurveys2026 ?? [])].sort(
+    (a, b) => (a.createdon ?? '').localeCompare(b.createdon ?? ''),
+  ))) {
+    const mid = s as RawMidPilotStudentSurvey2026;
+    const ownerName =
+      (s['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
+      ?? counsellor;
+    const focusFmt = mid['cr89a_focusoverthenext6months@OData.Community.Display.V1.FormattedValue'] ?? '';
+    const description = focusFmt
+      ? `Focus over next 6 months: ${focusFmt}`
+      : mid.cr89a_havethesessionshelped
+        ? `Have the sessions helped: ${mid.cr89a_havethesessionshelped}`
+        : 'Mid-pilot survey completed.';
+    const notes = mid.cr89a_suggestionstohelpimproveourprogrammein2025 ?? '';
+    events.push({
+      id:           `mid-survey-2026-${s.activityid}`,
+      date:         s.createdon ?? fallbackDate,
+      modifiedDate: s.modifiedon ?? s.createdon ?? fallbackDate,
+      type:         'survey',
+      title:        'EMCI Student Mid Pilot Survey',
       status:       s.statecode === 0 ? 'Active' : 'Completed',
       by:           ownerName,
       description,
@@ -804,7 +902,7 @@ export function deriveStudentEvents(
       date:         s.createdon ?? fallbackDate,
       modifiedDate: s.modifiedon ?? s.createdon ?? fallbackDate,
       type:         'survey',
-      title:        s.subject ?? 'EMCI End of Pilot Survey (Legacy)',
+      title:        'EMCI End of Pilot Survey (Legacy)',
       status:       s.statecode === 0 ? 'Active' : 'Completed',
       by:           ownerName,
       description:  ratingFmt ? `Overall programme rating: ${ratingFmt}` : 'End-of-pilot survey completed.',
@@ -837,7 +935,7 @@ export function deriveStudentEvents(
       date:         s.createdon ?? fallbackDate,
       modifiedDate: s.modifiedon ?? s.createdon ?? fallbackDate,
       type:         'survey',
-      title:        s.subject ?? 'EMCI End of Pilot Survey 2026',
+      title:        'EMCI End of Pilot Survey 2026',
       status:       s.statecode === 0 ? 'Active' : 'Completed',
       by:           ownerName,
       description,
@@ -847,24 +945,68 @@ export function deriveStudentEvents(
     });
   }
 
-  // ── Fallback end survey event ──────────────────────────────────
-  // Only created when the student is at 'complete' stage but has no real survey.
-  // The event is a placeholder — no survey fields are available.
-  const hasEndSurveys = (endOfPilotSurveysLegacy?.length ?? 0) + (endOfPilotSurveys2026?.length ?? 0) > 0;
-  if (student.currentStage === 'complete' && !hasEndSurveys) {
-    const latestSession = events.filter(isRealSessionEvent).at(-1);
-    const endSurveyDate = latestSession?.date ?? fallbackDate;
+  // End-of-pilot survey events are only ever created from real Dataverse
+  // records (legacy / 2026 above). Students at 'complete' stage with no survey
+  // record intentionally show no end-of-pilot survey card — the 'Complete'
+  // journey milestone is driven by currentStage, not by a synthetic event.
+
+  // ── Absence events (cr89a_emcistudentabsence) ─────────────────
+  // Surfaced on the timeline and fed into AI context via buildTimelineNotes
+  // (the reason is placed in `notes` so all three AI calls see it).
+  for (const a of ([...(absences ?? [])].sort(
+    (x, y) => (x.cr89a_absencedate ?? x.createdon ?? '').localeCompare(y.cr89a_absencedate ?? y.createdon ?? ''),
+  ))) {
+    const ownerName =
+      (a['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
+      ?? counsellor;
+    const reasonLabel =
+      a['cr89a_reasondropdown@OData.Community.Display.V1.FormattedValue'] ?? '';
+    const freeText = a.cr89a_reasonifknown?.trim() ?? '';
+    const absenceDate = a.cr89a_absencedate ?? a.createdon ?? fallbackDate;
+    const fields: SurveyField[] = [];
+    if (reasonLabel) fields.push({ label: 'Reason', value: reasonLabel });
+    if (freeText)    fields.push({ label: 'Details', value: freeText });
+    if (a.cr89a_emcischoolnamedisplay) {
+      fields.push({ label: 'School', value: a.cr89a_emcischoolnamedisplay });
+    }
     events.push({
-      id:           'step-4',
-      date:         endSurveyDate,
-      modifiedDate: endSurveyDate,
-      type:         'survey',
-      title:        'EMCI End of Pilot Survey',
-      status:       'Pending',
-      by:           counsellor,
-      description:  'No survey responses recorded yet.',
-      notes:        '',
-      track:        'above',
+      id:           `absence-${a.activityid}`,
+      date:         absenceDate,
+      modifiedDate: a.modifiedon ?? absenceDate,
+      type:         'absence',
+      title:        'EMCI Student Absence',
+      status:       '',
+      by:           ownerName,
+      description:  reasonLabel ? `Reason: ${reasonLabel}` : 'Student absence recorded.',
+      notes:        [reasonLabel, freeText].filter(Boolean).join(' — '),
+      track:        'below',
+      surveyFields: fields,
+    });
+  }
+
+  // ── Dataverse Notes (annotations) ──────────────────────────────
+  // Free-text notes recorded against the student in Dataverse. Surfaced on
+  // the timeline and fed into AI context via buildTimelineNotes.
+  for (const a of (annotations ?? [])) {
+    const rawNote = a.notetext ?? '';
+    const plainNote = rawNote.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const subject = a.subject?.trim() ?? '';
+    if (!plainNote && !subject) continue;
+    const noteDate = a.createdon ?? a.modifiedon ?? fallbackDate;
+    const ownerName =
+      (a['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
+      ?? counsellor;
+    events.push({
+      id:           `note-${a.annotationid}`,
+      date:         noteDate,
+      modifiedDate: a.modifiedon ?? noteDate,
+      type:         'note',
+      title:        subject || 'Note',
+      status:       '',
+      by:           ownerName,
+      description:  subject && plainNote ? subject : '',
+      notes:        plainNote || subject,
+      track:        'below',
       surveyFields: [],
     });
   }

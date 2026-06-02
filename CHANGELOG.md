@@ -5,7 +5,131 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-01 (latest)
+## — 2026-06-02 (latest)
+
+### Changed: All AI calls now fire concurrently on page load
+
+- The **Tracking Score**, **Analysis Summary**, and **Student Voice & Sentiment** AI calls now all auto-trigger simultaneously when the student journey page loads — no button clicks required. Each call respects its own "already exists" guard: the tracking score skips if a matching fingerprint is cached in localStorage; the analysis summary skips if a fresh (non-stale) result is already stored in the DB; the sentiment call re-runs each session (no persistence layer). Previously, the Analysis Summary required a manual "Generate" button click and the Tracking Score only auto-generated for students in the Career Guidance stage ([`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts), [`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+- Tracking Score auto-generation now covers **all** students at stage progress ≥ 3 (Career Guidance and Complete), not only students with `currentStage = career_guidance`.
+
+### Added: Student Voice & Sentiment card on the student journey page
+
+- A new **Student Voice & Sentiment** card now appears below the Analysis Summary on every student's journey page. It auto-generates on load (no button required) and calls the new `sentiment-student` edge function, which analyses all available student voice data — pilot survey responses, session satisfaction/found-useful feedback, and timeline notes — to surface overall sentiment and direct quotes ([`src/components/StudentSentimentCard.tsx`](src/components/StudentSentimentCard.tsx), [`src/hooks/useStudentSentiment.ts`](src/hooks/useStudentSentiment.ts), [`supabase/functions/sentiment-student/index.ts`](supabase/functions/sentiment-student/index.ts)).
+- The card shows a sentiment badge (**Mostly Positive**, **Mixed Signals**, **Needs Attention**) alongside a 2–3 sentence counsellor-grade summary and up to 4 quoted student voice items. Each quote is colour-coded by tone and includes a precise citation (source, exact field label, and date) so practitioners can trace the quote back to the original record. Hidden in PII-restricted mode.
+- When no student voice data is on record the card shows a friendly empty state (illustrated speech-bubble icon, `public/sentiment-empty-state.png`) rather than a blank or error. Errors are silently suppressed — the card only appears when there is something meaningful to show.
+
+### Changed: Student journey header identity
+
+- The student name block is reworked for clearer hierarchy — name stands alone, with status, school and year level on a separate metadata row below. Status uses a soft bordered pill (not bright inline text); year level uses a neutral slate badge instead of loud primary orange ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+
+### Changed: Tracking-score category cards (Linear-style)
+
+- The five tracking-score breakdown categories (Engagement, Career, Work Readiness, Attendance, Wellbeing) now render as compact bordered mini-cards with subtle shadow and hover lift, instead of plain inline buttons — closer to Linear.app's stat tiles ([`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx)).
+- Card hover uses a premium lift — layered shadow, 300ms ease-out, subtle `-translate-y` — on both tracking-score tiles and Quick Insights intervention tiles; rubric tooltips use a softer frosted shadow ([`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx)).
+
+### Changed: Typography aligned across the student journey page
+
+- Standardised every "eyebrow"/overline label on the student journey page to a single style (`text-[10px]` bold uppercase, wider tracking, slate-400). Previously the header card, Quick Insights group labels, and timeline month dividers each used different sizes, weights, tracking, and colours ([`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx), [`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx)).
+- Normalised the progress-stepper labels off a one-off `text-[13px]` size onto the standard `text-xs` scale ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+
+### Fixed: Phantom "End of Pilot Survey" on completed students
+
+- Removed the synthetic fallback End-of-Pilot Survey event that was shown for students at the `complete` stage who had no end-of-pilot survey record in Dataverse. The timeline now only shows an End-of-Pilot Survey when a real record exists in the CRM (source of truth); the "Complete" journey milestone is still driven by the student's stage, not the placeholder ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+
+### Added: Dedicated "Work Readiness" category in the Tracking Score
+
+- The Tracking Score now scores **five** categories instead of four — **Work Readiness** is split out from Career Outcomes so work-experience and employability signals are no longer mixed with career planning. Category weights are now Engagement 25, Career Outcomes 20, Work Readiness 20, Attendance & Momentum 15, Growth & Wellbeing 20 (was 30/30/—/20/20), aligning the live points system with [`STUDENT_RATING_SYSTEM_PLAN.md`](STUDENT_RATING_SYSTEM_PLAN.md) §4 ([`src/lib/studentRating.ts`](src/lib/studentRating.ts)).
+- **Work Readiness** points: Work experience completed 40, Part-time/casual job 25, Work experience prep 20, Work-readiness intervention 15. **Career Outcomes** re-pointed to planning/exploration only: Career Action Plan 40, Morrisby profile 25, Researching careers 20, Career interview 15. Following the plan's fairness rule, Work Readiness returns `null` (not a low score) when a student has had no work-experience opportunity yet ([`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Score breakdown now renders the Work Readiness meter and its rubric tooltip ([`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx)).
+- Bumped the rating cache (`v8`) so existing students are re-scored under the new rubric ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Changed: Student journey now uses a 3-stage Consent → Career Guidance → Complete model
+
+- The progress stepper on the student journey page now shows three stages — **Consent**, **Career Guidance**, **Complete** — with Consent representing stage-1 progress. The standalone "Referral" step was removed (the referral data stage is folded into the Consent step) ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- The Activity Timeline no longer displays referral events, and the **Referral** filter tab was removed ([`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx)).
+
+### Added: EMCI Student Absences now appear in the timeline and AI context
+
+- EMCI **Student Absence** records (`cr89a_emcistudentabsence`) are now surfaced as `Absence` events on the Activity Timeline, showing the absence date, reason (`cr89a_reasondropdown` — e.g. "Away from school", "Didn't show up/Refusal", "Other") and any free-text detail (`cr89a_reasonifknown`). Previously absences only fed the aggregate `absenceCount`/risk level and were invisible on the timeline ([`src/services/dataverse.ts`](src/services/dataverse.ts), [`src/App.tsx`](src/App.tsx), [`src/components/TimelineCore.tsx`](src/components/TimelineCore.tsx)).
+- Each absence's reason flows into the EMCI Assistant, Analysis Summary, and Tracking Score via the existing redacted timeline-notes context, and re-triggers analysis/scoring automatically via the source fingerprint — so all three AI calls now see per-absence reasons, not just the absence count ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+
+### Added: Dataverse student Notes now appear in the timeline and AI context
+
+- Free-text Dataverse **Notes** (the `annotation` records shown in the Dataverse "Notes" panel, e.g. "Email from Principal…") are now fetched and surfaced as `Note` events on the Activity Timeline, with a new **Notes** filter tab. Previously these were never retrieved, so the assistant, Analysis Summary, and Tracking Score could not "see" them ([`src/services/dataverse.ts`](src/services/dataverse.ts), [`src/App.tsx`](src/App.tsx), [`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx)).
+- These notes flow into the EMCI Assistant, Analysis Summary, and Tracking Score via the existing redacted timeline-notes context, and re-trigger analysis/scoring automatically via the source fingerprint ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+
+### Changed: Timeline notes included in AI context
+
+- The EMCI Assistant, Analysis Summary, and Tracking Score now receive redacted timeline notes from activity records, including note/comment-like timeline fields, so recommendations, wellbeing reads, and scoring context reflect practitioner notes shown in the timeline ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts), [`src/lib/studentChatContext.ts`](src/lib/studentChatContext.ts), [`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts)).
+- Updated the `chat-student`, `analyze-student`, and `rate-student` edge function prompts/contracts to explicitly use timeline notes without inventing unsupported details ([`supabase/functions/chat-student/index.ts`](supabase/functions/chat-student/index.ts), [`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts), [`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Bumped the rating cache (`v7`) so tracking scores are regenerated with timeline-note context ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Changed: Tracking score attendance rubric — recency removed
+
+- The Attendance & Momentum category no longer scores days-since-last-activity or applies a programme-completion recency override. It is absence-only, rescaled to 0–100 (0 absences = 100, 1–2 = 75, 3–5 = 40, >5 = 15). Removed `daysSinceLastActivity` and `programmeComplete` from the rating packet ([`STUDENT_RATING_SYSTEM_PLAN.md`](STUDENT_RATING_SYSTEM_PLAN.md), [`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts), [`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx)).
+- Bumped the rating cache (`v6`) so affected students are re-scored under the updated rubric ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Changed: EMCI Assistant drawer is now lazy-loaded
+
+- The assistant drawer (and the `react-markdown` renderer it uses) is now code-split and only loads on first open, removing ~50 kB gzip from the initial bundle. The lightweight launcher and chat state stay in the main bundle, so the conversation is preserved across close/reopen and enter/exit animations are unchanged ([`src/components/StudentAssistantChat.tsx`](src/components/StudentAssistantChat.tsx), [`src/components/StudentAssistantDrawer.tsx`](src/components/StudentAssistantDrawer.tsx), [`src/components/EmciAssistantLogo.tsx`](src/components/EmciAssistantLogo.tsx)).
+
+### Added: Suggested follow-up questions in the EMCI Assistant
+
+- After each assistant reply, the chat now surfaces up to three contextual "Suggested follow-ups" chips beneath the latest message; tapping one sends it as the next question. Suggestions are generated by the model from the student's context and phrased from the practitioner's perspective ([`src/components/StudentAssistantChat.tsx`](src/components/StudentAssistantChat.tsx), [`src/hooks/useStudentChat.ts`](src/hooks/useStudentChat.ts)).
+- The `chat-student` edge function now returns a structured `{ reply, followUps }` response via a strict JSON schema ([`supabase/functions/chat-student/index.ts`](supabase/functions/chat-student/index.ts)).
+
+### Changed: EMCI Assistant replies now render as formatted markdown
+
+- Assistant chat replies now render rich markdown — headings, bold/italic, bullet and numbered lists, links, inline code, and code blocks — via `react-markdown` + `remark-gfm`, styled to match the chat design. User messages remain plain text. The message bubble was extracted to its own component ([`src/components/ChatMessageBubble.tsx`](src/components/ChatMessageBubble.tsx), [`src/components/StudentAssistantChat.tsx`](src/components/StudentAssistantChat.tsx)).
+- The assistant launcher, header, and empty state now use the EMCI emblem instead of generic AI icons ([`src/components/StudentAssistantChat.tsx`](src/components/StudentAssistantChat.tsx)).
+
+### Added: EMCI Assistant chat on the student journey page
+
+- Added an AI assistant chat to the student journey page (`/student/:studentId`). A floating "Ask EMCI Assistant" button opens a Linear-style right-side drawer with smooth animations, suggested starter prompts, a typing indicator, and multi-turn conversation ([`src/components/StudentAssistantChat.tsx`](src/components/StudentAssistantChat.tsx), [`src/routes/StudentJourneyRoute.tsx`](src/routes/StudentJourneyRoute.tsx)).
+- The assistant is grounded in the same on-page context as the Analysis Summary — programme stage, Quick Insights, counselling session detail, and pilot survey shifts — and never receives the student's name. PII redaction is respected via the route's already-redacted student/timeline view ([`src/lib/studentChatContext.ts`](src/lib/studentChatContext.ts), [`src/hooks/useStudentChat.ts`](src/hooks/useStudentChat.ts)).
+- Added the `chat-student` Supabase edge function (OpenAI `gpt-4o-mini`, full CORS) which composes the system prompt, the student context block, and the trimmed conversation history ([`supabase/functions/chat-student/index.ts`](supabase/functions/chat-student/index.ts)).
+
+### Changed: Typography hierarchy on student journey panels
+
+- Quick Insights, Analysis Summary, and Activity Timeline now use clearer type hierarchy — section titles, subsection labels, primary values, and supporting text are visually distinct ([`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx), [`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/StudentTimeline.tsx`](src/components/StudentTimeline.tsx), [`src/components/AnalysisHighlights.tsx`](src/components/AnalysisHighlights.tsx)).
+
+### Added: 2026 student mid-pilot survey in the timeline
+
+- The activity timeline now pulls the new `cr89a_emcimidpilotsurvey2026` table and surfaces its records as "EMCI Student Mid Pilot Survey" events ([`src/services/dataverse.ts`](src/services/dataverse.ts), [`src/services/surveyTypes.ts`](src/services/surveyTypes.ts), [`src/App.tsx`](src/App.tsx)).
+
+### Changed: Timeline survey and session naming
+
+- The legacy student mid-pilot survey event is now titled "EMCI Mid-Pilot Student Survey (Legacy)" to distinguish it from the 2026 survey ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Session entity reference renamed from "WLPC Session" to "EMCI Session" in the Dataverse connection reference ([`DATAVERSE_CONNECTION_REFERENCE.md`](DATAVERSE_CONNECTION_REFERENCE.md)).
+
+### Fixed: Timeline events showing wrong titles
+
+- Session events in the activity timeline now use the EMCI intervention type (`cr89a_typeofintervention`) as their title instead of the activity `subject`, which was picking up incorrect names. This reflects the correct session types in the timeline ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Survey events now use their survey type as the title (e.g. "EMCI End of Pilot Survey") instead of the activity `subject` (e.g. a student-name code like "J.C 05.11.25") ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+
+### Fixed: Analysis Summary failing (CORS / 500 on analyze-student)
+
+- The AI Analysis Summary stopped generating, surfacing in the browser as a CORS error. Root cause: the `analyze-student` edge function deployed in production still expected the old Quick Insights shape (`careerActionPlan`, `morrisbyUnpack`, `workExperience`…) while the app now sends the eight intervention areas plus session/absence counts — so the function threw a `TypeError` and returned a 500 whose error responses carried no CORS header. Redeployed the function with the current insights shape ([`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts)).
+- Hardened the function so every response — including errors — carries CORS headers, and wrapped the handler in a try/catch. Future input mismatches now return a readable JSON error instead of an opaque CORS failure ([`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts)).
+
+### Changed: Tracking score now reads full session intervention detail
+
+- The tracking-score AI packet now includes the complete per-session record — session length, intervention type, the intervention multiselect areas (Morrisby, Career Action Plan, industry engagement, work-experience preparation, work readiness, other), and, where the student gave feedback, their session satisfaction and what they found useful — all as human-readable labels rather than option codes. The scoring rubric uses this to corroborate engagement breadth and inform the growth & wellbeing read ([`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)).
+- Session student-feedback fields (`cr89a_studentsatisfactiontodayssession`, `cr89a_whatdidyoufindusefulintodayssession`) are now captured from Dataverse and surfaced to the AI analysis and tracking score. They are carried on dedicated session fields so the deterministic detectors never keyword-match their values ([`src/services/dataverse.ts`](src/services/dataverse.ts), [`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+- Bumped the rating cache so affected students are re-scored automatically with the richer packet ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+---
+
+## — 2026-06-01
+
+### Added: Session and absence counts in Quick Insights
+
+- Quick Insights now shows counselling **session count** and **absence count** at the top of the panel, with absences highlighted when above threshold ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts), [`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx)).
+- AI analysis prompt includes session and absence counts in the Quick Insight categories block ([`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts)).
+
+### Changed: Quick Insights aligned to EMCI intervention areas
+
+- Quick Insights now shows all eight session intervention areas — Unpack, CAP, Work Readiness, Industry Engagement, External Support, WEX Preparation, Introduction, and Other — each as yes/no based on counselling session records ([`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx), [`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
 
 ### Fixed: End-of-pilot survey missing session context
 

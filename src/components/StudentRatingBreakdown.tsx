@@ -1,7 +1,7 @@
 /**
  * Minimalist category breakdown shown beside the tracking score.
  *
- * Surfaces the four rubric categories that make up the headline number, each
+ * Surfaces the five rubric categories that make up the headline number, each
  * with a short plain-language description of what it measures, a thin
  * score-coloured meter and the 0–100 value. Hovering a category reveals a
  * custom tooltip explaining how that category is scored (the point rubric).
@@ -35,22 +35,32 @@ const CATEGORY_META: Record<RatingCategoryKey, CategoryMeta> = {
   },
   career_outcomes: {
     label: 'Career',
-    description: 'Action plan, work experience, Morrisby',
+    description: 'Action plan, Morrisby & exploration',
     rubric: [
-      { signal: 'Career Action Plan',     pts: '30' },
-      { signal: 'Work experience done',   pts: '25' },
-      { signal: 'Work experience prep',   pts: '10' },
-      { signal: 'Morrisby profile',       pts: '15' },
-      { signal: 'Part-time job',          pts: '10' },
-      { signal: 'Researching careers',    pts: '10' },
+      { signal: 'Career Action Plan',     pts: '40' },
+      { signal: 'Morrisby profile',       pts: '25' },
+      { signal: 'Researching careers',    pts: '20' },
+      { signal: 'Career interview held',  pts: '15' },
+    ],
+  },
+  work_readiness: {
+    label: 'Work readiness',
+    description: 'Work experience & employability',
+    rubric: [
+      { signal: 'Work experience done',  pts: '40' },
+      { signal: 'Part-time job',         pts: '25' },
+      { signal: 'Work experience prep',  pts: '20' },
+      { signal: 'Work-readiness session', pts: '15' },
     ],
   },
   attendance_momentum: {
     label: 'Attendance',
-    description: 'Absences & recent activity',
+    description: 'Recorded absences',
     rubric: [
-      { signal: 'Attendance (fewer absences)', pts: '0–60' },
-      { signal: 'Recency of activity',         pts: '0–40' },
+      { signal: '0 absences',  pts: '100' },
+      { signal: '1–2 absences', pts: '75' },
+      { signal: '3–5 absences', pts: '40' },
+      { signal: '>5 absences',  pts: '15' },
     ],
   },
   growth_wellbeing: {
@@ -87,7 +97,7 @@ export function StudentRatingBreakdown({ rating }: StudentRatingBreakdownProps) 
   const activeCat = active ? rating.categories.find(c => c.key === active) ?? null : null;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
       {rating.categories.map(cat => {
         const meta = CATEGORY_META[cat.key];
         const hasScore = cat.score !== null;
@@ -100,26 +110,26 @@ export function StudentRatingBreakdown({ rating }: StudentRatingBreakdownProps) 
             onMouseLeave={hide}
             onFocus={e => show(cat.key, e.currentTarget)}
             onBlur={hide}
-            className="group min-w-0 text-left -m-1.5 p-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-help"
+            className="group min-w-0 text-left rounded-md border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300 hover:bg-white hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.04)] active:translate-y-0 active:shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/30 transition-all duration-300 ease-out cursor-help"
           >
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 truncate">
               {meta.label}
             </p>
-            <div className="flex items-baseline gap-0.5 mt-0.5">
-              <span className={`text-xl font-bold leading-none tabular-nums ${color ? color.text : 'text-slate-300'}`}>
+            <div className="flex items-baseline gap-0.5 mt-1">
+              <span className={`text-lg font-semibold leading-none tabular-nums ${hasScore ? 'text-slate-900' : 'text-slate-300'}`}>
                 {hasScore ? cat.score : '—'}
               </span>
-              {hasScore && <span className="text-xs font-semibold text-slate-300">/100</span>}
+              {hasScore && <span className="text-[11px] font-medium text-slate-300">/100</span>}
             </div>
-            <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div className="mt-2 h-1 w-full rounded-full bg-slate-100/90 overflow-hidden">
               {hasScore && (
                 <div
-                  className={`h-full rounded-full ${color!.bar} transition-all`}
+                  className={`h-full rounded-full ${color!.bar} opacity-75 group-hover:opacity-100 transition-all duration-300 ease-out group-hover:brightness-105`}
                   style={{ width: `${cat.score}%` }}
                 />
               )}
             </div>
-            <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{meta.description}</p>
+            <p className="mt-1.5 text-[10px] leading-snug text-slate-400 line-clamp-2">{meta.description}</p>
           </button>
         );
       })}
@@ -175,7 +185,7 @@ function RubricTooltip({ category, anchor }: RubricTooltipProps) {
         width: TOOLTIP_WIDTH,
         transform: `translate(-50%, ${placement.above ? '-100%' : '0'})`,
       }}
-      className="z-[300] pointer-events-none rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+      className="z-[300] pointer-events-none rounded-xl border border-slate-200/90 bg-white/95 backdrop-blur-sm p-3 shadow-[0_12px_40px_rgba(15,23,42,0.12),0_4px_12px_rgba(15,23,42,0.06)]"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-xs font-bold text-slate-900">{meta.label}</span>
