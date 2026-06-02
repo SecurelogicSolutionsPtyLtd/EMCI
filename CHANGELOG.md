@@ -5,7 +5,23 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-02 (latest)
+## — 2026-06-03 (latest)
+
+### Added: Pinnable main sidebar layout
+
+- Main sidebar can be cycled between three modes via a control below the logo: **hover to expand** (default), **pinned open**, and **pinned closed**. Preference is stored in `localStorage` and restored on reload ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx), [`src/hooks/useMainSidebarPin.ts`](src/hooks/useMainSidebarPin.ts)).
+
+### Fixed: Main sidebar pin control alignment when collapsed
+
+- Pin mode button uses the same `px-2` rail padding and full-width `px-3 py-3` hit area as nav icons so it lines up with the rest of the collapsed sidebar ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx)).
+
+### Fixed: Sign out button in collapsed main sidebar
+
+- Collapsed sidebar sign-out showed a clipped, nearly empty control because the hidden "Sign out" label still reserved flex width and the footer used extra horizontal padding. Labels now collapse to zero width when the sidebar is narrow, and the sign-out button uses tighter padding to match nav items ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx)).
+
+---
+
+## — 2026-06-02
 
 ### Changed: All AI calls now fire concurrently on page load
 

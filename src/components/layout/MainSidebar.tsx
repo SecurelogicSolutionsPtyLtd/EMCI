@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Building2,
   Users,
@@ -9,10 +9,14 @@ import {
   Loader2,
   LayoutDashboard,
   BarChart3,
+  PanelLeft,
+  PanelLeftClose,
+  Pin,
 } from 'lucide-react';
 import type { AppRole } from '../../types/roles';
 import { canAccessPage, canViewStudentRoster, isAdminRole, ROLE_LABELS } from '../../types/roles';
 import { useAuth } from '../../context/AuthContext';
+import { useMainSidebarPin, type SidebarPinMode } from '../../hooks/useMainSidebarPin';
 
 export type NetworkMainTab = 'schools' | 'students';
 
@@ -30,6 +34,21 @@ interface MainSidebarProps {
   onGoToDevLab: () => void;
   onGoToTeam: () => void;
   userRole: AppRole;
+}
+
+function SidebarPinModeIcon({ mode }: { mode: SidebarPinMode }) {
+  switch (mode) {
+    case 'dynamic':
+      return <PanelLeft className="w-5 h-5 shrink-0" />;
+    case 'open':
+      return <Pin className="w-5 h-5 shrink-0" />;
+    case 'closed':
+      return <PanelLeftClose className="w-5 h-5 shrink-0" />;
+    default: {
+      const _exhaustive: never = mode;
+      return _exhaustive;
+    }
+  }
 }
 
 export function MainSidebar({
@@ -50,6 +69,15 @@ export function MainSidebar({
   const { authUser, signOutUser } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const { pinMode, cyclePinMode, pinModeLabel } = useMainSidebarPin();
+
+  const expanded = pinMode === 'open' || (pinMode === 'dynamic' && hovered);
+
+  useEffect(() => {
+    if (pinMode !== 'dynamic') {
+      setHovered(false);
+    }
+  }, [pinMode]);
 
   const showStudentRoster = canViewStudentRoster(userRole);
   const showCounsellors    = canAccessPage(userRole, 'counsellors');
@@ -64,28 +92,46 @@ export function MainSidebar({
     { label: 'DE Analytics', icon: BarChart3,  show: showDeAnalytics,     onClick: onGoToDeAnalytics, isActive: deAnalyticsActive },
   ].filter(item => item.show);
 
-  const labelClass = `whitespace-nowrap overflow-hidden transition-opacity duration-200 ${
-    hovered ? 'opacity-100 delay-100' : 'opacity-0'
+  const labelClass = `whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-200 ${
+    expanded ? 'opacity-100 delay-100 max-w-none' : 'opacity-0 w-0 max-w-0'
   }`;
 
   return (
     <aside
       className={`shrink-0 bg-white border-r border-slate-200 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out ${
-        hovered ? 'w-64' : 'w-14'
+        expanded ? 'w-64' : 'w-14'
       }`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => pinMode === 'dynamic' && setHovered(true)}
+      onMouseLeave={() => pinMode === 'dynamic' && setHovered(false)}
     >
-      <div className={`flex items-center p-4 ${hovered ? 'gap-3' : 'justify-center'}`}>
-        <img
-          src="/favicon.png"
-          alt=""
-          className="w-9 h-9 shrink-0 object-contain"
-          draggable={false}
-        />
-        <div className={labelClass}>
-          <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">EMCI</h1>
-          <p className="text-xs text-slate-500 leading-tight">Student Management Platform</p>
+      <div className={expanded ? 'p-4 space-y-3' : 'pt-4 pb-1'}>
+        <div className={`flex items-center ${expanded ? 'gap-3' : 'justify-center px-2'}`}>
+          <img
+            src="/favicon.png"
+            alt=""
+            className="w-9 h-9 shrink-0 object-contain"
+            draggable={false}
+          />
+          <div className={`min-w-0 flex-1 ${labelClass}`}>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">EMCI</h1>
+            <p className="text-xs text-slate-500 leading-tight">Student Management Platform</p>
+          </div>
+        </div>
+        <div className={expanded ? undefined : 'px-2'}>
+          <button
+            type="button"
+            onClick={cyclePinMode}
+            title={pinModeLabel}
+            aria-label={pinModeLabel}
+            className={`w-full flex items-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer ${
+              expanded ? 'gap-2 px-3 py-2 text-xs font-medium' : 'justify-center px-3 py-3'
+            }`}
+          >
+            <SidebarPinModeIcon mode={pinMode} />
+            <span className={labelClass}>
+              {pinMode === 'dynamic' ? 'Hover to expand' : pinMode === 'open' ? 'Pinned open' : 'Pinned closed'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -93,9 +139,9 @@ export function MainSidebar({
         <button
           type="button"
           onClick={onGoToDashboard}
-          title={hovered ? undefined : 'Dashboard'}
+          title={expanded ? undefined : 'Dashboard'}
           className={`w-full flex items-center px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left cursor-pointer ${
-            hovered ? 'gap-3' : 'justify-center'
+            expanded ? 'gap-3' : 'justify-center'
           } ${dashboardActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'}`}
         >
           <LayoutDashboard className="w-5 h-5 shrink-0" />
@@ -107,9 +153,9 @@ export function MainSidebar({
             key={item.label}
             type="button"
             onClick={item.onClick}
-            title={hovered ? undefined : item.label}
+            title={expanded ? undefined : item.label}
             className={`w-full flex items-center px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left cursor-pointer ${
-              hovered ? 'gap-3' : 'justify-center'
+              expanded ? 'gap-3' : 'justify-center'
             } ${item.isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'}`}
           >
             <item.icon className="w-5 h-5 shrink-0" />
@@ -121,9 +167,9 @@ export function MainSidebar({
           <button
             type="button"
             onClick={onGoToDevLab}
-            title={hovered ? undefined : 'Dataverse Lab'}
+            title={expanded ? undefined : 'Dataverse Lab'}
             className={`w-full flex items-center px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer ${
-              hovered ? 'gap-3' : 'justify-center'
+              expanded ? 'gap-3' : 'justify-center'
             }`}
           >
             <FlaskConical className="w-5 h-5 shrink-0" />
@@ -135,9 +181,9 @@ export function MainSidebar({
           <button
             type="button"
             onClick={onGoToTeam}
-            title={hovered ? undefined : 'Team Management'}
+            title={expanded ? undefined : 'Team Management'}
             className={`w-full flex items-center px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer ${
-              hovered ? 'gap-3' : 'justify-center'
+              expanded ? 'gap-3' : 'justify-center'
             }`}
           >
             <UsersRound className="w-5 h-5 shrink-0" />
@@ -146,8 +192,8 @@ export function MainSidebar({
         )}
       </nav>
 
-      <div className="p-3 border-t border-slate-200 space-y-2">
-        <div className={`flex items-center px-1 ${hovered ? 'gap-3' : 'justify-center'}`}>
+      <div className={`border-t border-slate-200 space-y-2 ${expanded ? 'p-3' : 'px-2 py-3'}`}>
+        <div className={`flex items-center px-1 ${expanded ? 'gap-3' : 'justify-center'}`}>
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 text-white text-xs font-bold">
             {(authUser?.firstName ?? authUser?.email ?? 'U').slice(0, 1).toUpperCase()}
           </div>
@@ -159,7 +205,7 @@ export function MainSidebar({
         <button
           type="button"
           disabled={signingOut}
-          title={hovered ? undefined : 'Sign out'}
+          title={expanded ? undefined : 'Sign out'}
           onClick={async () => {
             setSigningOut(true);
             try {
@@ -168,8 +214,8 @@ export function MainSidebar({
               setSigningOut(false);
             }
           }}
-          className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50 cursor-pointer ${
-            hovered ? 'gap-2 justify-center' : 'justify-center'
+          className={`w-full flex items-center py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50 cursor-pointer ${
+            expanded ? 'gap-2 px-3' : 'justify-center px-0'
           }`}
         >
           {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
