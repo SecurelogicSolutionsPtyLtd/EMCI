@@ -39,15 +39,15 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
 
   return (
     <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50">
-      <header className="shrink-0 h-16 bg-white border-b border-slate-200 flex items-center px-8">
-        <div className="flex items-center gap-3">
+      <header className="shrink-0 h-16 bg-white border-b border-slate-200 flex items-center px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3 min-w-0">
           <Building2 className="w-6 h-6 text-primary shrink-0" />
-          <h1 className="text-xl font-bold text-slate-900">School Dashboard</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">School Dashboard</h1>
         </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="w-full p-8 space-y-6 pb-16">
+        <div className="w-full p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-12 sm:pb-16">
           {/* ── Official letterhead ──────────────────────────────── */}
           <DashboardLetterhead
             eyebrow="EMCI · Official School Record"
@@ -75,10 +75,10 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="px-6 py-5 hover:bg-slate-50/60 transition-colors"
+                  className="px-4 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/60 transition-colors"
                 >
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold tracking-tight tabular-nums text-slate-900">
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-slate-900">
                     {stat.displayValue ?? stat.value.toLocaleString('en-AU')}
                   </p>
                   <div className="h-1 w-full bg-slate-100 rounded-full mt-3">
@@ -111,9 +111,9 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
           </div>
 
           {/* ── Official footer rule ─────────────────────────────── */}
-          <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-            <span>EMCI Student Management Platform · Last synced {format(new Date(), 'dd MMM yyyy, h:mm aa')}</span>
-            <span>Confidential — internal use only</span>
+          <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            <span className="leading-relaxed">EMCI Student Management Platform · Last synced {format(new Date(), 'dd MMM yyyy, h:mm aa')}</span>
+            <span className="shrink-0">Confidential — internal use only</span>
           </div>
         </div>
       </div>

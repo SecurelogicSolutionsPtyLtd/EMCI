@@ -17,11 +17,11 @@ export function SchoolParticularsPanel({ school }: { school: School }) {
       <DashboardSectionHeading>School Particulars</DashboardSectionHeading>
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm divide-y divide-slate-100">
         {rows.map(row => (
-          <div key={row.label} className="px-5 py-3 flex items-center justify-between gap-4">
+          <div key={row.label} className="px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0">
               {row.label}
             </span>
-            <span className="text-sm font-semibold text-slate-800 text-right truncate">{row.value}</span>
+            <span className="text-sm font-semibold text-slate-800 sm:text-right break-words">{row.value}</span>
           </div>
         ))}
       </div>

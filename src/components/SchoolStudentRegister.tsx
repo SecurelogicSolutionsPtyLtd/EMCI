@@ -128,19 +128,19 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
       {/* Toolbar */}
-      <div className="p-4 border-b border-slate-200 flex flex-col xl:flex-row gap-4 items-center">
-        <div className="relative w-full xl:w-80">
+      <div className="p-3 sm:p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch lg:items-center">
+        <div className="relative w-full lg:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search students by name, ID or counsellor..."
+            placeholder="Search students..."
             value={search}
             onChange={e => handleSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full xl:flex-1 xl:justify-end xl:min-w-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full lg:flex lg:flex-wrap lg:items-center lg:flex-1 lg:justify-end lg:min-w-0">
           <SearchableDropdown
             value={rosterFilters.stage}
             onChange={v => handleRosterFilters({ stage: v })}
@@ -148,7 +148,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
             placeholder="All Stages"
             searchPlaceholder="Search stages…"
             panelWidthClass="w-56"
-            triggerClassName="min-w-[10.5rem]"
+            triggerClassName="w-full min-w-0 lg:min-w-[10.5rem]"
           />
           <SearchableDropdown
             value={rosterFilters.year}
@@ -157,7 +157,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
             placeholder="Year Level"
             searchPlaceholder="Search year levels…"
             panelWidthClass="w-48"
-            triggerClassName="min-w-[9.5rem]"
+            triggerClassName="w-full min-w-0 lg:min-w-[9.5rem]"
           />
           <SearchableDropdown
             value={rosterFilters.counsellor}
@@ -166,7 +166,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
             placeholder="All Counsellors"
             searchPlaceholder="Search counsellors…"
             panelWidthClass="w-56"
-            triggerClassName="min-w-[11rem]"
+            triggerClassName="w-full min-w-0 lg:min-w-[11rem]"
           />
           <StudentRosterAdvancedFilters
             filters={rosterFilters}
@@ -178,13 +178,106 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
             yearOptions={yearFilterOptions}
             statusOptions={statusFilterOptions}
             studentTypeOptions={studentTypeFilterOptions}
-            className="shrink-0"
+            className="col-span-2 sm:col-span-1 w-full sm:w-auto shrink-0"
           />
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile card list */}
+      <div className="lg:hidden divide-y divide-slate-100">
+        {paginated.length === 0 ? (
+          <div className="py-16 text-center px-4">
+            <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">No students match your search.</p>
+          </div>
+        ) : (
+          paginated.map((student, idx) => {
+            const atRisk     = student.riskLevel !== 'none';
+            const initials   = getInitials(student);
+            const pct        = programmeProgressPct(student.stageProgress);
+            const barColor   = getProgressBarColor(student);
+            const stagePill  = student.currentStage ? STAGE_PILL[student.currentStage] : 'bg-slate-100 text-slate-500';
+            const stageLabel = student.currentStage ? (STAGE_LABELS[student.currentStage] ?? student.currentStage) : 'Not started';
+
+            return (
+              <motion.div
+                key={student.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15, delay: idx * 0.025 }}
+                className={`p-4 ${onSelectStudent ? 'hover:bg-slate-50/70 cursor-pointer active:bg-slate-50' : ''}`}
+                onClick={onSelectStudent ? () => onSelectStudent(student) : undefined}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900">
+                            {student.firstName} {student.lastName}
+                          </span>
+                          {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {formatYearLevelLine(student)} · {student.counsellor ?? '—'}
+                        </p>
+                      </div>
+                      {onSelectStudent && (
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
+                          className="text-slate-400 hover:text-primary transition-colors shrink-0 p-1 -mr-1"
+                          aria-label={`Open ${student.firstName} ${student.lastName}`}
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${stagePill}`}>
+                        {stageLabel}
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                        student.status === 'Active'   ? 'bg-emerald-100 text-emerald-700'
+                      : student.status === 'Pending' ? 'bg-blue-100 text-blue-700'
+                      : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {student.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs font-medium text-slate-500 tabular-nums shrink-0">{pct}%</span>
+                    </div>
+
+                    {(student.absenceCount > 0 || atRisk) && (
+                      <p className="text-xs text-slate-500 mt-2 tabular-nums">
+                        <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
+                        {atRisk && (
+                          <>
+                            <span className="text-slate-300 mx-1">·</span>
+                            <span className="text-red-500/80 font-medium">At risk</span>
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
@@ -298,8 +391,8 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
       </div>
 
       {/* Pagination */}
-      <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-        <p className="text-sm text-slate-500">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-sm text-slate-500 text-center sm:text-left">
           Showing{' '}
           <span className="font-bold text-slate-900">{showingFrom}</span>
           {' '}to{' '}
@@ -308,7 +401,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
           <span className="font-bold text-slate-900">{filtered.length}</span>
           {' '}students
         </p>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5 flex-wrap">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}

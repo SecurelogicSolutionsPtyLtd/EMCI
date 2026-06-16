@@ -15,7 +15,7 @@ export function DashboardAdvisories({ atRiskCount, scopeSuffix, onReviewRoster }
     <section className="space-y-3">
       <DashboardSectionHeading>Advisories</DashboardSectionHeading>
       {atRiskCount > 0 ? (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400 rounded-lg px-5 py-4">
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400 rounded-lg px-4 sm:px-5 py-4">
           <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
           <div className="min-w-0">
             <p className="text-sm text-amber-800 leading-relaxed">
@@ -34,7 +34,7 @@ export function DashboardAdvisories({ atRiskCount, scopeSuffix, onReviewRoster }
           </div>
         </div>
       ) : (
-        <div className="flex items-start gap-3 bg-white border border-slate-200 border-l-4 border-l-emerald-400 rounded-lg px-5 py-4">
+        <div className="flex items-start gap-3 bg-white border border-slate-200 border-l-4 border-l-emerald-400 rounded-lg px-4 sm:px-5 py-4">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
           <p className="text-sm text-slate-600 leading-relaxed">
             No students are currently flagged at risk {scopeSuffix}.

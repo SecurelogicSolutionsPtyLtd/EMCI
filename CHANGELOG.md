@@ -7,6 +7,13 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-16 (latest)
 
+### Changed: School dashboard mobile responsiveness
+
+- School Dashboard page and its child components now adapt to small screens: responsive page padding and header, stacked footer, tighter KPI cards, and letterhead/particulars panels that stack on narrow viewports ([`src/components/SchoolDashboard.tsx`](src/components/SchoolDashboard.tsx), [`src/components/dashboard/DashboardLetterhead.tsx`](src/components/dashboard/DashboardLetterhead.tsx), [`src/components/dashboard/SchoolParticularsPanel.tsx`](src/components/dashboard/SchoolParticularsPanel.tsx), [`src/components/dashboard/DashboardStageDistribution.tsx`](src/components/dashboard/DashboardStageDistribution.tsx), [`src/components/dashboard/DashboardAdvisories.tsx`](src/components/dashboard/DashboardAdvisories.tsx)).
+- School student register shows a card list on mobile/tablet (`< lg`) instead of a wide table, with a responsive filter toolbar and stacked pagination controls ([`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx)).
+
+---
+
 ### Added: Permanently remove a team member
 
 - Team Management now has a **Remove** action (alongside the existing **Deactivate**/**Reactivate**) that permanently deletes a user. It shows a confirmation modal, then deletes both the `emci_user_roles` row **and** the Supabase Auth user via a new `delete-user` Edge Function ([`supabase/functions/delete-user/index.ts`](supabase/functions/delete-user/index.ts), [`src/services/supabase.ts`](src/services/supabase.ts), [`src/components/TeamManagement.tsx`](src/components/TeamManagement.tsx)).

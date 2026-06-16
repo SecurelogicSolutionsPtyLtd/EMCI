@@ -30,7 +30,7 @@ export function DashboardStageDistribution({ students }: { students: Student[] }
     <section className="space-y-3">
       <DashboardSectionHeading>Programme Stage Distribution</DashboardSectionHeading>
 
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6 space-y-5">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5">
         <div className="flex h-3 rounded-full overflow-hidden bg-slate-100" role="img" aria-label="Stage distribution">
           {segments.map((seg, i) =>
             seg.count > 0 ? (
