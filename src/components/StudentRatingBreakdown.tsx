@@ -14,6 +14,8 @@ import type { RatingCategoryKey, FinalCategory, StudentRating } from '../lib/stu
 
 interface StudentRatingBreakdownProps {
   rating: StudentRating;
+  /** Grid column classes, overridable for narrower containers. */
+  columnsClass?: string;
 }
 
 interface CategoryMeta {
@@ -63,13 +65,13 @@ const CATEGORY_META: Record<RatingCategoryKey, CategoryMeta> = {
       { signal: '>5 absences',  pts: '15' },
     ],
   },
-  growth_wellbeing: {
-    label: 'Wellbeing',
-    description: 'Survey shifts & sentiment',
+  growth_sentiment: {
+    label: 'Sentiment',
+    description: 'Survey shifts & student voice',
     rubric: [
       { signal: 'Preparedness & strengths shift', pts: '0–40' },
       { signal: 'Helpfulness / positive tone',    pts: '0–30' },
-      { signal: 'Wellbeing read of notes',        pts: '0–30' },
+      { signal: 'Sentiment read of notes',        pts: '0–30' },
     ],
   },
 };
@@ -81,7 +83,10 @@ function scoreColor(score: number): { bar: string; text: string } {
   return { bar: 'bg-rose-500', text: 'text-rose-600' };
 }
 
-export function StudentRatingBreakdown({ rating }: StudentRatingBreakdownProps) {
+export function StudentRatingBreakdown({
+  rating,
+  columnsClass = 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+}: StudentRatingBreakdownProps) {
   const [active, setActive] = useState<RatingCategoryKey | null>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
 
@@ -97,7 +102,7 @@ export function StudentRatingBreakdown({ rating }: StudentRatingBreakdownProps) 
   const activeCat = active ? rating.categories.find(c => c.key === active) ?? null : null;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+    <div className={`grid ${columnsClass} gap-2`}>
       {rating.categories.map(cat => {
         const meta = CATEGORY_META[cat.key];
         const hasScore = cat.score !== null;
@@ -112,7 +117,7 @@ export function StudentRatingBreakdown({ rating }: StudentRatingBreakdownProps) 
             onBlur={hide}
             className="group min-w-0 text-left rounded-md border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300 hover:bg-white hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.04)] active:translate-y-0 active:shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/30 transition-all duration-300 ease-out cursor-help"
           >
-            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 truncate">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">
               {meta.label}
             </p>
             <div className="flex items-baseline gap-0.5 mt-1">

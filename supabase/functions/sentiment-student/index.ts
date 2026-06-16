@@ -152,6 +152,16 @@ function formatRelevantNotes(notes: TimelineNoteInput[]): string {
   return `Relevant timeline notes (${voiceNotes.length} note(s) — may contain student voice):\n${lines.join("\n")}`;
 }
 
+const PROGRAMME_STAGE_TOTAL = 3;
+
+function programmeProgressStep(stageProgress: number): number {
+  return Math.max(0, Math.min(PROGRAMME_STAGE_TOTAL, stageProgress - 1));
+}
+
+function formatProgrammeProgressScore(stageProgress: number): string {
+  return `${programmeProgressStep(stageProgress)}/${PROGRAMME_STAGE_TOTAL}`;
+}
+
 function buildUserPrompt(
   s:        StudentInput,
   insights: InsightsInput | undefined,
@@ -165,7 +175,7 @@ function buildUserPrompt(
     `Student context:`,
     `- Year level: ${yearStr}`,
     `- Student type: ${s.studentType}`,
-    `- Programme stage progress: ${s.stageProgress}/4`,
+    `- Programme stage progress: ${formatProgrammeProgressScore(s.stageProgress)}`,
     `- Absences: ${insights?.absenceCount ?? s.absenceCount}${insights?.absencesFlagged ? " (FLAGGED)" : ""}`,
     `- Sessions attended: ${insights?.sessionCount ?? "unknown"}`,
     "",

@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import { AlertTriangle, Award, CheckCircle2, Clock, Users } from 'lucide-react';
 import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
+import { programmeProgressPct, programmeProgressStep } from './stageProgress';
 
 export interface MetricCardConfig {
   label: string;
@@ -14,10 +15,10 @@ export interface MetricCardConfig {
 }
 
 const STAGE_LABELS: Record<string, string> = {
-  referral: 'Initial Intake',
-  consent: 'Consent',
+  referral:        'Referral',
+  consent:         'Consent',
   career_guidance: 'Career Guidance',
-  complete: 'Job Ready',
+  complete:        'Job Ready',
 };
 
 export function buildSchoolMetricCards(
@@ -66,7 +67,7 @@ export function buildStudentMetricCards(
   student: Student,
   events: TimelineEvent[] = [],
 ): MetricCardConfig[] {
-  const progressPct = Math.round((student.stageProgress / 4) * 100);
+  const progressPct = programmeProgressPct(student.stageProgress);
   const sessionCount = events.filter(e => e.type === 'session').length;
   const stageLabel = student.currentStage
     ? (STAGE_LABELS[student.currentStage] ?? student.currentStage)
@@ -100,7 +101,7 @@ export function buildStudentMetricCards(
     },
     {
       label: 'Current Stage',
-      value: student.stageProgress,
+      value: programmeProgressStep(student.stageProgress),
       displayValue: stageLabel,
       icon: Award,
       iconColor: student.currentStage === 'complete' ? 'text-emerald-500/60' : 'text-amber-500/60',

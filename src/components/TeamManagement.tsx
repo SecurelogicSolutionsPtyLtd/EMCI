@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, UserPlus, ChevronLeft, Search,
   Shield, CheckCircle2, Loader2, AlertCircle,
-  Mail, User, Building2, Lock,
+  Mail, User, Building2, Lock, Trash2,
 } from 'lucide-react';
 import {
   listTeamMembers,
-  addTeamMember,
+  inviteTeamMember,
   updateTeamMemberRole,
   toggleTeamMemberActive,
+  deleteTeamMember,
   type TeamMember,
 } from '../services/supabase';
 import {
@@ -133,6 +134,14 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
   const [editingRole, setEditingRole] = useState<AppRole>('acce_staff');
   const [editLoading, setEditLoading] = useState(false);
 
+  // Deactivation confirmation
+  const [confirmDeactivate, setConfirmDeactivate] = useState<TeamMember | null>(null);
+  const [toggleLoading,     setToggleLoading]     = useState(false);
+
+  // Permanent removal confirmation
+  const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
+
   // Preview-as-role picker (acce_admin only, UI-only, no DB changes)
   const [previewPickType,     setPreviewPickType]     = useState<RoleGroup>('acce');
   const [previewPickRole,     setPreviewPickRole]     = useState<AppRole>('acce_staff');
@@ -222,7 +231,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
     setInviteError(null);
     try {
       const needsSchool = getRoleGroup(inviteRole) === 'school';
-      await addTeamMember(
+      await inviteTeamMember(
         inviteEmail.trim(),
         inviteRole,
         inviteName.trim() || undefined,
@@ -252,12 +261,29 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
     }
   }
 
-  async function handleToggleActive(id: string, current: boolean) {
+  async function handleToggleActive(member: TeamMember, newActive: boolean) {
+    setToggleLoading(true);
     try {
-      await toggleTeamMemberActive(id, !current);
+      await toggleTeamMemberActive(member.id, member.user_id, newActive);
+      setConfirmDeactivate(null);
       await load();
     } catch (e: any) {
       setError(e.message ?? 'Failed to update status.');
+    } finally {
+      setToggleLoading(false);
+    }
+  }
+
+  async function handleRemove(member: TeamMember) {
+    setRemoveLoading(true);
+    try {
+      await deleteTeamMember(member.id, member.user_id);
+      setConfirmRemove(null);
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to remove user.');
+    } finally {
+      setRemoveLoading(false);
     }
   }
 
@@ -576,10 +602,24 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                               </button>
                               <span className="text-slate-200">|</span>
                               <button
-                                onClick={() => void handleToggleActive(member.id, member.is_active)}
+                                onClick={() => {
+                                  if (member.is_active) {
+                                    setConfirmDeactivate(member);
+                                  } else {
+                                    void handleToggleActive(member, true);
+                                  }
+                                }}
                                 className={`text-xs font-medium transition-colors ${member.is_active ? 'text-red-400 hover:text-red-600' : 'text-emerald-500 hover:text-emerald-700'}`}
                               >
                                 {member.is_active ? 'Deactivate' : 'Reactivate'}
+                              </button>
+                              <span className="text-slate-200">|</span>
+                              <button
+                                onClick={() => setConfirmRemove(member)}
+                                className="flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Remove
                               </button>
                             </div>
                           )}
@@ -593,6 +633,114 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
           </div>
         )}
       </div>
+
+      {/* Deactivation confirmation modal */}
+      <AnimatePresence>
+        {confirmDeactivate && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+              onClick={() => !toggleLoading && setConfirmDeactivate(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"
+            >
+              <div className="h-1 w-full bg-gradient-to-r from-red-500 via-red-400 to-red-300" />
+              <div className="px-6 py-5">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">Deactivate user?</h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      <span className="font-semibold text-slate-700">
+                        {confirmDeactivate.display_name ?? confirmDeactivate.email}
+                      </span>{' '}
+                      will be immediately blocked from logging in and lose access to the platform.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setConfirmDeactivate(null)}
+                    disabled={toggleLoading}
+                    className="flex-1 py-2.5 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void handleToggleActive(confirmDeactivate, false)}
+                    disabled={toggleLoading}
+                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-xl hover:bg-red-600 active:scale-[0.98] transition-all disabled:opacity-60"
+                  >
+                    {toggleLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Deactivate'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Permanent removal confirmation modal */}
+      <AnimatePresence>
+        {confirmRemove && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+              onClick={() => !removeLoading && setConfirmRemove(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"
+            >
+              <div className="h-1 w-full bg-gradient-to-r from-red-600 via-red-500 to-red-400" />
+              <div className="px-6 py-5">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">Remove user permanently?</h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      <span className="font-semibold text-slate-700">
+                        {confirmRemove.display_name ?? confirmRemove.email}
+                      </span>{' '}
+                      will be permanently deleted, including their login account. This cannot be undone — you would need to send a brand-new invite to restore access.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setConfirmRemove(null)}
+                    disabled={removeLoading}
+                    className="flex-1 py-2.5 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void handleRemove(confirmRemove)}
+                    disabled={removeLoading}
+                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-60"
+                  >
+                    {removeLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Remove permanently'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Add user modal */}
       <AnimatePresence>
@@ -751,7 +899,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                       disabled={inviteLoading}
                       className="flex-1 py-2.5 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-60"
                     >
-                      {inviteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Add user'}
+                      {inviteLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Add & send invite'}
                     </button>
                   </div>
                 </form>

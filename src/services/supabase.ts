@@ -169,6 +169,32 @@ export async function addTeamMember(
   if (error) throw error;
 }
 
+/**
+ * Adds a new team member AND sends them a Supabase invite email via the
+ * `invite-user` edge function (which holds the service-role key).
+ */
+export async function inviteTeamMember(
+  email: string,
+  role: AppRole,
+  displayName?: string,
+  schoolId?: string,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('invite-user', {
+    body: {
+      email,
+      role,
+      displayName: displayName ?? null,
+      schoolId:    schoolId    ?? null,
+    },
+  });
+  if (error) {
+    // Extract the real error message from the edge function response body
+    const body = await (error as { context?: Response }).context?.json?.().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error ?? error.message);
+  }
+  if (data?.error) throw new Error(data.error as string);
+}
+
 export async function updateTeamMemberRole(id: string, role: AppRole): Promise<void> {
   const { error } = await supabase
     .from('emci_user_roles')
@@ -177,10 +203,41 @@ export async function updateTeamMemberRole(id: string, role: AppRole): Promise<v
   if (error) throw error;
 }
 
-export async function toggleTeamMemberActive(id: string, isActive: boolean): Promise<void> {
-  const { error } = await supabase
-    .from('emci_user_roles')
-    .update({ is_active: isActive })
-    .eq('id', id);
-  if (error) throw error;
+/**
+ * Deactivates or reactivates a team member.
+ * Calls the `toggle-user-active` edge function which updates `emci_user_roles`
+ * AND bans/unbans the Supabase Auth user so they cannot log in while inactive.
+ */
+export async function toggleTeamMemberActive(
+  id: string,
+  userId: string | null,
+  isActive: boolean,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('toggle-user-active', {
+    body: { id, userId, isActive },
+  });
+  if (error) {
+    const body = await (error as { context?: Response }).context?.json?.().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error ?? error.message);
+  }
+  if (data?.error) throw new Error(data.error as string);
+}
+
+/**
+ * Permanently removes a team member.
+ * Calls the `delete-user` edge function which deletes the Supabase Auth user
+ * AND the `emci_user_roles` row, so a future invite is a clean fresh invite.
+ */
+export async function deleteTeamMember(
+  id: string,
+  userId: string | null,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: { id, userId },
+  });
+  if (error) {
+    const body = await (error as { context?: Response }).context?.json?.().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error ?? error.message);
+  }
+  if (data?.error) throw new Error(data.error as string);
 }

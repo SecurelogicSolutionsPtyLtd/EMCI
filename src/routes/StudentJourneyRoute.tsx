@@ -6,7 +6,7 @@ import { StudentJourneySummary } from '../components/StudentJourneySummary';
 import { StudentJourneyModal } from '../components/StudentJourneyModal';
 import { StudentAssistantChat } from '../components/StudentAssistantChat';
 import { useAuth } from '../context/AuthContext';
-import { canAccessPage, canSeeStudentNames, getRoleGroup } from '../types/roles';
+import { canAccessPage, canSeeStudentNames, canUseAiFeatures, getRoleGroup } from '../types/roles';
 import type { AppShellOutletContext } from './shellContext';
 import { isPlausibleRecordIdParam } from '../lib/recordIdParam';
 import {
@@ -14,6 +14,7 @@ import {
   studentPseudonym,
   toRedactedStudentView,
 } from '../lib/studentRedaction';
+import { useAiRedactedEvents } from '../redaction';
 
 export function StudentJourneyRoute() {
   const { studentId: studentIdParam } = useParams();
@@ -33,6 +34,7 @@ export function StudentJourneyRoute() {
   }, [studentIdParam]);
 
   const hidePii = !canSeeStudentNames(userRole);
+  const hideAi  = !canUseAiFeatures(userRole);
 
   const selectedStudent = useMemo(() => {
     if (!isPlausibleRecordIdParam(studentIdParam)) return null;
@@ -44,11 +46,14 @@ export function StudentJourneyRoute() {
     [hidePii, selectedStudent],
   );
 
-  const studentEvents = useMemo(() => {
+  const baseEvents = useMemo(() => {
     if (!selectedStudent) return [];
     const raw = studentEventsMap[selectedStudent.id] ?? [];
     return redactTimelineEvents(raw, selectedStudent, userRole);
   }, [selectedStudent, studentEventsMap, userRole]);
+
+  // AI deep scan (tier 2) for sensitive info the pattern tier missed.
+  const studentEvents = useAiRedactedEvents(baseEvents);
 
   if (!isPlausibleRecordIdParam(studentIdParam)) {
     return <Navigate to="/dashboard" replace />;
@@ -141,12 +146,13 @@ export function StudentJourneyRoute() {
             events={studentEvents}
             schoolName={studentSchoolName}
             hidePii={hidePii}
+            hideAi={hideAi}
           />
         )}
       </div>
 
-      {/* ── AI assistant chat (grounded in the on-page student context) ── */}
-      {displayStudent && (
+      {/* ── AI assistant chat — ACCE Admin only ── */}
+      {displayStudent && canUseAiFeatures(userRole) && (
         <StudentAssistantChat
           student={displayStudent}
           events={studentEvents}

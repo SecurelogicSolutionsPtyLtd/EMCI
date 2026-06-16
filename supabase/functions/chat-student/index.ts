@@ -7,10 +7,9 @@ const SYSTEM_PROMPT = `You are the EMCI Assistant — a professional career-coun
 EMCI supports Year 9 and 10 students from priority cohorts — Koorie students, students in out-of-home care, students engaged with Youth Justice, and students with disabilities who experience significant disadvantage. The program connects these students with additional career guidance supports and work-based learning opportunities through ACCE (Australian Centre for Career Education).
 
 The program stages are:
-1. Referral — student is referred into EMCI and initial engagement begins
-2. Consent — parental/guardian consent obtained
-3. Career Guidance — student is actively engaged in career consultations, Morrisby profiling, and work readiness activities
-4. Complete — student has finished the EMCI programme
+1. Consent — parental/guardian consent obtained (initial intake)
+2. Career Guidance — student is actively engaged in career consultations, Morrisby profiling, and work readiness activities
+3. Complete — student has finished the EMCI programme
 
 You are answering questions for a school-based career practitioner or ACCE consultant about the ONE student described in the context block below.
 
@@ -20,7 +19,7 @@ Rules:
 - Never use or guess the student's name — refer to "the student" or "they". The context intentionally omits identifying details.
 - Be concise and practical: prefer short paragraphs and tight bullet points. Lead with the direct answer.
 - Where helpful, reference the Quick Insight categories (Career Action Plan, Morrisby Unpack, Morrisby Profile, Work Experience, Absences) and any pilot-survey shifts across start / mid / end stages.
-- Use timeline notes when they answer the practitioner’s question or clarify engagement, barriers, goals, wellbeing, or next steps. Do not invent details beyond those notes.
+- Use timeline notes when they answer the practitioner’s question or clarify engagement, barriers, goals, sentiment, or next steps. Do not invent details beyond those notes.
 - Offer concrete, actionable next steps when asked for recommendations.
 - Do not include sensitive personal information beyond what is provided. This guidance supports — never replaces — professional judgement.
 
@@ -82,11 +81,35 @@ interface ChatMessageInput {
   content: string;
 }
 
+const PROGRAMME_STAGE_TOTAL = 3;
+
+function programmeProgressStep(stageProgress: number): number {
+  return Math.max(0, Math.min(PROGRAMME_STAGE_TOTAL, stageProgress - 1));
+}
+
+function formatProgrammeProgressScore(stageProgress: number): string {
+  return `${programmeProgressStep(stageProgress)}/${PROGRAMME_STAGE_TOTAL}`;
+}
+
+function formatProgrammeStageLabel(stage: string | null): string {
+  switch (stage) {
+    case "career_guidance":
+      return "Career Guidance (Stage 2 of 3)";
+    case "complete":
+      return "Complete (Stage 3 of 3)";
+    case "consent":
+    case "referral":
+      return "Consent (Stage 1 of 3)";
+    default:
+      return "Not yet started";
+  }
+}
+
 const STAGE_LABEL: Record<string, string> = {
-  referral:        "Referral (Stage 1 of 4)",
-  consent:         "Consent (Stage 2 of 4)",
-  career_guidance: "Career Guidance (Stage 3 of 4)",
-  complete:        "Complete (Stage 4 of 4)",
+  referral:        "Consent (Stage 1 of 3)",
+  consent:         "Consent (Stage 1 of 3)",
+  career_guidance: "Career Guidance (Stage 2 of 3)",
+  complete:        "Complete (Stage 3 of 3)",
 };
 
 const STAGE_NAME: Record<SurveyShiftInput["stage"], string> = {
@@ -99,7 +122,7 @@ function formatInsights(i: InsightsInput): string {
   return [
     `- Counselling sessions: ${i.sessionCount}`,
     `- Absences: ${i.absenceCount}${i.absencesFlagged ? " (FLAGGED — exceeds attendance threshold)" : ""}`,
-    `- Unpack: ${i.unpack.yes ? "Yes" : "No"}`,
+    `- Morrisby Unpack: ${i.unpack.yes ? "Yes" : "No"}`,
     `- CAP: ${i.cap.yes ? "Yes" : "No"}`,
     `- Work Readiness: ${i.workReadiness.yes ? "Yes" : "No"}`,
     `- Industry Engagement: ${i.industryEngagement.yes ? "Yes" : "No"}`,
@@ -168,13 +191,13 @@ function buildContextBlock(
   sessions: SessionDetailInput[] | undefined,
   notes:    TimelineNoteInput[] | undefined,
 ): string {
-  const stageStr = s.stage ? (STAGE_LABEL[s.stage] ?? s.stage) : "Not yet started";
+  const stageStr = formatProgrammeStageLabel(s.stage);
   const yearStr  = s.yearLevelLabel?.trim() || `Year ${s.yearLevel}`;
 
   const sections: string[] = [
     `STUDENT CONTEXT (the only student this conversation is about):`,
     `- Programme stage: ${stageStr}`,
-    `- Stage progress score: ${s.stageProgress}/4`,
+    `- Stage progress score: ${formatProgrammeProgressScore(s.stageProgress)}`,
     `- Enrolment status: ${s.status}`,
     `- Year level: ${yearStr}`,
     `- Student type: ${s.studentType}`,

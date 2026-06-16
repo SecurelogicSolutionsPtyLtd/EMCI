@@ -17,7 +17,7 @@ interface StudentAssistantDrawerProps {
 const SUGGESTED_PROMPTS = [
   'Summarise this student in three bullet points',
   'What should I focus on in the next session?',
-  'Are there any attendance or wellbeing concerns?',
+  'Are there any attendance or sentiment concerns?',
   'How have their survey responses shifted?',
 ];
 

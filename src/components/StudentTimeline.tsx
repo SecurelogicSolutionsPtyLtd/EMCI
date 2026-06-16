@@ -23,7 +23,7 @@ function safeFormat(dateStr: string | null | undefined, fmt: string, fallback = 
 type EventType = TimelineEvent['type'];
 
 const TYPE_LABEL: Record<EventType, string> = {
-  referral: 'Referral',
+  referral: 'Consent',
   consent:  'Consent',
   session:  'Session',
   survey:   'Survey',
@@ -32,7 +32,7 @@ const TYPE_LABEL: Record<EventType, string> = {
 };
 
 const TYPE_DOT: Record<EventType, string> = {
-  referral: 'bg-primary',
+  referral: 'bg-emerald-500',
   consent:  'bg-emerald-500',
   session:  'bg-primary',
   survey:   'bg-violet-500',
@@ -41,7 +41,7 @@ const TYPE_DOT: Record<EventType, string> = {
 };
 
 const TYPE_BADGE: Record<EventType, string> = {
-  referral: 'bg-primary/8 text-primary',
+  referral: 'bg-emerald-50 text-emerald-700',
   consent:  'bg-emerald-50 text-emerald-700',
   session:  'bg-primary/8 text-primary',
   survey:   'bg-violet-50 text-violet-700',
@@ -237,13 +237,16 @@ export function StudentTimeline({ events }: StudentTimelineProps) {
 
   const sorted = useMemo(
     () => [...events]
-      .filter(e => e.type !== 'referral')
       .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
     [events],
   );
 
   const filtered = useMemo(
-    () => (filter === 'all' ? sorted : sorted.filter(e => e.type === filter)),
+    () => filter === 'all'
+      ? sorted
+      : filter === 'consent'
+        ? sorted.filter(e => e.type === 'consent' || e.type === 'referral')
+        : sorted.filter(e => e.type === filter),
     [sorted, filter],
   );
 

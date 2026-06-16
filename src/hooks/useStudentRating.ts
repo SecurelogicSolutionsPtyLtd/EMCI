@@ -1,8 +1,8 @@
 /**
  * Computes a student's tracking rating via the `rate-student` edge function and
- * finalises it deterministically in code. Results are cached in localStorage,
- * keyed by a source fingerprint, so the AI is only re-run when the underlying
- * student record actually changes.
+ * finalises it deterministically in code. Results are persisted encrypted in
+ * Supabase (student_analysis.rating, alongside analysis and sentiment) and
+ * restored on load when the source fingerprint still matches.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,11 +16,17 @@ import {
   type AiRating,
   type StudentRating,
 } from '../lib/studentRating';
+import {
+  clearLegacyRatingCache,
+  parseStoredRating,
+  readLegacyRatingCache,
+  serializeRating,
+} from '../lib/studentRatingStorage';
 
 export type RatingState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'success'; rating: StudentRating }
+  | { status: 'success'; rating: StudentRating; sourceHash: string | null }
   | { status: 'error'; message: string };
 
 export interface UseStudentRating {
@@ -28,63 +34,91 @@ export interface UseStudentRating {
   generate: () => void;
 }
 
-interface CachedRating {
-  fingerprint: string;
-  rating:      StudentRating;
+interface StoredRatingRecord {
+  rating?:       string;
+  source_hash?:  string | null;
 }
 
-// v8: added dedicated Work Readiness category; weights now 25/20/20/15/20.
-const CACHE_PREFIX = 'emci-rating:v8:';
-
-function readCache(studentId: string, fingerprint: string): StudentRating | null {
-  try {
-    const raw = localStorage.getItem(CACHE_PREFIX + studentId);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CachedRating;
-    return parsed.fingerprint === fingerprint ? parsed.rating : null;
-  } catch {
-    return null;
-  }
+async function persistRatingToDb(
+  student:     Student,
+  rating:      StudentRating,
+  fingerprint: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('upsert_student_rating', {
+    p_student_id:  student.id,
+    p_school_id:   student.schoolId ?? null,
+    p_rating:      serializeRating(rating),
+    p_source_hash: fingerprint,
+  });
+  if (error) throw new Error(error.message ?? 'Failed to save tracking score');
 }
 
-function writeCache(studentId: string, value: CachedRating): void {
-  try {
-    localStorage.setItem(CACHE_PREFIX + studentId, JSON.stringify(value));
-  } catch {
-    // localStorage may be unavailable / full — caching is best-effort.
-  }
-}
-
-/**
- * @param student  the student to rate, or null to disable (e.g. redacted view)
- * @param events   the student's derived timeline events
- *
- * Scoring is manually triggered via `generate()`. On mount (and whenever the
- * student record changes) any previously generated score for the current
- * fingerprint is restored from cache; otherwise the badge stays in its empty
- * state until the user asks for a score.
- */
 export function useStudentRating(
   student: Student | null,
   events:  TimelineEvent[],
 ): UseStudentRating {
   const [state, setState] = useState<RatingState>({ status: 'idle' });
+  const [dbChecked, setDbChecked] = useState(false);
   const cancelledRef = useRef(false);
   const autoTriggeredRef = useRef<string | null>(null);
+  const migrateTriggeredRef = useRef<string | null>(null);
 
   const fingerprint = student ? buildAnalysisSourceFingerprint(student, events) : null;
 
-  // Restore a cached score (or reset to empty) when the student/record changes.
   useEffect(() => {
     if (!student || !fingerprint) {
       setState({ status: 'idle' });
+      setDbChecked(false);
       return;
     }
-    const cached = readCache(student.id, fingerprint);
-    setState(cached ? { status: 'success', rating: cached } : { status: 'idle' });
+    let cancelled = false;
+    setDbChecked(false);
+
+    (async () => {
+      const { data, error } = await supabase.rpc('get_student_rating_record', {
+        p_student_id: student.id,
+      });
+      if (cancelled) return;
+      setDbChecked(true);
+
+      if (error) return;
+
+      if (data) {
+        const record = data as StoredRatingRecord;
+        if (record.rating) {
+          const parsed = parseStoredRating(record.rating);
+          if (parsed) {
+            setState({
+              status:     'success',
+              rating:     parsed,
+              sourceHash: record.source_hash ?? null,
+            });
+            return;
+          }
+        }
+      }
+
+      // One-time migration from legacy localStorage cache into Supabase.
+      const legacy = readLegacyRatingCache(student.id, fingerprint);
+      if (!legacy) return;
+      const migrateKey = `${student.id}:${fingerprint}`;
+      if (migrateTriggeredRef.current === migrateKey) return;
+      migrateTriggeredRef.current = migrateKey;
+
+      try {
+        await persistRatingToDb(student, legacy, fingerprint);
+        clearLegacyRatingCache(student.id);
+        if (!cancelled) {
+          setState({ status: 'success', rating: legacy, sourceHash: fingerprint });
+        }
+      } catch {
+        // Keep legacy cache; user can regenerate manually.
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [student, fingerprint]);
 
-  // Cancel any in-flight request on unmount.
   useEffect(() => {
     cancelledRef.current = false;
     return () => { cancelledRef.current = true; };
@@ -109,8 +143,11 @@ export function useStudentRating(
         }
 
         const rating = finaliseRating(aiRating, student);
-        writeCache(student.id, { fingerprint, rating });
-        setState({ status: 'success', rating });
+        await persistRatingToDb(student, rating, fingerprint);
+        clearLegacyRatingCache(student.id);
+
+        if (cancelledRef.current) return;
+        setState({ status: 'success', rating, sourceHash: fingerprint });
       } catch (err) {
         if (cancelledRef.current) return;
         const message = err instanceof Error ? err.message : 'Failed to rate student';
@@ -119,18 +156,15 @@ export function useStudentRating(
     })();
   }, [student, events, fingerprint]);
 
-  // Auto-generate on load for any student who has reached Career Guidance or
-  // beyond (stageProgress >= 3) and has no cached score for their current
-  // fingerprint. Runs once per student/fingerprint combination.
   useEffect(() => {
-    if (!student || !fingerprint) return;
+    if (!student || !fingerprint || !dbChecked) return;
     if (student.stageProgress < ANALYSIS_MIN_STAGE_PROGRESS) return;
-    if (readCache(student.id, fingerprint)) return;
+    if (state.status === 'success' && state.sourceHash === fingerprint) return;
     const key = `${student.id}:${fingerprint}`;
     if (autoTriggeredRef.current === key) return;
     autoTriggeredRef.current = key;
     generate();
-  }, [student, fingerprint, generate]);
+  }, [student, fingerprint, dbChecked, state, generate]);
 
   return { state, generate };
 }

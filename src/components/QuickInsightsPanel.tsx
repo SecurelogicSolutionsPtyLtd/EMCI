@@ -1,17 +1,25 @@
+import { useMemo, useState } from 'react';
 import {
   BookOpen, ClipboardList, Briefcase, Building2, HandHelping,
-  HardHat, UserPlus, MoreHorizontal, CalendarDays, UserX,
+  HardHat, UserPlus, MoreHorizontal, CalendarDays, UserX, ClipboardCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { TimelineEvent } from '../services/dataverse';
 import {
+  PILOT_SURVEY_STAGE_COUNT,
   QUICK_INSIGHT_AREAS,
+  buildQuickInsightDetails,
   type QuickInsightAreaKey,
+  type QuickInsightDetailKey,
   type QuickInsights,
 } from '../lib/studentInsights';
+import { ReportCardHeader, ReportSectionHeading } from './ReportCard';
+import { QuickInsightDetailPanel } from './QuickInsightDetail';
 
 type Variant = 'success' | 'neutral' | 'warning';
 
 interface InsightRow {
+  key:     QuickInsightDetailKey;
   label:   string;
   value:   string;
   Icon:    LucideIcon;
@@ -58,16 +66,25 @@ function countRowsFromInsights(insights: QuickInsights): InsightRow[] {
   const absenceLabel = insights.absenceCount === 1 ? '1 absence' : `${insights.absenceCount} absences`;
   return [
     {
+      key:     'sessions',
       label:   'Sessions',
       value:   sessionLabel,
       Icon:    CalendarDays,
       variant: insights.sessionCount > 0 ? 'success' : 'neutral',
     },
     {
+      key:     'absences',
       label:   'Absences',
       value:   absenceLabel,
       Icon:    UserX,
       variant: insights.absencesFlagged ? 'warning' : insights.absenceCount > 0 ? 'neutral' : 'success',
+    },
+    {
+      key:     'surveys',
+      label:   'Surveys',
+      value:   `${insights.surveyCount}/${PILOT_SURVEY_STAGE_COUNT}`,
+      Icon:    ClipboardCheck,
+      variant: insights.surveyCount === PILOT_SURVEY_STAGE_COUNT ? 'success' : 'neutral',
     },
   ];
 }
@@ -76,6 +93,7 @@ function rowsFromInsights(insights: QuickInsights): InsightRow[] {
   return QUICK_INSIGHT_AREAS.map(area => {
     const yes = insights[area.key].yes;
     return {
+      key:     area.key,
       label:   area.label,
       value:   yes ? 'Yes' : 'No',
       Icon:    AREA_ICONS[area.key],
@@ -86,54 +104,81 @@ function rowsFromInsights(insights: QuickInsights): InsightRow[] {
 
 interface QuickInsightsPanelProps {
   insights: QuickInsights;
+  events:   TimelineEvent[];
 }
 
-function InsightGrid({ rows }: { rows: InsightRow[] }) {
+interface InsightGridProps {
+  rows:     InsightRow[];
+  selected: QuickInsightDetailKey | null;
+  onSelect: (key: QuickInsightDetailKey) => void;
+}
+
+function InsightGrid({ rows, selected, onSelect }: InsightGridProps) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      {rows.map(row => (
-        <div
-          key={row.label}
-          className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-lg border min-w-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:-translate-y-px active:translate-y-0 transition-all duration-300 ease-out ${ROW_BG[row.variant]} ${ROW_HOVER[row.variant]}`}
-        >
-          <row.Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ease-out group-hover:scale-110 ${ICON_COLOR[row.variant]}`} />
-          <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-            <span className="text-[11px] font-medium text-slate-500 leading-none truncate">
-              {row.label}
-            </span>
-            <span className={`text-sm font-semibold leading-tight truncate ${VALUE_COLOR[row.variant]}`}>
-              {row.value}
-            </span>
-          </div>
-        </div>
-      ))}
+      {rows.map(row => {
+        const isSelected = row.key === selected;
+        return (
+          <button
+            key={row.key}
+            type="button"
+            onClick={() => onSelect(row.key)}
+            aria-expanded={isSelected}
+            className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-lg border min-w-0 text-left cursor-pointer shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:-translate-y-px active:translate-y-0 transition-all duration-300 ease-out ${ROW_BG[row.variant]} ${ROW_HOVER[row.variant]} ${
+              isSelected ? 'ring-2 ring-primary/40 border-primary/40' : ''
+            }`}
+          >
+            <row.Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ease-out group-hover:scale-110 ${ICON_COLOR[row.variant]}`} />
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+              <span className="text-[11px] font-medium text-slate-500 leading-none truncate">
+                {row.label}
+              </span>
+              <span className={`text-sm font-semibold leading-tight truncate ${VALUE_COLOR[row.variant]}`}>
+                {row.value}
+              </span>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-export function QuickInsightsPanel({ insights }: QuickInsightsPanelProps) {
+export function QuickInsightsPanel({ insights, events }: QuickInsightsPanelProps) {
+  const [selected, setSelected] = useState<QuickInsightDetailKey | null>(null);
   const countRows = countRowsFromInsights(insights);
   const areaRows  = rowsFromInsights(insights);
+  const details   = useMemo(() => buildQuickInsightDetails(events), [events]);
+
+  const toggle = (key: QuickInsightDetailKey) =>
+    setSelected(prev => (prev === key ? null : key));
+
+  const allRows = [...countRows, ...areaRows];
+  const selectedRow = selected ? allRows.find(r => r.key === selected) ?? null : null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
-      <h3 className="text-sm font-semibold text-slate-900 tracking-tight mb-4">
-        Quick Insights
-      </h3>
-      <div className="flex flex-col gap-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Attendance
-          </p>
-          <InsightGrid rows={countRows} />
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden h-full flex flex-col">
+      <ReportCardHeader
+        title="Quick Insights"
+        subtitle="Programme engagement at a glance"
+      />
+      <div className="p-6 flex-1 flex flex-col gap-6">
+        <div className="space-y-3">
+          <ReportSectionHeading>Attendance</ReportSectionHeading>
+          <InsightGrid rows={countRows} selected={selected} onSelect={toggle} />
         </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Interventions
-          </p>
-          <InsightGrid rows={areaRows} />
+        <div className="space-y-3">
+          <ReportSectionHeading>Interventions</ReportSectionHeading>
+          <InsightGrid rows={areaRows} selected={selected} onSelect={toggle} />
         </div>
       </div>
+      <QuickInsightDetailPanel
+        open={selected !== null && selectedRow !== null}
+        label={selectedRow?.label ?? ''}
+        value={selectedRow?.value ?? ''}
+        items={selected ? details[selected] : []}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }

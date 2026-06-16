@@ -1,8 +1,5 @@
-import React, { useMemo } from 'react';
-import {
-  Check, Sparkles, AlertTriangle, RotateCcw, Loader2,
-  ClipboardCheck, Compass, Flag, type LucideIcon,
-} from 'lucide-react';
+import { useMemo } from 'react';
+import { Sparkles, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react';
 import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
 import { studentPseudonym } from '../lib/studentRedaction';
@@ -17,43 +14,9 @@ import { StudentRatingBadge } from './StudentRatingBadge';
 import { StudentRatingBreakdown } from './StudentRatingBreakdown';
 import { StudentWatchouts } from './StudentWatchouts';
 import { StudentSentimentCard } from './StudentSentimentCard';
-
-// ── Stepper ──────────────────────────────────────────────────────────────────
-
-const STEPS: { key: string; label: string; Icon: LucideIcon }[] = [
-  { key: 'consent',         label: 'Consent',         Icon: ClipboardCheck },
-  { key: 'career_guidance', label: 'Career Guidance', Icon: Compass },
-  { key: 'complete',        label: 'Complete',        Icon: Flag },
-];
-
-type StepStatus = 'done' | 'current' | 'pending';
-
-/**
- * Derives each visual step's status from the numeric `stageProgress` (0–4)
- * rather than the nullable `currentStage`. This is the same value the AI
- * analysis reports as "X/4", so the stepper always matches the narrative and
- * renders consistently for every student — including completed and inactive
- * ones whose `currentStage` may be cleared.
- *
- * Progress scale: 0 not started · 1–2 consent · 3 career guidance · 4 complete.
- * The referral data stage (1) is folded into the visual "Consent" step.
- */
-function getStepStatus(stepKey: string, stageProgress: number): StepStatus {
-  switch (stepKey) {
-    case 'consent':
-      if (stageProgress >= 3) return 'done';
-      if (stageProgress >= 1) return 'current';
-      return 'pending';
-    case 'career_guidance':
-      if (stageProgress >= 4) return 'done';
-      if (stageProgress === 3) return 'current';
-      return 'pending';
-    case 'complete':
-      return stageProgress >= 4 ? 'done' : 'pending';
-    default:
-      return 'pending';
-  }
-}
+import { StudentJourneyStepper } from './StudentJourneyStepper';
+import { CompletedJourneyPanel } from './CompletedJourneyPanel';
+import { ReportCardHeader, ReportSectionHeading, ReportFooter, ReportEyebrow } from './ReportCard';
 
 // ── Fallback static summary (used in PII-restricted mode) ────────────────────
 
@@ -84,24 +47,23 @@ interface AnalysisCardProps {
   student:     Student;
   events:      TimelineEvent[];
   schoolName?: string;
-  hidePii:     boolean;
+  hideAi:      boolean;
 }
 
-function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProps) {
+function AnalysisCard({ student, events, schoolName, hideAi }: AnalysisCardProps) {
   const { state, displayState, generate } = useStudentAnalysis(
-    hidePii ? null : student,
+    hideAi ? null : student,
     events,
     schoolName,
   );
 
   return (
-    <div className="col-span-3 bg-white rounded-xl border border-slate-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-900 tracking-tight flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          Analysis Summary
-        </h3>
-        {displayState === 'current' && !hidePii && (
+    <div className="col-span-3 bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+      <ReportCardHeader
+        title="Analysis Summary"
+        subtitle="EMCI practitioner analysis of programme engagement"
+      >
+        {displayState === 'current' && !hideAi && (
           <button
             onClick={generate}
             className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
@@ -110,15 +72,17 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
             Regenerate
           </button>
         )}
-      </div>
+      </ReportCardHeader>
 
-      {hidePii && (
+      <div className="p-6 flex-1">
+
+      {hideAi && (
           <p className="text-sm text-slate-700 leading-relaxed">
             {buildFallbackSummary(student)}
           </p>
       )}
 
-      {!hidePii && displayState === 'too_early' && (
+      {!hideAi && displayState === 'too_early' && (
         <div className="flex flex-col items-center text-center px-4 py-6">
           <img
             src="/analysis-not-yet-available.png"
@@ -137,7 +101,7 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
         </div>
       )}
 
-      {!hidePii && displayState === 'ready' && (
+      {!hideAi && displayState === 'ready' && (
         <div className="flex flex-col items-center text-center px-4 py-6">
           <img
             src="/analysis-empty-state.png"
@@ -150,7 +114,7 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
           </p>
           <p className="mt-1.5 mb-5 text-sm text-slate-600 max-w-xs leading-relaxed">
             Generate an EMCI analysis to see insights about this student&apos;s
-            strengths, wellbeing and engagement.
+            strengths, sentiment and engagement.
           </p>
           <button
             onClick={generate}
@@ -162,14 +126,14 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
         </div>
       )}
 
-      {!hidePii && displayState === 'loading' && (
+      {!hideAi && displayState === 'loading' && (
         <div className="flex items-center gap-3 px-4 py-5 rounded-xl bg-slate-50 border border-slate-100">
           <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
           <span className="text-sm text-slate-500">Generating analysis…</span>
         </div>
       )}
 
-      {!hidePii && displayState === 'error' && state.status === 'error' && (
+      {!hideAi && displayState === 'error' && state.status === 'error' && (
         <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-red-50 border border-red-200">
           <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
@@ -181,7 +145,7 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
         </div>
       )}
 
-      {!hidePii && displayState === 'stale' && state.status === 'success' && (
+      {!hideAi && displayState === 'stale' && state.status === 'success' && (
         <>
           <div className="flex flex-col items-center text-center px-4 pt-6 pb-4">
             <img
@@ -204,33 +168,52 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
               Regenerate EMCI Analysis
             </button>
           </div>
-          <div className="opacity-80">
-            <AnalysisHighlights highlights={state.highlights} />
-            <div className="px-4 py-4 rounded-xl bg-primary/5 border border-primary/15">
-              <p className="text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
-                {state.analysis}
-              </p>
-              <p className="text-[11px] text-slate-400 mt-3 uppercase tracking-wide">
-                AI-generated · Out of date · For guidance purposes only
-              </p>
+          <div className="opacity-80 space-y-6">
+            {state.highlights.length > 0 && (
+              <div className="space-y-3">
+                <ReportSectionHeading>Key Indicators</ReportSectionHeading>
+                <AnalysisHighlights highlights={state.highlights} />
+              </div>
+            )}
+            <div className="space-y-3">
+              <ReportSectionHeading>Summary of Findings</ReportSectionHeading>
+              <div className="rounded-lg bg-primary/5 border border-primary/10 px-4 py-3.5">
+                <p className="text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
+                  {state.analysis}
+                </p>
+              </div>
             </div>
+            <ReportFooter
+              left="AI-Generated · Out of Date · For Guidance Purposes Only"
+              right="Not an Official Assessment"
+            />
           </div>
         </>
       )}
 
-      {!hidePii && displayState === 'current' && state.status === 'success' && (
-        <>
-          <AnalysisHighlights highlights={state.highlights} />
-          <div className="px-4 py-4 rounded-xl bg-primary/5 border border-primary/15">
-            <p className="text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
-              {state.analysis}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-3 uppercase tracking-wide">
-              AI-generated · For guidance purposes only
-            </p>
+      {!hideAi && displayState === 'current' && state.status === 'success' && (
+        <div className="space-y-6">
+          {state.highlights.length > 0 && (
+            <div className="space-y-3">
+              <ReportSectionHeading>Key Indicators</ReportSectionHeading>
+              <AnalysisHighlights highlights={state.highlights} />
+            </div>
+          )}
+          <div className="space-y-3">
+            <ReportSectionHeading>Summary of Findings</ReportSectionHeading>
+            <div className="rounded-lg bg-primary/5 border border-primary/10 px-4 py-3.5">
+              <p className="text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
+                {state.analysis}
+              </p>
+            </div>
           </div>
-        </>
+          <ReportFooter
+            left="AI-Generated · For Guidance Purposes Only"
+            right="Not an Official Assessment"
+          />
+        </div>
       )}
+      </div>
     </div>
   );
 }
@@ -238,10 +221,11 @@ function AnalysisCard({ student, events, schoolName, hidePii }: AnalysisCardProp
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface StudentJourneySummaryProps {
-  student: Student;
-  events: TimelineEvent[];
+  student:    Student;
+  events:     TimelineEvent[];
   schoolName?: string;
-  hidePii?: boolean;
+  hidePii?:   boolean;
+  hideAi?:    boolean;
 }
 
 export function StudentJourneySummary({
@@ -249,6 +233,7 @@ export function StudentJourneySummary({
   events,
   schoolName,
   hidePii = false,
+  hideAi  = false,
 }: StudentJourneySummaryProps) {
   const displayName = hidePii
     ? studentPseudonym(student.id)
@@ -262,7 +247,7 @@ export function StudentJourneySummary({
   const yearBadge = formatYearLevelLine(student);
   const insights  = useMemo(() => computeQuickInsights(student, events), [student, events]);
   const { state: ratingState, generate: generateRating } = useStudentRating(
-    hidePii ? null : student,
+    hideAi ? null : student,
     events,
   );
   const ratingForWatchouts = ratingState.status === 'success' ? ratingState.rating : null;
@@ -270,95 +255,95 @@ export function StudentJourneySummary({
     () => computeWatchouts(student, events, ratingForWatchouts),
     [student, events, ratingForWatchouts],
   );
+  const isComplete = student.stageProgress >= 4;
+  const showWatchouts = !hideAi && watchouts.length > 0;
+
+  const ratingBadge = !hideAi
+    ? <StudentRatingBadge state={ratingState} generate={generateRating} />
+    : null;
+
+  const identityBlock = (
+    <>
+      <div className="flex flex-col gap-1.5 min-w-0">
+        <ReportEyebrow>EMCI Student Record</ReportEyebrow>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 truncate">
+          {displayName}
+        </h1>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide ${statusStyles.pill}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusStyles.dot}`} />
+          {student.status}
+        </span>
+        {schoolName && (
+          <span className="text-sm font-medium text-slate-600">{schoolName}</span>
+        )}
+        {yearBadge !== '—' && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md border border-slate-200/80 bg-slate-50/80 text-xs font-medium text-slate-600">
+            {yearBadge}
+          </span>
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div className="flex flex-col gap-5 p-6">
 
-      {/* ── Student header card ── */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {isComplete ? (
+        /* ── Completed: identity card (left) + programme record card (right) ── */
+        <div className="grid grid-cols-5 gap-5 items-stretch">
+          <div className="col-span-2 bg-white rounded-xl border border-slate-200 p-6 flex flex-col justify-center gap-3 min-w-0">
+            {identityBlock}
+          </div>
 
-        {/* Name + status + school */}
-        <div className="px-6 pt-6 pb-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-3 min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 truncate">
-                {displayName}
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide ${statusStyles.pill}`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusStyles.dot}`} />
-                  {student.status}
-                </span>
-                {schoolName && (
-                  <span className="text-sm font-medium text-slate-600">{schoolName}</span>
-                )}
-                {yearBadge !== '—' && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md border border-slate-200/80 bg-slate-50/80 text-xs font-medium text-slate-600">
-                    {yearBadge}
-                  </span>
-                )}
+          <div className="col-span-3 bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+            <CompletedJourneyPanel
+              events={events}
+              watchouts={showWatchouts ? watchouts : []}
+              ratingBadge={ratingBadge ?? undefined}
+            />
+            {!hideAi && ratingState.status === 'success' && (
+              <div className="mt-auto px-6 py-5 border-t border-slate-100 space-y-2.5">
+                <ReportEyebrow right="Weighted rubric · 0–100">Tracking Indicators</ReportEyebrow>
+                <StudentRatingBreakdown
+                  rating={ratingState.rating}
+                  columnsClass="grid-cols-2 sm:grid-cols-3"
+                />
               </div>
-            </div>
-            {!hidePii && <StudentRatingBadge state={ratingState} generate={generateRating} />}
-          </div>
-
-          {!hidePii && ratingState.status === 'success' && (
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <StudentRatingBreakdown rating={ratingState.rating} />
-            </div>
-          )}
-
-          {!hidePii && watchouts.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <StudentWatchouts watchouts={watchouts} />
-            </div>
-          )}
-        </div>
-
-        {/* ── Progress stepper ── */}
-        <div className="border-t border-slate-100 px-8 py-5">
-          <div className="flex items-center">
-            {STEPS.map((step, i) => {
-              const status = getStepStatus(step.key, student.stageProgress);
-              const StepIcon = status === 'done' ? Check : step.Icon;
-              return (
-                <React.Fragment key={step.key}>
-                  <div className="flex flex-col items-center gap-2 shrink-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      status === 'done'
-                        ? 'bg-primary shadow-sm shadow-primary/30'
-                        : status === 'current'
-                        ? 'bg-primary ring-4 ring-primary/15 shadow-sm shadow-primary/30'
-                        : 'border-2 border-slate-300 bg-white'
-                    }`}>
-                      <StepIcon
-                        className={`w-4 h-4 ${status === 'pending' ? 'text-slate-400' : 'text-white'}`}
-                        strokeWidth={2.25}
-                      />
-                    </div>
-                    <span className={`text-xs font-medium tracking-tight transition-colors duration-300 ${
-                      status === 'pending'
-                        ? 'text-slate-400'
-                        : status === 'current'
-                        ? 'text-slate-900'
-                        : 'text-slate-600'
-                    }`}>
-                      {step.label}
-                    </span>
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <div className={`flex-1 h-0.5 mb-5 mx-2 rounded-full transition-colors duration-300 ${
-                      status === 'done' ? 'bg-primary' : 'bg-slate-200'
-                    }`} />
-                  )}
-                </React.Fragment>
-              );
-            })}
+            )}
           </div>
         </div>
-      </div>
+      ) : (
+        /* ── In progress: single full-width header card ── */
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-6 pt-6 pb-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-3 min-w-0">
+                {identityBlock}
+              </div>
+              {ratingBadge}
+            </div>
+
+            {!hideAi && ratingState.status === 'success' && (
+              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2.5">
+                <ReportEyebrow right="Weighted rubric · 0–100">Tracking Indicators</ReportEyebrow>
+                <StudentRatingBreakdown rating={ratingState.rating} />
+              </div>
+            )}
+
+            {showWatchouts && (
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <StudentWatchouts watchouts={watchouts} />
+              </div>
+            )}
+          </div>
+
+          <StudentJourneyStepper student={student} events={events} />
+        </div>
+      )}
 
       {/* ── Analysis + Quick Insights ── */}
       <div className="grid grid-cols-5 gap-5">
@@ -366,15 +351,15 @@ export function StudentJourneySummary({
           student={student}
           events={events}
           schoolName={schoolName}
-          hidePii={hidePii}
+          hideAi={hideAi}
         />
         <div className="col-span-2">
-          <QuickInsightsPanel insights={insights} />
+          <QuickInsightsPanel insights={insights} events={events} />
         </div>
       </div>
 
       {/* ── Student Voice & Sentiment ── */}
-      {!hidePii && (
+      {!hideAi && (
         <StudentSentimentCard
           student={student}
           events={events}

@@ -27,6 +27,8 @@ export interface Student {
   hasProfile: boolean;
   studentType: string;
   lastActivity: string;
+  /** Dataverse `createdon` — when the student record was created in the CRM. */
+  createdAt?: string;
   avatar?: string;
   schoolId?: string;
   /** Dataverse choice value for deactivation reason (read-only in EMCI; maintained in Dataverse / automation). */

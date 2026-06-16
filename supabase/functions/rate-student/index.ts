@@ -8,11 +8,11 @@ const CATEGORY_KEYS = [
   "career_outcomes",
   "work_readiness",
   "attendance_momentum",
-  "growth_wellbeing",
+  "growth_sentiment",
 ] as const;
 
 const FLAGS = [
-  "wellbeing_concern",
+  "sentiment_concern",
   "attendance_risk",
   "disengaged",
   "stalled",
@@ -24,7 +24,7 @@ const SYSTEM_PROMPT = `You are a strict scoring engine for the EMCI (Enhanced My
 
 You are given a compact data packet about ONE student. Apply the rubric below EXACTLY and return JSON only. Use ONLY the provided data — never assume or invent. If a category has no supporting data in the packet, return null for that category's score.
 
-The packet's "sessionDetails" array is the per-session record of what actually happened: session length, intervention type, the intervention areas covered (Morrisby, Career Action Plan, industry engagement, work-experience preparation, work readiness, other), and — where the student gave feedback — their satisfaction with the session ("Session Satisfaction") and what they found useful ("Found Useful"). The packet's "timelineNotes" array and "notesRedacted" string contain redacted notes from timeline activity records. Read these to corroborate ENGAGEMENT breadth and, especially, to inform the GROWTH_WELLBEING helpfulness/sentiment/wellbeing read. They never override the deterministic flags (interventionAreas, careerSignals, hasProfile) — those remain authoritative for their point awards.
+The packet's "sessionDetails" array is the per-session record of what actually happened: session length, intervention type, the intervention areas covered (Morrisby, Career Action Plan, industry engagement, work-experience preparation, work readiness, other), and — where the student gave feedback — their satisfaction with the session ("Session Satisfaction") and what they found useful ("Found Useful"). The packet's "timelineNotes" array and "notesRedacted" string contain redacted notes from timeline activity records. Read these to corroborate ENGAGEMENT breadth and, especially, to inform the GROWTH_SENTIMENT helpfulness/sentiment read. They never override the deterministic flags (interventionAreas, careerSignals, hasProfile) — those remain authoritative for their point awards.
 
 Score five categories, each 0–100, by summing the listed points (cap each at 100). Work-readiness signals are scored ONLY in WORK_READINESS so nothing is double-counted:
 
@@ -50,10 +50,10 @@ The "reason" must only state facts supported by the packet evidence; never claim
 ATTENDANCE_MOMENTUM:
 - Attendance only (score 0–100 from absence count in the packet): 0 absences=100, 1–2=75, 3–5=40, >5=15 (treat unexplained absences as the harsher end)
 
-GROWTH_WELLBEING (read the free-text notes & survey comments):
+GROWTH_SENTIMENT (read the free-text notes & survey comments):
 - Preparedness + interests/strengths shift start→end: up to 40 (improvement high, no change ~20, decline low)
 - Helpfulness / positive programme sentiment: up to 30
-- Wellbeing read of notes/comments: up to 30 (clear positive signals high; concern signals low)
+- Sentiment read of notes/comments: up to 30 (clear positive signals high; concern signals low)
 
 Rules:
 - "reason" is a terse ≤12-word justification, no student names, no PII.
@@ -62,7 +62,8 @@ Rules:
 - Output must match the schema exactly. No extra text.`;
 
 interface RatingPacket {
-  stageProgress: number;
+  programmeProgressScore: string;
+  programmeStageProgress: number;
   status: string;
   interviewed: boolean;
   hasProfile: boolean;

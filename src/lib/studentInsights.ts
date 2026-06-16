@@ -2,7 +2,7 @@
  * Deterministic Quick Insights + pilot survey shifts.
  *
  * Computes the eight EMCI session intervention areas shown alongside the AI
- * Analysis Summary (Unpack, CAP, Work Readiness, Industry Engagement,
+ * Analysis Summary (Morrisby Unpack, CAP, Work Readiness, Industry Engagement,
  * External Support, WEX Preparation, Introduction, Other) directly from
  * counselling session records — no AI involvement.
  *
@@ -26,7 +26,7 @@ export interface YesNoInsight {
 }
 
 export const QUICK_INSIGHT_AREAS = [
-  { key: 'unpack',             label: 'Unpack',              pattern: /\bunpack\b|morrisby/i },
+  { key: 'unpack',             label: 'Morrisby Unpack',     pattern: /\bunpack\b/i },
   { key: 'cap',                label: 'CAP',                 pattern: /career\s*action\s*plan|\bcap\b/i },
   { key: 'workReadiness',      label: 'Work Readiness',      pattern: /work\s*readiness/i },
   { key: 'industryEngagement', label: 'Industry Engagement', pattern: /industry\s*engagement|\bindustry\b/i },
@@ -38,10 +38,14 @@ export const QUICK_INSIGHT_AREAS = [
 
 export type QuickInsightAreaKey = typeof QUICK_INSIGHT_AREAS[number]['key'];
 
+export const PILOT_SURVEY_STAGE_COUNT = 3;
+
 export interface QuickInsightCounts {
   sessionCount:    number;
   absenceCount:    number;
   absencesFlagged: boolean;
+  /** Distinct pilot survey stages completed (initial, mid, end) — max 3. */
+  surveyCount:     number;
 }
 
 export type QuickInsights = Record<QuickInsightAreaKey, YesNoInsight> & QuickInsightCounts;
@@ -74,6 +78,10 @@ export interface TimelineNote {
 
 const ABSENCE_FLAG_THRESHOLD = 3;
 
+// Free-text timeline notes recording an absence (e.g. "Student absent
+// 14.05.25") count alongside dedicated absence records.
+const ABSENCE_NOTE = /\babsen(?:t|ce|ces)\b/i;
+
 const WORK_EXP_LABEL = /work\s*experience/i;
 const AFFIRMATIVE    = /^(yes|true|completed|done|y)\b/i;
 const NOTE_LABEL     = /note|support|comment|reflection|goal|next step/i;
@@ -85,8 +93,14 @@ const PLACEHOLDER_NOTES = new Set([
   'Session notes not recorded.',
 ]);
 
+/** Student feedback labels — excluded from intervention keyword matching. */
+export const SESSION_FEEDBACK_FIELD_LABELS = ['Session Satisfaction', 'Found Useful'] as const;
+
+export function isSessionFeedbackField(label: string): boolean {
+  return (SESSION_FEEDBACK_FIELD_LABELS as readonly string[]).includes(label);
+}
+
 const DEDICATED_FIELD_LABELS: Partial<Record<QuickInsightAreaKey, string>> = {
-  unpack:             'Morrisby Activities',
   cap:                'Career Action Plan',
   industryEngagement: 'Industry Engagement',
   wexPreparation:     'Work Experience Prep',
@@ -111,6 +125,7 @@ function sessionTextParts(ev: TimelineEvent): string[] {
   const linked = (ev as TimelineEvent & { linkedInterventions?: string[] }).linkedInterventions;
   if (linked) parts.push(...linked);
   for (const f of ev.surveyFields ?? []) {
+    if (isSessionFeedbackField(f.label)) continue;
     parts.push(f.label, f.value);
   }
   return parts;
@@ -124,13 +139,30 @@ function dedicatedFieldPresent(ev: TimelineEvent, key: QuickInsightAreaKey): boo
   );
 }
 
+function fieldValueMatches(ev: TimelineEvent, label: string, pattern: RegExp): boolean {
+  const field = (ev.surveyFields ?? []).find(f => f.label === label);
+  if (!field?.value.trim()) return false;
+  return field.value.split(';').some(token => pattern.test(token.trim()));
+}
+
 function interventionAreasMatch(ev: TimelineEvent, pattern: RegExp): boolean {
-  const areas = (ev.surveyFields ?? []).find(f => f.label === 'Intervention Areas');
-  if (!areas?.value.trim()) return false;
-  return areas.value.split(';').some(token => pattern.test(token.trim()));
+  return fieldValueMatches(ev, 'Intervention Areas', pattern);
+}
+
+// Morrisby Unpack must reflect an actual "Unpack" intervention, not the mere
+// presence of any Morrisby activity. Match only the structured intervention
+// field values (Morrisby Activities, Intervention Areas, Intervention Type) so
+// free-text notes mentioning "unpack" never trigger a false positive.
+function morrisbyUnpackPresent(ev: TimelineEvent, pattern: RegExp): boolean {
+  return (
+    fieldValueMatches(ev, 'Morrisby Activities', pattern) ||
+    fieldValueMatches(ev, 'Intervention Areas', pattern) ||
+    fieldValueMatches(ev, 'Intervention Type', pattern)
+  );
 }
 
 function sessionHasArea(ev: TimelineEvent, key: QuickInsightAreaKey, pattern: RegExp): boolean {
+  if (key === 'unpack') return morrisbyUnpackPresent(ev, pattern);
   const haystack = sessionTextParts(ev).join(' ');
   if (pattern.test(haystack)) return true;
   if (interventionAreasMatch(ev, pattern)) return true;
@@ -153,6 +185,26 @@ function detectInterventionAreas(events: TimelineEvent[]): QuickInsights {
 
 function countSessions(events: TimelineEvent[]): number {
   return events.reduce((n, ev) => (ev.type === 'session' ? n + 1 : n), 0);
+}
+
+function isAbsenceNote(ev: TimelineEvent): boolean {
+  return (
+    ev.type === 'note' &&
+    (ABSENCE_NOTE.test(ev.title) || ABSENCE_NOTE.test(ev.notes ?? ''))
+  );
+}
+
+function countAbsenceNotes(events: TimelineEvent[]): number {
+  return events.reduce((n, ev) => (isAbsenceNote(ev) ? n + 1 : n), 0);
+}
+
+function countSurveyStages(events: TimelineEvent[]): number {
+  const stages = new Set<SurveyStage>();
+  for (const ev of events) {
+    const stage = stageFromEvent(ev);
+    if (stage) stages.add(stage);
+  }
+  return stages.size;
 }
 
 function stageFromEvent(ev: TimelineEvent): SurveyStage | null {
@@ -187,13 +239,81 @@ export function computeQuickInsights(
   student: Student,
   events:  TimelineEvent[],
 ): QuickInsights {
-  const absenceCount = student.absenceCount;
+  const absenceCount = student.absenceCount + countAbsenceNotes(events);
   return {
     ...detectInterventionAreas(events),
     sessionCount:    countSessions(events),
     absenceCount,
     absencesFlagged: absenceCount > ABSENCE_FLAG_THRESHOLD,
+    surveyCount:     countSurveyStages(events),
   };
+}
+
+// ── Quick Insight drill-down details ─────────────────────────────────────────
+
+export interface InsightDetailItem {
+  date:  string;
+  title: string;
+  note?: string;
+}
+
+export type QuickInsightDetailKey = QuickInsightAreaKey | 'sessions' | 'absences' | 'surveys';
+
+const SURVEY_STAGE_LABELS: Record<SurveyStage, string> = {
+  start: 'Initial pilot survey',
+  mid:   'Mid pilot survey',
+  end:   'End of pilot survey',
+};
+
+/**
+ * Records behind each Quick Insights tile, using the same matching logic as
+ * the yes/no flags so a tile's detail always agrees with its value.
+ */
+export function buildQuickInsightDetails(
+  events: TimelineEvent[],
+): Record<QuickInsightDetailKey, InsightDetailItem[]> {
+  const details = Object.fromEntries(
+    QUICK_INSIGHT_AREAS.map(a => [a.key, []]),
+  ) as Record<QuickInsightDetailKey, InsightDetailItem[]>;
+  details.sessions = [];
+  details.absences = [];
+  details.surveys  = [];
+
+  for (const ev of events) {
+    if (ev.type === 'session') {
+      const item: InsightDetailItem = {
+        date:  ev.date,
+        title: ev.title,
+        note:  ev.interventionType,
+      };
+      details.sessions.push(item);
+      for (const area of QUICK_INSIGHT_AREAS) {
+        if (sessionHasArea(ev, area.key, area.pattern)) {
+          details[area.key].push(item);
+        }
+      }
+    } else if (ev.type === 'absence' || isAbsenceNote(ev)) {
+      details.absences.push({
+        date:  ev.date,
+        title: ev.title,
+        note:  ev.notes || undefined,
+      });
+    } else {
+      const stage = stageFromEvent(ev);
+      if (stage) {
+        details.surveys.push({
+          date:  ev.date,
+          title: ev.title,
+          note:  SURVEY_STAGE_LABELS[stage],
+        });
+      }
+    }
+  }
+
+  for (const items of Object.values(details)) {
+    items.sort((a, b) => a.date.localeCompare(b.date));
+  }
+  return details;
 }
 
 export function buildSurveyShifts(events: TimelineEvent[]): SurveyShift[] {
@@ -227,10 +347,13 @@ export function buildSessionDetails(events: TimelineEvent[]): SessionDetail[] {
     ) {
       fields['Notes'] = ev.notes;
     }
-    // Per-session student feedback — read from dedicated event fields rather than
-    // surveyFields so the deterministic detectors never see (and mis-match) them.
-    if (ev.sessionSatisfaction) fields['Session Satisfaction'] = ev.sessionSatisfaction;
-    if (ev.sessionUseful)       fields['Found Useful']         = ev.sessionUseful;
+    // Fallback for events that carry feedback on dedicated fields only.
+    if (ev.sessionSatisfaction && !fields['Session Satisfaction']) {
+      fields['Session Satisfaction'] = ev.sessionSatisfaction;
+    }
+    if (ev.sessionUseful && !fields['Found Useful']) {
+      fields['Found Useful'] = ev.sessionUseful;
+    }
     details.push({
       date:             ev.date,
       title:            ev.title,
@@ -265,6 +388,7 @@ export function buildTimelineNotes(student: Student, events: TimelineEvent[]): T
   };
 
   for (const ev of events) {
+    if (ev.type === 'referral') continue;
     addNote(ev, ev.notes);
     for (const field of ev.surveyFields ?? []) {
       if (NOTE_LABEL.test(field.label)) {

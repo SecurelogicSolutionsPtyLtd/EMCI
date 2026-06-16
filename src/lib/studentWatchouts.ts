@@ -29,7 +29,7 @@ export interface Watchout {
 
 const DORMANT_ACTIVE_DAYS = 90; // Active but no activity for this long
 const STALL_DAYS          = 60; // in-progress and idle for this long
-const CONSENT_STALL_DAYS  = 90; // referred this long ago, still pre-guidance
+const CONSENT_STALL_DAYS  = 90; // at consent this long, still pre-guidance
 const HIGH_ABSENCE_COUNT  = 5;  // more than this many absences
 
 const SEVERITY_ORDER: Record<WatchoutSeverity, number> = {
@@ -62,14 +62,6 @@ function isInProgress(student: Student): boolean {
 
 function countSessions(events: TimelineEvent[]): number {
   return events.reduce((n, e) => (e.type === 'session' ? n + 1 : n), 0);
-}
-
-function earliestReferralDays(events: TimelineEvent[]): number | null {
-  const referralDates = events
-    .filter(e => e.type === 'referral' && e.date)
-    .map(e => e.date)
-    .sort();
-  return referralDates.length > 0 ? daysSince(referralDates[0]) : null;
 }
 
 function joinList(items: string[]): string {
@@ -153,14 +145,20 @@ export function computeWatchouts(
     });
   }
 
-  // 5. Consent stall — referred long ago, still pre-guidance.
-  const referralDays = earliestReferralDays(events);
-  if (referralDays !== null && referralDays > CONSENT_STALL_DAYS && inProgress && student.stageProgress < 3) {
-    out.push({
-      id: 'consent-stall',
-      severity: 'watch',
-      label: `Referred ${referralDays} days ago, not yet in guidance`,
-    });
+  // 5. Consent stall — at consent a long time, still pre-guidance.
+  if (
+    (student.currentStage === 'consent' || student.currentStage === 'referral') &&
+    inProgress &&
+    student.stageProgress < 3
+  ) {
+    const idleAtConsent = daysSinceLastActivity(student, events);
+    if (idleAtConsent !== null && idleAtConsent > CONSENT_STALL_DAYS) {
+      out.push({
+        id: 'consent-stall',
+        severity: 'watch',
+        label: `At consent ${idleAtConsent} days, not yet in guidance`,
+      });
+    }
   }
 
   // 6. Deactivation recorded but still marked Active.
@@ -200,11 +198,11 @@ export function computeWatchouts(
     const lowConfidence = rating.confidence === 'low';
     const verifyHint = lowConfidence ? 'Limited data — verify first.' : undefined;
 
-    if (rating.flags.includes('wellbeing_concern')) {
+    if (rating.flags.includes('sentiment_concern')) {
       out.push({
-        id: 'wellbeing-concern',
+        id: 'sentiment-concern',
         severity: 'action',
-        label: 'Wellbeing concern flagged — review notes',
+        label: 'Sentiment concern flagged — review notes',
         detail: verifyHint,
       });
     }

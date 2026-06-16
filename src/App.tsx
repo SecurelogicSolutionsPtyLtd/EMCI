@@ -40,8 +40,8 @@ import {
   type RawAnnotation,
 } from './services/dataverse';
 import { getRoleGroup, ROLE_LABELS } from './types/roles';
+import { redactSensitiveEventsMap } from './redaction';
 import { Eye, RotateCcw } from 'lucide-react';
-import { ProgramDataSkeleton } from './components/skeletons/ProgramDataSkeleton';
 import { EmciLoadingScreen } from './components/EmciLoadingScreen';
 import { MainShell } from './routes/MainShell';
 import { OutletContextBridge } from './routes/OutletContextBridge';
@@ -179,7 +179,9 @@ function AppInner() {
 
       setStudents(enriched);
       setSchools(fetchedSchools);
-      setStudentEventsMap(eventsMap);
+      // Sensitive info (health, disability, family, contact details) is
+      // redacted at this choke point so no consumer ever sees raw data.
+      setStudentEventsMap(redactSensitiveEventsMap(eventsMap));
       hasLoadedRef.current = true;
       return enriched;
     } catch (e: any) {
@@ -390,15 +392,6 @@ function AppInner() {
             </Route>
           </Routes>
         </div>
-        {dataLoading && hasLoadedRef.current && (
-          <div
-            className="absolute inset-0 z-[120] bg-slate-50/95 backdrop-blur-[2px] overflow-hidden"
-            aria-busy="true"
-            aria-live="polite"
-          >
-            <ProgramDataSkeleton />
-          </div>
-        )}
       </div>
     </>
   );

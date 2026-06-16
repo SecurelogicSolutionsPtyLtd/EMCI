@@ -71,6 +71,8 @@ export function buildSessionFields(
     { label: 'Other Intervention', value: fmt('cr89a_interventionother_ms') },
     { label: 'External Support',   value: s.cr89a_externalsupportdetails as string | null },
     { label: 'Notes',              value: stripHtml(s.cr89a_internalnotes) },
+    { label: 'Session Satisfaction', value: fmt('cr89a_studentsatisfactiontodayssession') },
+    { label: 'Found Useful',         value: fmt('cr89a_whatdidyoufindusefulintodayssession') },
   ]);
 }
 

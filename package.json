@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/lib/studentRedaction.test.ts"
+    "test": "tsx --test src/lib/studentRedaction.test.ts src/redaction/smartRedaction.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -23,6 +23,8 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "html2canvas-pro": "^2.0.4",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.0",

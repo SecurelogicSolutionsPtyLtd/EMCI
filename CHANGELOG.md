@@ -5,7 +5,143 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-03 (latest)
+## — 2026-06-16 (latest)
+
+### Added: Permanently remove a team member
+
+- Team Management now has a **Remove** action (alongside the existing **Deactivate**/**Reactivate**) that permanently deletes a user. It shows a confirmation modal, then deletes both the `emci_user_roles` row **and** the Supabase Auth user via a new `delete-user` Edge Function ([`supabase/functions/delete-user/index.ts`](supabase/functions/delete-user/index.ts), [`src/services/supabase.ts`](src/services/supabase.ts), [`src/components/TeamManagement.tsx`](src/components/TeamManagement.tsx)).
+- This fixes the case where re-inviting a previously **deactivated** user silently reactivated them: deactivation is a soft, reversible action (and re-inviting reactivates by design), whereas **Remove** fully deletes the account so a later invite is a clean, fresh invite.
+
+---
+
+## — 2026-06-15
+
+### Fixed: Deactivate user now fully blocks access and requires confirmation
+
+- Clicking **Deactivate** in Team Management now shows a confirmation modal before proceeding, preventing accidental deactivations.
+- Deactivation is now fully applied at both the database and auth layers: the `emci_user_roles` row is set to `is_active = false` **and** the Supabase Auth user is banned (effectively permanently), so they cannot log in or hold a session while inactive. Reactivating a user reverses both — the DB flag and the auth ban are both cleared.
+- A new `toggle-user-active` Supabase Edge Function handles the combined DB + auth admin operation using the service-role key ([`supabase/functions/toggle-user-active/index.ts`](supabase/functions/toggle-user-active/index.ts)).
+- Previously, only the `is_active` column was updated — the Supabase Auth user remained unbanned and could still authenticate.
+
+---
+
+### Fixed: MFA onboarding page no longer loops "factor already exists" error
+
+- When a user switched to their authenticator app and returned, the browser could perform a full page reload (e.g. iOS tab eviction), resetting all React state. On reload, `startEnrolment()` ran fresh but Supabase still held the previous unverified TOTP factor, returning "A factor with the friendly name "" for this user already exists" on every attempt — looping indefinitely. Fixed in three places:
+  - **`LoginPage.tsx`** (root fix): `startEnrolment()` now calls `getMfaFactors()` first and unenrolls any leftover unverified factor via `unenrollMfa()` before creating a new one. This handles full page reloads cleanly — the user gets a fresh QR code every time.
+  - **`AuthContext.tsx`**: Added a `stageRef` kept in sync with the current stage. The `onAuthStateChange` handler now passes `silent: true` during active MFA flow (`mfa_enroll` / `mfa_required`), preventing the `loading → mfa_enroll` flash that could re-trigger enrolment on desktop tab-switches without a full reload.
+  - **`LoginPage.tsx`** (guard): The `useEffect` that starts enrolment/verification now checks `!mfaFactorId` / `!mfaChallengeId` before calling, so it is a no-op if the flow is already in progress.
+
+---
+
+### Added: EMCI-branded invite user email template
+
+- Created a custom HTML email template (`supabase/email-templates/invite-user.html`) for the Supabase "Invite user" auth email. Template uses EMCI brand colours (navy `#0F172A`, orange `#ec5b13`, accent blue `#2563EB`), the EMCI logo lockup served from `{{ .SiteURL }}/emci-logo-lockup.png`, and all required Supabase template variables (`{{ .ConfirmationURL }}`, `{{ .Email }}`). Designed for broad email-client compatibility using table-based layout.
+
+---
+
+### Added: Supabase invite email when adding a team member
+
+- When an admin adds a new team member (DE admin, school staff, school admin, etc.) via Team Management, the user is now inserted into `emci_user_roles` **and** automatically sent a Supabase invite email containing a sign-in link. A new `invite-user` Supabase Edge Function handles both operations using the service-role key. The "Add user" button is now labelled **"Add & send invite"** to reflect this ([`supabase/functions/invite-user/index.ts`](supabase/functions/invite-user/index.ts), [`src/services/supabase.ts`](src/services/supabase.ts), [`src/components/TeamManagement.tsx`](src/components/TeamManagement.tsx)).
+
+---
+
+### Removed: Secondary skeleton loader on data refresh
+
+- The `ProgramDataSkeleton` overlay that appeared over the app during background data refreshes has been removed. The branded `EmciLoadingScreen` is now the sole loading UI — it covers initial auth, platform connection, and the first programme-data fetch. Background refreshes now complete silently without blocking the UI ([`src/App.tsx`](src/App.tsx)).
+
+---
+
+## — 2026-06-11
+
+### Fixed: AI analysis no longer reports "Current Work" for students who only want a job
+
+- The **Current Work** highlight chip on the Analysis Summary was being inferred from statements of intent (e.g. "I would like a part-time job as soon as possible"), wrongly labelling students as currently employed. The `analyze-student` prompt now requires the data to show a job the student currently holds or completed work experience, and explicitly forbids inferring it from a desire or plan to find work ([`supabase/functions/analyze-student/index.ts`](supabase/functions/analyze-student/index.ts), deployed as v7).
+
+### Fixed: Quick Insights now counts absences recorded as timeline notes
+
+- The **Absences** tile in Quick Insights previously only counted dedicated absence records, so absences recorded as free-text notes (e.g. "Student absent 14.05.25") showed as 0. Timeline notes mentioning an absence are now included in the absence count, and appear in the Absences drill-down panel ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+
+### Changed: Completed students get a split identity / programme record header
+
+- For students who have completed the programme, the student header is now two side-by-side cards: a left identity card (EMCI Student Record eyebrow, name, status pill, school, year level) and a right programme record card with the minimal **Programme Complete** band (check emblem, journey evidence line, tracking-score badge), quiet watch-out chips, and the Tracking Indicators rubric tiles wrapped to three columns ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx)).
+- In-progress students keep the original single full-width header card (name and score badge, Tracking Indicators, watch-outs, and the progress stepper).
+
+### Changed: Student journey stepper now shows real completion details
+
+- Completed stepper steps now surface evidence from the activity timeline instead of a generic "Completed" label: the Referral step shows its completion date, Career Guidance shows the number of sessions held and the date of the last one, and Complete shows the programme finish date ([`src/components/StudentJourneyStepper.tsx`](src/components/StudentJourneyStepper.tsx)).
+- Students who have finished the programme now get a minimal **Programme Complete** band at the very top of the student header card: an emerald check emblem, then one quiet reading line of journey evidence (referral date · guidance session count and last session date · finish date) with the tracking-score badge on the right ([`src/components/CompletedJourneyPanel.tsx`](src/components/CompletedJourneyPanel.tsx)). The stepper, standalone watch-outs section and duplicate score badge no longer render for completed students.
+- Watch-outs in the completion band use a new quiet style — neutral chips with a small severity-coloured dot, indented under the completion line — so they no longer compete with the band's colours; the regular Watch-Outs section elsewhere is unchanged ([`src/components/StudentWatchouts.tsx`](src/components/StudentWatchouts.tsx)).
+- The stepper was extracted from `StudentJourneySummary` into its own component with no change to step-status logic ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+
+### Changed: Dashboard redesigned as an official programme overview
+
+- The dashboard home now follows the official government/report design language: a letterhead panel (**EMCI · Official Programme Overview**) with reporting date, visible scope line, and an `Authorised access` chip; a divided KPI strip; and a confidential-use footer rule ([`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx)).
+- The page now uses the full available width with a true dashboard layout: letterhead and KPI strip span across the top, programme data (stage distribution, schools register) sits in a wide left column, and an **Advisories** rail (at-risk notice or all-clear state) plus Records & Registers sit in a right column.
+- New **Programme Stage Distribution** section: an animated segmented bar with a legend showing counts and percentages across Not Started, Initial Intake, Consent, Career Guidance, and Job Ready ([`src/components/dashboard/DashboardStageDistribution.tsx`](src/components/dashboard/DashboardStageDistribution.tsx)).
+- New **Schools Register** snapshot (network-scope roles only): the five largest school cohorts with status, completion bars, and student counts, linking through to the full schools directory ([`src/components/dashboard/DashboardSchoolsSnapshot.tsx`](src/components/dashboard/DashboardSchoolsSnapshot.tsx)).
+- New at-risk advisory notice strip surfaces the number of flagged students within the user's scope.
+- Schools/Students quick links restyled as formal **Records & Registers** entries with primary left-rule accents; all sections use a shared accent-rule heading primitive ([`src/components/dashboard/DashboardQuickAccess.tsx`](src/components/dashboard/DashboardQuickAccess.tsx), [`src/components/dashboard/DashboardSectionHeading.tsx`](src/components/dashboard/DashboardSectionHeading.tsx)).
+
+### Fixed: Dashboard schools register rows now open the selected school
+
+- Clicking a school row in the dashboard's **Schools Register — Largest Cohorts** now opens that school's dashboard (`/school/:schoolId`) instead of the general schools directory, using the same role gate as the Schools page; roles without school-dashboard access still fall back to the directory ([`src/components/dashboard/DashboardSchoolsSnapshot.tsx`](src/components/dashboard/DashboardSchoolsSnapshot.tsx), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx)).
+
+### Changed: School dashboard redesigned in the official programme style
+
+- The school dashboard now matches the dashboard home's official design language: a letterhead panel (**EMCI · Official School Record**) with the school name, status chip, Morrisby ID and region; a divided KPI ledger strip with progress bars; and a confidential footer rule with the last-synced timestamp ([`src/components/SchoolDashboard.tsx`](src/components/SchoolDashboard.tsx)).
+- Page restructured into a full-width two-column dashboard: the **Student Register** (search, filters, table, pagination — extracted unchanged into [`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx)) sits in the wide left column; the right rail carries **Advisories** (school at-risk count or all-clear), the **Programme Stage Distribution** for the school cohort, and a new **School Particulars** register (Morrisby ID, region, principal contact, status, joined year) ([`src/components/dashboard/SchoolParticularsPanel.tsx`](src/components/dashboard/SchoolParticularsPanel.tsx)).
+- The letterhead and advisories treatments are now shared primitives used by both dashboards ([`src/components/dashboard/DashboardLetterhead.tsx`](src/components/dashboard/DashboardLetterhead.tsx), [`src/components/dashboard/DashboardAdvisories.tsx`](src/components/dashboard/DashboardAdvisories.tsx)).
+
+### Removed: Standalone metric card grid
+
+- `MetricCardGrid` removed — its only consumer (the school dashboard) now uses the official divided KPI ledger strip.
+
+### Added: Clickable Quick Insights tiles with record drill-down
+
+- Every Quick Insights tile is now clickable: selecting a tile opens an official-style slide-over panel on the right showing the underlying timeline entries — session dates for **Sessions**, recorded absences with reasons for **Absences**, completed pilot survey stages for **Surveys**, and the specific sessions where each intervention area was recorded ([`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx), [`src/components/QuickInsightDetail.tsx`](src/components/QuickInsightDetail.tsx)).
+- The panel carries the document design language: slate header band with primary accent rule and the tile's value, numbered records with full (untruncated) notes, and a `Source: Student Activity Timeline` footer. It closes via the close control, backdrop click, Escape, or re-clicking the selected tile.
+- Detail records are derived with the exact same matching logic as the yes/no flags, so a tile's drill-down always agrees with its value ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts)).
+
+### Changed: Tracking-score badge now explains what the score means
+
+- The tracking-score ring in the student journey header no longer shows a bare number: it now pairs the ring with the plain-language band the score falls into — **On Track**, **Progressing**, **Monitoring** or **Needs Attention** — coloured to match, plus a `Tracking score · out of 100` context line ([`src/components/StudentRatingBadge.tsx`](src/components/StudentRatingBadge.tsx)).
+- Hovering the badge reveals the full band scale (80–100 On Track · 65–79 Progressing · 45–64 Monitoring · below 45 Needs Attention), and the badge's accessible label now reads the score and band aloud rather than just "Tracking score".
+
+### Changed: Student header card given a lighter official-record treatment
+
+- The student journey header card now nods to the document style without repeating the full header-band treatment, via a new lightweight `ReportEyebrow` primitive — a small primary marker beside a tiny uppercase label, with an optional right-aligned hint ([`src/components/ReportCard.tsx`](src/components/ReportCard.tsx)).
+- An **EMCI Student Record** eyebrow now sits above the student name; the tracking-score breakdown gains a **Tracking Indicators** eyebrow with a `Weighted rubric · 0–100` hint; the watch-outs strip uses the same eyebrow with a flagged count ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/StudentWatchouts.tsx`](src/components/StudentWatchouts.tsx)).
+- The progress stepper now mirrors the PDF concept's stage timeline: each step shows a tiny uppercase stage name (primary-coloured when active) over a status line (**Completed** / **Active Stage** / **Upcoming**) ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- Tracking-indicator tile labels use the bolder tracked uppercase style, and watch-out chips are squared (`rounded-md`) with semibold labels for a more formal read ([`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx), [`src/components/StudentWatchouts.tsx`](src/components/StudentWatchouts.tsx)).
+
+### Changed: Analysis Summary & Quick Insights restyled in official document style
+
+- The **Analysis Summary** and **Quick Insights** cards now share the same official report design language as the Student Voice & Sentiment card: a slate header band with primary left-accent rule and subtitle, uppercase section headings, and (for AI content) the two-sided document footer disclaimer ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx)).
+- Analysis Summary content is now organised under `Key Indicators` (highlight chips) and `Summary of Findings` (tinted prose panel) headings, in both current and out-of-date states.
+- Quick Insights `Attendance` and `Interventions` labels use the shared accent-rule section heading style; the card stretches to match the Analysis Summary height.
+- The header band, section heading, and footer are extracted into shared primitives used by all three cards ([`src/components/ReportCard.tsx`](src/components/ReportCard.tsx)).
+
+### Changed: Student Voice & Sentiment card redesigned in official document style
+
+- The Student Voice & Sentiment card now follows the official report design language from the PDF export concept: a slate header band with a primary left-accent rule and registry-style subtitle, uppercase `Summary of Findings` / `In Their Own Words` section headings, and the AI summary presented in a formal tinted panel ([`src/components/StudentSentimentCard.tsx`](src/components/StudentSentimentCard.tsx)).
+- Quotes are restyled as numbered verbatim records (`Record 01`, `Record 02`, …) with a sentiment-coloured left rule, a tone tag (**Positive** / **Concern** / **Neutral**), and a separated `Source field` citation line — plus a verbatim record count beside the section heading.
+- The sentiment badge is now a squared, uppercase document-style chip, and the footer carries a two-sided disclaimer (`AI-Generated · For Guidance Purposes Only` / `Not an Official Assessment`).
+
+### Added: Smart sensitive-information redaction
+
+- New two-tier redaction system removes sensitive student information (medications, health conditions, disabilities, family/parent details, contact details, welfare matters) from all timeline content **before it is displayed to any user** ([`src/redaction/`](src/redaction/)).
+  - **Tier 1 (instant, pattern-based):** applied at the single data choke point where the student events map is built, so every consumer — student journey, PDF export, survey search, AI prompts — only ever receives redacted data ([`src/App.tsx`](src/App.tsx), [`src/redaction/smartRedaction.ts`](src/redaction/smartRedaction.ts), [`src/redaction/sensitivePatterns.ts`](src/redaction/sensitivePatterns.ts)).
+  - **Tier 2 (AI deep scan):** a new `redact-sensitive` Supabase Edge Function (OpenAI) detects sensitive disclosures the patterns miss; results are cached per text for the session and applied on the student journey page. If the AI call fails, content stays pattern-redacted — the UI never blocks ([`supabase/functions/redact-sensitive/index.ts`](supabase/functions/redact-sensitive/index.ts), [`src/redaction/useAiRedaction.ts`](src/redaction/useAiRedaction.ts), [`src/routes/StudentJourneyRoute.tsx`](src/routes/StudentJourneyRoute.tsx)).
+  - Routine programme wording such as "parental consent obtained" is allowlisted and never redacted.
+
+### Added: Pilot survey count in Quick Insights
+
+- Quick Insights now shows **Surveys** as a score out of 3 (initial, mid, and end pilot surveys), derived from distinct completed survey stages on the student timeline ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts), [`src/components/QuickInsightsPanel.tsx`](src/components/QuickInsightsPanel.tsx)).
+
+---
+
+## — 2026-06-03
 
 ### Added: Pinnable main sidebar layout
 

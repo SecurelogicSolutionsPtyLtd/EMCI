@@ -19,10 +19,9 @@ const SYSTEM_PROMPT = `You are a professional career counsellor working within t
 EMCI supports Year 9 and 10 students from priority cohorts — Koorie students, students in out-of-home care, students engaged with Youth Justice, and students with disabilities who experience significant disadvantage. The program connects these students with additional career guidance supports and work-based learning opportunities through ACCE (Australian Centre for Career Education).
 
 The program stages are:
-1. Referral — student is referred into EMCI and initial engagement begins
-2. Consent — parental/guardian consent obtained
-3. Career Guidance — student is actively engaged in career consultations, Morrisby profiling, and work readiness activities
-4. Complete — student has finished the EMCI programme
+1. Consent — parental/guardian consent obtained (initial intake)
+2. Career Guidance — student is actively engaged in career consultations, Morrisby profiling, and work readiness activities
+3. Complete — student has finished the EMCI programme
 
 You must return a JSON object with two fields: "analysis" and "highlights".
 
@@ -30,15 +29,16 @@ You must return a JSON object with two fields: "analysis" and "highlights".
 - Refer to "the student" or "they" — never use the student's name.
 - Reference the Quick Insight categories (Career Action Plan, Morrisby Unpack, Morrisby Profile, Work Experience, Absences) where they meaningfully inform the picture. Explicitly flag absences when the absences entry is flagged.
 - When pilot survey data is provided for more than one stage (start / mid / end), describe how the student's responses shifted across those stages — focus on perceptions like preparedness, understanding of interests and strengths, programme helpfulness, work-experience exposure, and any change in focus.
-- Use the timeline notes when they clarify engagement, barriers, goals, wellbeing, or recommended next steps. Do not invent detail beyond those notes.
+- Use the timeline notes when they clarify engagement, barriers, goals, sentiment, or recommended next steps. Do not invent detail beyond those notes.
 - Be direct, positive where appropriate, and clearly flag any areas needing attention.
 - Do not include sensitive personal information beyond what is provided.
 
 "highlights" — an array of AT MOST 3 at-a-glance highlight chips that let a practitioner instantly recognise the student. Only include a highlight when it is clearly supported by the provided data (especially the pilot survey fields). Prefer these three categories, in priority order, and omit any that are unknown (return an empty array if none apply):
 1. Career Interest — the job, industry, or aspiration the student is drawn to (e.g. "Firefighter", "Nursing", "Trades").
 2. Strength — a talent, subject, or interest the student identifies with (e.g. "Music", "Sport", "Art").
-3. Current Work — a part-time job or completed work experience (e.g. "KFC", "Retail", "Hospitality").
+3. Current Work — a part-time job the student CURRENTLY holds or work experience they have ALREADY completed (e.g. "KFC", "Retail", "Hospitality").
 Rules for highlights:
+- Never infer "Current Work" from a stated desire, plan, or intention to find work (e.g. "I would like a part-time job", "interested in part-time work in supermarkets"). If the data only shows the student wants work, omit the Current Work chip entirely.
 - "label" is the short category name (e.g. "Career Interest", "Strength", "Current Work").
 - "value" is a SHORT 1–3 word value. Never include names, addresses, or other sensitive identifiers.
 - "icon" MUST be exactly one key from this allowlist, choosing the best visual fit: ${HIGHLIGHT_ICONS.join(", ")}.`;
@@ -93,11 +93,35 @@ interface TimelineNoteInput {
   note:  string;
 }
 
+const PROGRAMME_STAGE_TOTAL = 3;
+
+function programmeProgressStep(stageProgress: number): number {
+  return Math.max(0, Math.min(PROGRAMME_STAGE_TOTAL, stageProgress - 1));
+}
+
+function formatProgrammeProgressScore(stageProgress: number): string {
+  return `${programmeProgressStep(stageProgress)}/${PROGRAMME_STAGE_TOTAL}`;
+}
+
+function formatProgrammeStageLabel(stage: string | null): string {
+  switch (stage) {
+    case "career_guidance":
+      return "Career Guidance (Stage 2 of 3)";
+    case "complete":
+      return "Complete (Stage 3 of 3)";
+    case "consent":
+    case "referral":
+      return "Consent (Stage 1 of 3)";
+    default:
+      return "Not yet started";
+  }
+}
+
 const STAGE_LABEL: Record<string, string> = {
-  referral:        "Referral (Stage 1 of 4)",
-  consent:         "Consent (Stage 2 of 4)",
-  career_guidance: "Career Guidance (Stage 3 of 4)",
-  complete:        "Complete (Stage 4 of 4)",
+  referral:        "Consent (Stage 1 of 3)",
+  consent:         "Consent (Stage 1 of 3)",
+  career_guidance: "Career Guidance (Stage 2 of 3)",
+  complete:        "Complete (Stage 3 of 3)",
 };
 
 const STAGE_NAME: Record<SurveyShiftInput["stage"], string> = {
@@ -110,7 +134,7 @@ function formatInsights(i: InsightsInput): string {
   const lines = [
     `- Counselling sessions: ${i.sessionCount}`,
     `- Absences: ${i.absenceCount}${i.absencesFlagged ? " (FLAGGED — exceeds attendance threshold)" : ""}`,
-    `- Unpack: ${i.unpack.yes ? "Yes" : "No"}`,
+    `- Morrisby Unpack: ${i.unpack.yes ? "Yes" : "No"}`,
     `- CAP: ${i.cap.yes ? "Yes" : "No"}`,
     `- Work Readiness: ${i.workReadiness.yes ? "Yes" : "No"}`,
     `- Industry Engagement: ${i.industryEngagement.yes ? "Yes" : "No"}`,
@@ -185,13 +209,13 @@ function buildUserPrompt(
   sessions: SessionDetailInput[] | undefined,
   notes:    TimelineNoteInput[] | undefined,
 ): string {
-  const stageStr = s.stage ? (STAGE_LABEL[s.stage] ?? s.stage) : "Not yet started";
+  const stageStr = formatProgrammeStageLabel(s.stage);
   const yearStr  = s.yearLevelLabel?.trim() || `Year ${s.yearLevel}`;
 
   const sections: string[] = [
     `Student programme data:`,
     `- Programme stage: ${stageStr}`,
-    `- Stage progress score: ${s.stageProgress}/4`,
+    `- Stage progress score: ${formatProgrammeProgressScore(s.stageProgress)}`,
     `- Enrolment status: ${s.status}`,
     `- Year level: ${yearStr}`,
     `- Student type: ${s.studentType}`,

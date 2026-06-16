@@ -1,15 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
-import {
-  Search, MoreVertical, AlertTriangle,
-  BookOpen,
-} from 'lucide-react';
-import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
+import { Building2 } from 'lucide-react';
+import type { Student } from '../data/studentsData';
 import type { School } from '../data/networkData';
-import { MetricCardGrid } from './MetricCardGrid';
 import { buildSchoolMetricCards } from '../lib/metricCards';
-import { SearchableDropdown } from './ui/SearchableDropdown';
+import { DashboardLetterhead } from './dashboard/DashboardLetterhead';
+import { DashboardAdvisories } from './dashboard/DashboardAdvisories';
+import { DashboardSectionHeading } from './dashboard/DashboardSectionHeading';
+import { DashboardStageDistribution } from './dashboard/DashboardStageDistribution';
+import { SchoolParticularsPanel } from './dashboard/SchoolParticularsPanel';
+import { SchoolStudentRegister } from './SchoolStudentRegister';
 
 interface SchoolDashboardProps {
   students: Student[];
@@ -17,359 +18,103 @@ interface SchoolDashboardProps {
   onSelectStudent?: (student: Student) => void;
 }
 
-const PAGE_SIZE = 10;
-
-const STAGE_LABELS: Record<string, string> = {
-  referral:        'Initial Intake',
-  consent:         'Consent',
-  career_guidance: 'Career Guidance',
-  complete:        'Job Ready',
-};
-
-const STAGE_PILL: Record<string, string> = {
-  referral:        'bg-slate-100 text-slate-600',
-  consent:         'bg-slate-100 text-slate-600',
-  career_guidance: 'bg-primary/10 text-primary',
-  complete:        'bg-emerald-100 text-emerald-700',
-};
-
 const SCHOOL_STATUS_BADGE: Record<string, string> = {
   Active:     'bg-emerald-100 text-emerald-700',
   Onboarding: 'bg-primary/10 text-primary',
   Inactive:   'bg-slate-100 text-slate-500',
 };
 
-function getInitials(student: Student) {
-  return `${student.firstName[0] ?? ''}${student.lastName[0] ?? ''}`.toUpperCase();
-}
-
-function getProgressPct(student: Student) {
-  return Math.round((student.stageProgress / 4) * 100);
-}
-
-function getProgressBarColor(student: Student) {
-  if (student.currentStage === 'complete') return 'bg-emerald-500';
-  if (student.riskLevel !== 'none') return 'bg-red-400';
-  return 'bg-primary';
-}
-
 export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDashboardProps) {
-  const [search, setSearch]                     = useState('');
-  const [filterStage, setFilterStage]           = useState<string>('all');
-  const [filterCounsellor, setFilterCounsellor] = useState<string>('all');
-  const [filterYear, setFilterYear]             = useState<string>('all');
-  const [page, setPage]                         = useState(1);
-
   const schoolStudents = school
     ? students.filter(s => (s as any).schoolId === school.id || !school.id)
     : students;
-
-  const counsellors = Array.from(new Set(schoolStudents.map(s => s.counsellor).filter(Boolean)));
-  const yearLevels  = Array.from(new Set(schoolStudents.map(s => s.yearLevel).filter(y => y > 0))).sort((a, b) => a - b);
-
-  const stageFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All Stages' },
-      { value: 'referral', label: 'Initial Intake' },
-      { value: 'consent', label: 'Consent' },
-      { value: 'career_guidance', label: 'Career Guidance' },
-      { value: 'complete', label: 'Job Ready' },
-    ],
-    [],
-  );
-
-  const yearFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'Year Level' },
-      ...yearLevels.map(y => ({
-        value: String(y),
-        label: y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`,
-      })),
-    ],
-    [yearLevels],
-  );
-
-  const counsellorFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All Counsellors' },
-      ...counsellors.map(c => ({ value: c, label: c })),
-    ],
-    [counsellors],
-  );
-
-  const filtered = schoolStudents.filter(s => {
-    const name        = `${s.firstName} ${s.lastName} ${s.preferredName ?? ''}`.toLowerCase();
-    const matchSearch     = name.includes(search.toLowerCase()) || s.morrisbyId.toLowerCase().includes(search.toLowerCase()) || (s.counsellor ?? '').toLowerCase().includes(search.toLowerCase());
-    const matchStage      = filterStage === 'all' || s.currentStage === filterStage;
-    const matchCounsellor = filterCounsellor === 'all' || s.counsellor === filterCounsellor;
-    const matchYear       = filterYear === 'all' || String(s.yearLevel) === filterYear;
-    return matchSearch && matchStage && matchCounsellor && matchYear;
-  });
 
   const total      = schoolStudents.length;
   const active     = schoolStudents.filter(s => s.status === 'Active').length;
   const inProgress = schoolStudents.filter(s => s.stageProgress > 0 && s.currentStage !== 'complete').length;
   const completed  = schoolStudents.filter(s => s.currentStage === 'complete').length;
-
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginated   = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-  const handleSearch = (val: string) => { setSearch(val); setPage(1); };
-  const handleFilterStage = (val: string) => { setFilterStage(val); setPage(1); };
-  const handleFilterYear = (val: string) => { setFilterYear(val); setPage(1); };
-  const handleFilterCounsellor = (val: string) => { setFilterCounsellor(val); setPage(1); };
-
-  // Page buttons: show up to 5 around current
-  const pageNumbers: number[] = [];
-  for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
-    pageNumbers.push(i);
-  }
-
-  const showingFrom = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const showingTo   = Math.min(currentPage * PAGE_SIZE, filtered.length);
+  const atRiskCount = schoolStudents.filter(s => s.riskLevel !== 'none').length;
 
   const metricCards = buildSchoolMetricCards(total, active, inProgress, completed);
 
   return (
     <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50">
-      <header className="shrink-0 bg-white border-b border-slate-200 flex items-center px-8 py-3 gap-4">
-        <div className="flex flex-col min-w-0 gap-0.5 flex-1">
-          <div className="flex items-center gap-3 min-w-0">
-            <h2 className="text-xl font-bold text-slate-900 truncate">{school?.name ?? 'School'}</h2>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${SCHOOL_STATUS_BADGE[school?.status ?? 'Active']}`}>
-              {school?.status ?? 'Active'}
-            </span>
-          </div>
-          <p className="text-sm text-slate-500 truncate">
-            Morrisby ID:{' '}
-            <span className="text-slate-800 font-medium font-mono tracking-wide">{school?.morrisbyId ?? '—'}</span>
-          </p>
+      <header className="shrink-0 h-16 bg-white border-b border-slate-200 flex items-center px-8">
+        <div className="flex items-center gap-3">
+          <Building2 className="w-6 h-6 text-primary shrink-0" />
+          <h1 className="text-xl font-bold text-slate-900">School Dashboard</h1>
         </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="w-full px-8 py-6 flex flex-col gap-6">
+        <div className="w-full p-8 space-y-6 pb-16">
+          {/* ── Official letterhead ──────────────────────────────── */}
+          <DashboardLetterhead
+            eyebrow="EMCI · Official School Record"
+            title={school?.name ?? 'School'}
+            titleBadge={
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${SCHOOL_STATUS_BADGE[school?.status ?? 'Active']}`}>
+                {school?.status ?? 'Active'}
+              </span>
+            }
+            subtitle={
+              <>
+                Morrisby ID:{' '}
+                <span className="text-slate-800 font-medium font-mono tracking-wide">{school?.morrisbyId ?? '—'}</span>
+                {school?.region && <> · {school.region}</>}
+              </>
+            }
+          />
 
-          {/* ── KPI Cards ────────────────────────────────────────── */}
-          <MetricCardGrid cards={metricCards} />
-
-          {/* ── Student Table Card ───────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-
-            {/* Toolbar */}
-            <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-4 items-center">
-              <div className="relative w-full lg:w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search students by name, ID or counsellor..."
-                  value={search}
-                  onChange={e => handleSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto lg:ml-auto">
-                <SearchableDropdown
-                  value={filterStage}
-                  onChange={handleFilterStage}
-                  options={stageFilterOptions}
-                  placeholder="All Stages"
-                  searchPlaceholder="Search stages…"
-                  panelWidthClass="w-56"
-                  triggerClassName="min-w-[10.5rem]"
-                />
-                <SearchableDropdown
-                  value={filterYear}
-                  onChange={handleFilterYear}
-                  options={yearFilterOptions}
-                  placeholder="Year Level"
-                  searchPlaceholder="Search year levels…"
-                  panelWidthClass="w-48"
-                  triggerClassName="min-w-[9.5rem]"
-                />
-                <SearchableDropdown
-                  value={filterCounsellor}
-                  onChange={handleFilterCounsellor}
-                  options={counsellorFilterOptions}
-                  placeholder="All Counsellors"
-                  searchPlaceholder="Search counsellors…"
-                  panelWidthClass="w-56"
-                  triggerClassName="min-w-[11rem]"
-                />
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Name</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Year</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Counsellor</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Current Stage</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Progress</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-16 text-center">
-                        <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                        <p className="text-sm text-slate-400">No students match your search.</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginated.map((student, idx) => {
-                      const atRisk   = student.riskLevel !== 'none';
-                      const initials = getInitials(student);
-                      const pct      = getProgressPct(student);
-                      const barColor = getProgressBarColor(student);
-                      const stagePill = student.currentStage ? STAGE_PILL[student.currentStage] : 'bg-slate-100 text-slate-500';
-                      const stageLabel = student.currentStage ? (STAGE_LABELS[student.currentStage] ?? student.currentStage) : 'Not started';
-
-                      return (
-                        <motion.tr
-                          key={student.id}
-                          initial={{ opacity: 0, x: -4 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.15, delay: idx * 0.025 }}
-                          className={`transition-colors group ${onSelectStudent ? 'hover:bg-slate-50/70 cursor-pointer' : ''}`}
-                          onClick={onSelectStudent ? () => onSelectStudent(student) : undefined}
-                        >
-                          {/* Name */}
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                                {initials}
-                              </div>
-                              <div className="flex flex-col min-w-0 gap-0.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
-                                    {student.firstName} {student.lastName}
-                                  </span>
-                                  {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                                </div>
-                                <p className="text-xs text-slate-500 tabular-nums">
-                                  <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
-                                  {atRisk && (
-                                    <>
-                                      <span className="text-slate-300 mx-1">·</span>
-                                      <span className="text-red-500/80 font-medium">At risk</span>
-                                    </>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Year */}
-                          <td className="px-4 py-4 text-sm text-slate-700 max-w-[10rem] truncate" title={formatYearLevelLine(student)}>
-                            {formatYearLevelLine(student)}
-                          </td>
-
-                          {/* Counsellor */}
-                          <td className="px-6 py-4 text-sm text-slate-700">{student.counsellor ?? '—'}</td>
-
-                          {/* Stage */}
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${stagePill}`}>
-                              {stageLabel}
-                            </span>
-                          </td>
-
-                          {/* Progress */}
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 h-1.5 w-24 bg-slate-100 rounded-full overflow-hidden">
-                                <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className="text-xs font-medium text-slate-500 tabular-nums">{pct}%</span>
-                            </div>
-                          </td>
-
-                          {/* Status */}
-                          <td className="px-4 py-4 text-center">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase ${
-                              student.status === 'Active'   ? 'bg-emerald-100 text-emerald-700'
-                            : student.status === 'Pending' ? 'bg-blue-100 text-blue-700'
-                            : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {student.status}
-                            </span>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="px-6 py-4 text-right">
-                            {onSelectStudent && (
-                              <button
-                                onClick={e => { e.stopPropagation(); onSelectStudent(student); }}
-                                className="text-slate-400 hover:text-primary transition-colors"
-                              >
-                                <MoreVertical className="w-5 h-5" />
-                              </button>
-                            )}
-                          </td>
-                        </motion.tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <p className="text-sm text-slate-500">
-                Showing{' '}
-                <span className="font-bold text-slate-900">{showingFrom}</span>
-                {' '}to{' '}
-                <span className="font-bold text-slate-900">{showingTo}</span>
-                {' '}of{' '}
-                <span className="font-bold text-slate-900">{filtered.length}</span>
-                {' '}students
-              </p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          {/* ── KPI strip ────────────────────────────────────────── */}
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div className="grid grid-cols-2 xl:grid-cols-4 divide-x divide-y xl:divide-y-0 divide-slate-100">
+              {metricCards.map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="px-6 py-5 hover:bg-slate-50/60 transition-colors"
                 >
-                  Previous
-                </button>
-                {pageNumbers.map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
-                    className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                      n === currentPage
-                        ? 'bg-primary text-white'
-                        : 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 text-sm border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                  <p className="text-3xl font-bold tracking-tight tabular-nums text-slate-900">
+                    {stat.displayValue ?? stat.value.toLocaleString('en-AU')}
+                  </p>
+                  <div className="h-1 w-full bg-slate-100 rounded-full mt-3">
+                    <motion.div
+                      className={`h-full ${stat.barColor} rounded-full`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${stat.barPct}%` }}
+                      transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
+                    />
+                  </div>
+                </motion.div>
+              ))}
             </div>
           </div>
 
-          {/* Footer timestamp */}
-          <p className="text-xs text-slate-400 pb-2">
-            Last synced: {format(new Date(), 'dd MMM yyyy, h:mm aa')}
-          </p>
+          {/* ── Two-column dashboard body ────────────────────────── */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            {/* Left column — student register */}
+            <section className="xl:col-span-8 space-y-3 min-w-0">
+              <DashboardSectionHeading>Student Register — School Cohort</DashboardSectionHeading>
+              <SchoolStudentRegister students={schoolStudents} onSelectStudent={onSelectStudent} />
+            </section>
 
+            {/* Right column — advisories & particulars */}
+            <div className="xl:col-span-4 space-y-6 min-w-0">
+              <DashboardAdvisories atRiskCount={atRiskCount} scopeSuffix="at this school" />
+              <DashboardStageDistribution students={schoolStudents} />
+              {school && <SchoolParticularsPanel school={school} />}
+            </div>
+          </div>
+
+          {/* ── Official footer rule ─────────────────────────────── */}
+          <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            <span>EMCI Student Management Platform · Last synced {format(new Date(), 'dd MMM yyyy, h:mm aa')}</span>
+            <span>Confidential — internal use only</span>
+          </div>
         </div>
       </div>
     </main>

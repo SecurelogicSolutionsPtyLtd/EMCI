@@ -228,6 +228,27 @@ export interface RawJourney {
   modifiedon: string | null;
 }
 
+// ── Helper: resolve a session's intervention type ─────────────────
+// The single-choice picklist cr89a_typeofintervention is the primary marker,
+// but counsellors often record the intervention only in the multiselect fields
+// (e.g. Morrisby "Unpack"). Fall back to those labels so every session is
+// marked with a real intervention rather than a generic "EMCI Session".
+function resolveInterventionType(s: RawSession): string | undefined {
+  const fmt = (key: keyof RawSession) =>
+    (s[`${key}@OData.Community.Display.V1.FormattedValue` as keyof RawSession] as string | null | undefined)
+    ?? undefined;
+
+  const primary = fmt('cr89a_typeofintervention')?.trim();
+  if (primary) return primary;
+
+  const multi = [fmt('cr89a_intervention_ms'), fmt('cr89a_interventionmorrisby_ms')]
+    .map(v => v?.trim())
+    .filter((v): v is string => !!v && v.length > 0)
+    .join('; ');
+
+  return multi.length > 0 ? multi : undefined;
+}
+
 // ── Helper: extract student ID from an activity record ─────────────
 // Activity records link to a student via _regardingobjectid_value when
 // the lookuplogicalname annotation confirms the target is cr89a_wlpcstudent.
@@ -266,6 +287,7 @@ function mapStudent(raw: RawStudent): Student & { schoolId: string } {
     hasProfile:    raw.cr89a_studenthasaprofile,
     studentType:   raw['new_studenttypemultiselect@OData.Community.Display.V1.FormattedValue'] ?? raw.new_studenttypemultiselect ?? 'Standard',
     lastActivity:  raw.modifiedon ?? raw.createdon ?? '',
+    createdAt:     raw.createdon ?? undefined,
     schoolId:      raw._cr89a_wlpcschool_value ?? '',
     studentDeactivation: raw.cr89a_studentdeactivation ?? null,
     studentDeactivationLabel:
@@ -589,9 +611,9 @@ export interface TimelineEvent {
   track: string;
   sessionLength?: string;
   interventionType?: string;
-  /** Student's satisfaction with the session (e.g. "Very Helpful") — AI context only. */
+  /** Student's satisfaction with the session (e.g. "Very Helpful"). */
   sessionSatisfaction?: string;
-  /** What the student found useful in the session (semicolon-delimited) — AI context only. */
+  /** What the student found useful in the session (semicolon-delimited). */
   sessionUseful?: string;
   surveyFields?: SurveyField[];
   /** Counselling session context for end surveys awaiting student responses. */
@@ -656,37 +678,19 @@ export function deriveStudentEvents(
   const fallbackDate = student.lastActivity || new Date().toISOString();
   const counsellor = student.counsellor || 'EMCI Counsellor';
 
-  // ── Stage milestone events (referral / consent) ────────────────
-  if (
-    student.currentStage === 'referral' ||
-    student.currentStage === 'consent' ||
-    student.currentStage === 'career_guidance' ||
-    student.currentStage === 'complete'
-  ) {
-    events.push({
-      id:           'step-1',
-      date:         fallbackDate,
-      modifiedDate: fallbackDate,
-      type:         'referral',
-      title:        'EMCI Referral',
-      status:       'Completed',
-      by:           counsellor,
-      description:  `Initial referral received for ${displayName}.`,
-      notes:        `Initial referral received for ${displayName}.`,
-      track:        'above',
-      surveyFields: [],
-    });
-  }
-
+  // ── Stage milestone event (consent) ────────────────────────────
+  // Consent is dated from when the student record was created in the CRM
+  // (Dataverse createdon), falling back to last activity only if absent.
   if (
     student.currentStage === 'consent' ||
     student.currentStage === 'career_guidance' ||
     student.currentStage === 'complete'
   ) {
+    const consentDate = student.createdAt || fallbackDate;
     events.push({
       id:           'step-2',
-      date:         fallbackDate,
-      modifiedDate: fallbackDate,
+      date:         consentDate,
+      modifiedDate: consentDate,
       type:         'consent',
       title:        'EMCI Consent',
       status:       'Completed',
@@ -707,9 +711,7 @@ export function deriveStudentEvents(
       const sessionLength =
         (s['cr89a_sessionlength@OData.Community.Display.V1.FormattedValue'] as string | undefined)
         ?? (s.cr89a_sessionlength ? `${s.cr89a_sessionlength} min` : undefined);
-      const interventionType =
-        (s['cr89a_typeofintervention@OData.Community.Display.V1.FormattedValue'] as string | undefined)
-        ?? undefined;
+      const interventionType = resolveInterventionType(s);
       const sessionSatisfaction =
         (s['cr89a_studentsatisfactiontodayssession@OData.Community.Display.V1.FormattedValue'] as string | undefined)
         ?? undefined;

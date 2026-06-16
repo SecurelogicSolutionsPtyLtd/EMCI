@@ -38,7 +38,7 @@ function ai(partial: Partial<AiRating>): AiRating {
       { key: 'career_outcomes', score: 80, reason: '' },
       { key: 'work_readiness', score: 80, reason: '' },
       { key: 'attendance_momentum', score: 80, reason: '' },
-      { key: 'growth_wellbeing', score: 80, reason: '' },
+      { key: 'growth_sentiment', score: 80, reason: '' },
     ],
     flags: [],
     confidence: 'high',
@@ -71,7 +71,7 @@ describe('finaliseRating', () => {
     assert.equal(r.categories.length, 5);
   });
 
-  it('weights categories per the rubric (engagement = 25%)', () => {
+  it('weights categories per the rubric (engagement = 20%, career = 25%)', () => {
     const r = finaliseRating(
       ai({
         categories: [
@@ -79,12 +79,14 @@ describe('finaliseRating', () => {
           { key: 'career_outcomes', score: 0, reason: '' },
           { key: 'work_readiness', score: 0, reason: '' },
           { key: 'attendance_momentum', score: 0, reason: '' },
-          { key: 'growth_wellbeing', score: 0, reason: '' },
+          { key: 'growth_sentiment', score: 0, reason: '' },
         ],
       }),
       baseStudent,
     );
-    assert.equal(r.overall, 25);
+    assert.equal(r.overall, 20);
+    const career = r.categories.find(c => c.key === 'career_outcomes')!;
+    assert.equal(career.weight, 25);
     const work = r.categories.find(c => c.key === 'work_readiness')!;
     assert.equal(work.weight, 20);
   });
@@ -97,7 +99,7 @@ describe('finaliseRating', () => {
           { key: 'career_outcomes', score: 60, reason: '' },
           { key: 'work_readiness', score: null, reason: '' },
           { key: 'attendance_momentum', score: null, reason: '' },
-          { key: 'growth_wellbeing', score: null, reason: '' },
+          { key: 'growth_sentiment', score: null, reason: '' },
         ],
       }),
       baseStudent,
@@ -114,7 +116,7 @@ describe('finaliseRating', () => {
           { key: 'career_outcomes', score: -20, reason: '' },
           { key: 'work_readiness', score: 50, reason: '' },
           { key: 'attendance_momentum', score: 100, reason: '' },
-          { key: 'growth_wellbeing', score: 0, reason: '' },
+          { key: 'growth_sentiment', score: 0, reason: '' },
         ],
       }),
       baseStudent,
@@ -133,7 +135,7 @@ describe('finaliseRating', () => {
           { key: 'career_outcomes', score: null, reason: '' },
           { key: 'work_readiness', score: null, reason: '' },
           { key: 'attendance_momentum', score: null, reason: '' },
-          { key: 'growth_wellbeing', score: null, reason: '' },
+          { key: 'growth_sentiment', score: null, reason: '' },
         ],
       }),
       baseStudent,

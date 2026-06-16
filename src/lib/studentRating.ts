@@ -16,10 +16,12 @@ import {
   buildSurveyShifts,
   buildSessionDetails,
   buildTimelineNotes,
+  isSessionFeedbackField,
   type QuickInsights,
   type SessionDetail,
   type TimelineNote,
 } from './studentInsights';
+import { formatProgrammeProgressScore, programmeProgressStep } from './stageProgress';
 
 // ── AI output (mirrors the edge function schema) ───────────────────────────────
 
@@ -28,13 +30,13 @@ export const RATING_CATEGORY_KEYS = [
   'career_outcomes',
   'work_readiness',
   'attendance_momentum',
-  'growth_wellbeing',
+  'growth_sentiment',
 ] as const;
 
 export type RatingCategoryKey = typeof RATING_CATEGORY_KEYS[number];
 
 export type RatingFlag =
-  | 'wellbeing_concern'
+  | 'sentiment_concern'
   | 'attendance_risk'
   | 'disengaged'
   | 'stalled'
@@ -80,11 +82,11 @@ export interface StudentRating {
 // ── Rubric weights (must sum to 100) ───────────────────────────────────────────
 
 const CATEGORY_WEIGHTS: Record<RatingCategoryKey, number> = {
-  engagement:           25,
-  career_outcomes:      20,
+  engagement:           20,
+  career_outcomes:      25,
   work_readiness:       20,
   attendance_momentum:  15,
-  growth_wellbeing:     20,
+  growth_sentiment:     20,
 };
 
 const CATEGORY_LABELS: Record<RatingCategoryKey, string> = {
@@ -92,14 +94,15 @@ const CATEGORY_LABELS: Record<RatingCategoryKey, string> = {
   career_outcomes:     'Career outcomes',
   work_readiness:      'Work readiness',
   attendance_momentum: 'Attendance & momentum',
-  growth_wellbeing:    'Growth & wellbeing',
+  growth_sentiment:    'Growth & sentiment',
 };
 
 // ── Packet builder (input the AI grades) ───────────────────────────────────────
 
 export interface RatingPacket {
-  stageProgress:    number;
-  status:           string;
+  programmeProgressScore: string;
+  programmeStageProgress: number;
+  status: string;
   interviewed:      boolean;
   hasProfile:       boolean;
   yearLevel:        number;
@@ -124,7 +127,9 @@ function detectInterventionAreas(events: TimelineEvent[]): RatingPacket['interve
     .filter(e => e.type === 'session')
     .flatMap(e => [
       e.interventionType ?? '',
-      ...(e.surveyFields ?? []).map(f => `${f.label} ${f.value}`),
+      ...(e.surveyFields ?? [])
+        .filter(f => !isSessionFeedbackField(f.label))
+        .map(f => `${f.label} ${f.value}`),
     ])
     .join(' ')
     .toLowerCase();
@@ -144,7 +149,8 @@ export function buildRatingPacket(student: Student, events: TimelineEvent[]): Ra
   const timelineNotes = buildTimelineNotes(student, events);
 
   return {
-    stageProgress:    student.stageProgress,
+    programmeProgressScore: formatProgrammeProgressScore(student.stageProgress),
+    programmeStageProgress: programmeProgressStep(student.stageProgress),
     status:           student.status,
     interviewed:      !!student.interviewed,
     hasProfile:       !!student.hasProfile,
@@ -189,9 +195,19 @@ function bandFromScore(score: number): RatingBand {
   return 'needs_attention';
 }
 
+function normalizeCategoryKey(key: string): RatingCategoryKey {
+  if (key === 'growth_wellbeing') return 'growth_sentiment';
+  return key as RatingCategoryKey;
+}
+
+function normalizeFlag(flag: string): RatingFlag {
+  if (flag === 'wellbeing_concern') return 'sentiment_concern';
+  return flag as RatingFlag;
+}
+
 export function finaliseRating(ai: AiRating, student: Student): StudentRating {
   const byKey = new Map<RatingCategoryKey, AiRatingCategory>();
-  for (const c of ai.categories) byKey.set(c.key, c);
+  for (const c of ai.categories) byKey.set(normalizeCategoryKey(c.key), c);
 
   const categories: FinalCategory[] = RATING_CATEGORY_KEYS.map(key => ({
     key,
@@ -214,7 +230,7 @@ export function finaliseRating(ai: AiRating, student: Student): StudentRating {
     overall,
     band:        bandFromScore(overall),
     categories,
-    flags:       ai.flags ?? [],
+    flags:       (ai.flags ?? []).map(normalizeFlag),
     supportNeed: deriveSupportNeed(student),
     confidence:  ai.confidence ?? 'low',
   };

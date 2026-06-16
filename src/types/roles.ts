@@ -96,6 +96,11 @@ export function canManageTeam(role: AppRole): boolean {
   return isAdminRole(role);
 }
 
+/** Only ACCE Admin may trigger AI-powered features (analysis, rating, sentiment, chat). */
+export function canUseAiFeatures(role: AppRole): boolean {
+  return role === 'acce_admin';
+}
+
 /** Which roles a given admin can assign. acce_admin can assign any; scoped admins only their group. */
 export function assignableRoles(role: AppRole): AppRole[] {
   if (role === 'acce_admin') {

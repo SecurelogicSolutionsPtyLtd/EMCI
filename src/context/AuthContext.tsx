@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, mapUser, getUserRole, isMfaVerified, signOut, type AppUser } from '../services/supabase';
 import type { AppRole } from '../types/roles';
 import { getRoleGroup } from '../types/roles';
@@ -49,6 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [actualRole,     setActualRole]     = useState<AppRole | null>(null);
   const [actualSchoolId, setActualSchoolId] = useState<string | null>(null);
   const [stage,          setStage]          = useState<AuthStage>('loading');
+  // Always reflects the latest stage value — used by the onAuthStateChange closure
+  // to avoid a non-silent resolve() while the user is mid-MFA-flow.
+  const stageRef = useRef<AuthStage>('loading');
+  stageRef.current = stage;
 
   // Preview / impersonation — UI-only, never touches the database
   const [previewRole,     setPreviewRole]     = useState<AppRole | null>(() => {
@@ -150,8 +154,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearImpersonation();
         setStage('unauthenticated');
       } else {
-        // Tab refocus often triggers TOKEN_REFRESHED — avoid flashing the full loading screen.
-        resolve({ silent: event === 'TOKEN_REFRESHED' });
+        // Silence the re-resolve when the user is mid-MFA-flow (e.g. switching to their
+        // auth app and back triggers TOKEN_REFRESHED or a visibility-change event).
+        // A non-silent resolve would flash stage through 'loading' → 'mfa_enroll', which
+        // re-triggers startEnrolment() and causes "factor already exists" from Supabase.
+        const midMfaFlow = stageRef.current === 'mfa_enroll' || stageRef.current === 'mfa_required';
+        resolve({ silent: event === 'TOKEN_REFRESHED' || midMfaFlow });
       }
     });
 

@@ -115,10 +115,10 @@ describe('computeWatchouts — AI-flag derived', () => {
     };
   }
 
-  it('adds a wellbeing concern action with a verify hint when confidence is low', () => {
+  it('adds a sentiment concern action with a verify hint when confidence is low', () => {
     const recent = session(new Date().toISOString());
-    const w = computeWatchouts(baseStudent, [recent], rating({ flags: ['wellbeing_concern'], confidence: 'low' }));
-    const concern = w.find(x => x.id === 'wellbeing-concern');
+    const w = computeWatchouts(baseStudent, [recent], rating({ flags: ['sentiment_concern'], confidence: 'low' }));
+    const concern = w.find(x => x.id === 'sentiment-concern');
     assert.ok(concern);
     assert.equal(concern!.severity, 'action');
     assert.match(concern!.detail ?? '', /verify/i);
@@ -133,7 +133,7 @@ describe('computeWatchouts — AI-flag derived', () => {
   it('orders actions before watches before positives', () => {
     const recent = session(new Date().toISOString());
     const s: Student = { ...baseStudent, hasProfile: false, absenceCount: 6 };
-    const w = computeWatchouts(s, [recent], rating({ flags: ['wellbeing_concern', 'thriving'] }));
+    const w = computeWatchouts(s, [recent], rating({ flags: ['sentiment_concern', 'thriving'] }));
     const order = w.map(x => x.severity);
     const sorted = [...order].sort((a, b) =>
       ({ action: 0, watch: 1, positive: 2 })[a] - ({ action: 0, watch: 1, positive: 2 })[b]);

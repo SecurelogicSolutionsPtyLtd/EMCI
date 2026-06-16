@@ -1,10 +1,16 @@
 import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Building2, LayoutDashboard, Users } from 'lucide-react';
+import { motion } from 'motion/react';
+import { LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { canSeeStudentNames, canViewStudentRoster } from '../types/roles';
+import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../types/roles';
 import type { AppShellOutletContext } from '../routes/shellContext';
 import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
+import { DashboardStageDistribution } from './dashboard/DashboardStageDistribution';
+import { DashboardSchoolsSnapshot } from './dashboard/DashboardSchoolsSnapshot';
+import { DashboardQuickAccess } from './dashboard/DashboardQuickAccess';
+import { DashboardLetterhead } from './dashboard/DashboardLetterhead';
+import { DashboardAdvisories } from './dashboard/DashboardAdvisories';
 
 export function DashboardHome() {
   const navigate = useNavigate();
@@ -20,6 +26,12 @@ export function DashboardHome() {
     schoolId,
   );
   const kpis = buildProgramKpiCards(visibleSchools, visibleStudents);
+  const atRiskCount = visibleStudents.filter(s => s.riskLevel !== 'none').length;
+
+  const scopeLabel =
+    visibleSchools.length === 1
+      ? visibleSchools[0].name
+      : `${visibleSchools.length} participating schools — network-wide scope`;
 
   return (
     <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-slate-50">
@@ -30,71 +42,75 @@ export function DashboardHome() {
         </div>
       </header>
 
-      <div className="p-8 max-w-5xl mx-auto w-full space-y-8">
-        <p className="text-slate-600 text-sm leading-relaxed">
-          Programme overview for your scope. Open the schools directory or the student roster for full tables and actions.
-        </p>
+      <div className="p-8 w-full space-y-6 pb-16">
+        {/* ── Official letterhead ──────────────────────────────── */}
+        <DashboardLetterhead
+          eyebrow="EMCI · Official Programme Overview"
+          title="Early & Meaningful Career Intelligence"
+          subtitle={scopeLabel}
+        />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {kpis.map((k, i) => (
-            <div
-              key={i}
-              className={`rounded-xl border px-4 py-3 shadow-sm ${
-                k.highlight ? 'bg-primary/5 border-primary/20' : 'bg-white border-slate-200'
-              }`}
-            >
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{k.label}</p>
-              <p className={`text-lg font-bold ${k.highlight ? 'text-primary' : 'text-slate-800'}`}>{k.value}</p>
-            </div>
-          ))}
+        {/* ── KPI strip ────────────────────────────────────────── */}
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 divide-x divide-y xl:divide-y-0 divide-slate-100">
+            {kpis.map((k, i) => (
+              <motion.div
+                key={k.label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="px-6 py-5 hover:bg-slate-50/60 transition-colors"
+              >
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{k.label}</p>
+                <p className={`text-3xl font-bold tracking-tight tabular-nums ${k.highlight ? 'text-primary' : 'text-slate-900'}`}>
+                  {k.value}
+                </p>
+              </motion.div>
+            ))}
+          </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/schools')}
-            className="flex items-start gap-4 p-6 rounded-2xl border border-slate-200 bg-white shadow-sm hover:border-primary/40 hover:shadow-md transition-all text-left"
-          >
-            <div className="rounded-xl bg-primary/10 p-3 text-primary shrink-0">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Schools</h2>
-              <p className="text-sm text-slate-500 mt-1">
-                Browse all schools, completion KPIs, and open a school cohort.
-              </p>
-            </div>
-          </button>
+        {/* ── Two-column dashboard body ────────────────────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          {/* Left column — programme data */}
+          <div className="xl:col-span-8 space-y-6 min-w-0">
+            <DashboardStageDistribution students={visibleStudents} />
 
-          {showStudentRoster ? (
-            <button
-              type="button"
-              onClick={() => navigate('/students')}
-              className="flex items-start gap-4 p-6 rounded-2xl border border-slate-200 bg-white shadow-sm hover:border-primary/40 hover:shadow-md transition-all text-left"
-            >
-              <div className="rounded-xl bg-primary/10 p-3 text-primary shrink-0">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Students</h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  {showStudentNames
-                    ? 'Network student roster, filters, and journey access (where permitted).'
-                    : 'Anonymized student roster and read-only redacted journey.'}
-                </p>
-              </div>
-            </button>
-          ) : (
-            <div className="flex items-start gap-4 p-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-slate-400">
-              <div className="rounded-xl bg-slate-100 p-3 shrink-0">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-500">Students</h2>
-                <p className="text-sm mt-1">Not available for your role.</p>
-              </div>
-            </div>
-          )}
+            {visibleSchools.length > 1 && (
+              <DashboardSchoolsSnapshot
+                schools={visibleSchools}
+                students={visibleStudents}
+                onOpenSchools={() => navigate('/schools')}
+                onSelectSchool={
+                  canAccessPage(userRole, 'school')
+                    ? school => navigate(`/school/${school.id}`)
+                    : undefined
+                }
+              />
+            )}
+          </div>
+
+          {/* Right column — advisories & registers */}
+          <div className="xl:col-span-4 space-y-6 min-w-0">
+            <DashboardAdvisories
+              atRiskCount={atRiskCount}
+              scopeSuffix="within your scope"
+              onReviewRoster={showStudentRoster ? () => navigate('/students') : undefined}
+            />
+
+            <DashboardQuickAccess
+              showStudentRoster={showStudentRoster}
+              showStudentNames={showStudentNames}
+              onOpenSchools={() => navigate('/schools')}
+              onOpenStudents={() => navigate('/students')}
+            />
+          </div>
+        </div>
+
+        {/* ── Official footer rule ─────────────────────────────── */}
+        <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          <span>EMCI Student Management Platform</span>
+          <span>Confidential — internal use only</span>
         </div>
       </div>
     </main>

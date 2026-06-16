@@ -4,6 +4,7 @@ import {
   computeQuickInsights,
   detectWorkExperienceCompleted,
   buildTimelineNotes,
+  buildQuickInsightDetails,
 } from './studentInsights.js';
 import type { Student } from '../data/studentsData.js';
 import type { TimelineEvent } from '../services/dataverse.js';
@@ -47,10 +48,42 @@ function session(interventionType: string, surveyFields: TimelineEvent['surveyFi
   };
 }
 
+function survey(id: string): TimelineEvent {
+  return {
+    type: 'survey',
+    id,
+    date: '2026-01-01T00:00:00Z',
+    modifiedDate: '2026-01-01T00:00:00Z',
+    title: 'Pilot survey',
+    status: 'Completed',
+    by: 'Student',
+    description: 'Survey completed.',
+    notes: null,
+    track: 'above',
+    surveyFields: [{ label: 'Preparedness', value: 'Agree' }],
+  };
+}
+
+function note(title: string, notes = ''): TimelineEvent {
+  return {
+    type: 'note',
+    id: `note-${title}`,
+    date: '2025-05-15T00:00:00Z',
+    modifiedDate: '2025-05-15T00:00:00Z',
+    title,
+    status: '',
+    by: 'Alex Counsellor',
+    description: '',
+    notes: notes || title,
+    track: 'below',
+    surveyFields: [],
+  };
+}
+
 describe('computeQuickInsights — intervention areas', () => {
   it('detects each area from session intervention type', () => {
     const insights = computeQuickInsights(baseStudent, [
-      session('Unpack'),
+      session('Unpack', [{ label: 'Intervention Type', value: 'Unpack' }]),
       session('CAP'),
       session('Work Readiness'),
       session('Industry Engagement'),
@@ -76,6 +109,19 @@ describe('computeQuickInsights — intervention areas', () => {
     assert.equal(insights.cap.yes, true);
     assert.equal(insights.wexPreparation.yes, true);
     assert.equal(insights.unpack.yes, false);
+  });
+
+  it('does not mis-detect intervention areas from student satisfaction feedback', () => {
+    const insights = computeQuickInsights(baseStudent, [
+      session('Unpack', [
+        { label: 'Intervention Type', value: 'Unpack' },
+        { label: 'Session Satisfaction', value: 'Other' },
+        { label: 'Found Useful', value: 'Industry engagement; Other' },
+      ]),
+    ]);
+    assert.equal(insights.other.yes, false);
+    assert.equal(insights.industryEngagement.yes, false);
+    assert.equal(insights.unpack.yes, true);
   });
 
   it('detects CAP and WEX independently', () => {
@@ -116,12 +162,93 @@ describe('computeQuickInsights — session and absence counts', () => {
     assert.equal(insights.absencesFlagged, true);
   });
 
+  it('counts timeline notes recording an absence', () => {
+    const insights = computeQuickInsights(baseStudent, [
+      note('Student absent 14.05.25'),
+      note('Email from Principal'),
+    ]);
+    assert.equal(insights.absenceCount, 1);
+  });
+
   it('does not flag absences at or below threshold', () => {
     const insights = computeQuickInsights(
       { ...baseStudent, absenceCount: 3 },
       [],
     );
     assert.equal(insights.absencesFlagged, false);
+  });
+
+  it('counts completed pilot survey stages out of 3', () => {
+    const none = computeQuickInsights(baseStudent, []);
+    assert.equal(none.surveyCount, 0);
+
+    const initialOnly = computeQuickInsights(baseStudent, [
+      survey('init-survey-legacy-1'),
+    ]);
+    assert.equal(initialOnly.surveyCount, 1);
+
+    const allThree = computeQuickInsights(baseStudent, [
+      survey('init-survey-2026-1'),
+      survey('mid-survey-legacy-1'),
+      survey('end-survey-2026-1'),
+    ]);
+    assert.equal(allThree.surveyCount, 3);
+
+    const duplicateStages = computeQuickInsights(baseStudent, [
+      survey('init-survey-legacy-1'),
+      survey('init-survey-2026-1'),
+      survey('mid-survey-2026-1'),
+    ]);
+    assert.equal(duplicateStages.surveyCount, 2);
+  });
+});
+
+describe('buildQuickInsightDetails', () => {
+  it('lists sessions, absences, and survey stages behind each tile', () => {
+    const absence: TimelineEvent = {
+      type: 'absence',
+      id: 'absence-1',
+      date: '2026-02-01T00:00:00Z',
+      modifiedDate: '2026-02-01T00:00:00Z',
+      title: 'EMCI Student Absence',
+      status: '',
+      by: 'Alex Counsellor',
+      description: 'Reason: Illness',
+      notes: 'Illness',
+      track: 'below',
+      surveyFields: [],
+    };
+    const details = buildQuickInsightDetails([
+      session('CAP'),
+      session('Unpack', [{ label: 'Intervention Type', value: 'Unpack' }]),
+      absence,
+      survey('init-survey-2026-1'),
+    ]);
+
+    assert.equal(details.sessions.length, 2);
+    assert.equal(details.absences.length, 1);
+    assert.equal(details.absences[0].note, 'Illness');
+    assert.equal(details.surveys.length, 1);
+    assert.equal(details.surveys[0].note, 'Initial pilot survey');
+  });
+
+  it('lists absence notes behind the Absences tile', () => {
+    const details = buildQuickInsightDetails([
+      note('Student absent 14.05.25'),
+      note('Email from Principal'),
+    ]);
+    assert.equal(details.absences.length, 1);
+    assert.equal(details.absences[0].title, 'Student absent 14.05.25');
+  });
+
+  it('attributes sessions to areas with the same matching as the yes/no flags', () => {
+    const details = buildQuickInsightDetails([
+      session('CAP'),
+      session('Session', [{ label: 'Intervention Areas', value: 'CAP; WEX Preparation' }]),
+    ]);
+    assert.equal(details.cap.length, 2);
+    assert.equal(details.wexPreparation.length, 1);
+    assert.equal(details.unpack.length, 0);
   });
 });
 

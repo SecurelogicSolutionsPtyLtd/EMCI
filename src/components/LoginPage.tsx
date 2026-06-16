@@ -6,6 +6,7 @@ import {
   signInWithEmail,
   getMfaFactors,
   enrollMfa,
+  unenrollMfa,
   challengeMfa,
   verifyMfa,
 } from '../services/supabase';
@@ -40,10 +41,12 @@ export function LoginPage() {
   const [mfaSecret,      setMfaSecret]      = useState<string | null>(null);
   const [secretCopied,   setSecretCopied]   = useState(false);
 
-  // Kick off MFA flow when stage changes
+  // Kick off MFA flow when stage changes.
+  // Guards prevent re-calling if the flow is already in progress (e.g. if the auth
+  // state change fires again while the user has switched to their authenticator app).
   useEffect(() => {
-    if (stage === 'mfa_enroll') void startEnrolment();
-    if (stage === 'mfa_required') void startVerification();
+    if (stage === 'mfa_enroll' && !mfaFactorId) void startEnrolment();
+    if (stage === 'mfa_required' && !mfaChallengeId) void startVerification();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
@@ -81,6 +84,14 @@ export function LoginPage() {
     setLoading(true);
     setError(null);
     try {
+      // If the page reloaded mid-enrolment (e.g. mobile browser tab eviction or
+      // switching to the authenticator app and back), Supabase may still hold an
+      // unverified factor from the previous attempt. Unenroll it first so we can
+      // create a fresh one — otherwise Supabase returns "factor already exists".
+      const existing = await getMfaFactors();
+      const stale = existing.find(f => f.status === 'unverified');
+      if (stale) await unenrollMfa(stale.id);
+
       const { id, qrCode, secret } = await enrollMfa();
       setMfaFactorId(id);
       setMfaQrCode(qrCode);
