@@ -24,7 +24,7 @@ export function MaintenanceScreen() {
         transition={{ duration: 0.35, delay: 0.1 }}
         className="text-xs text-slate-500 leading-relaxed mb-6"
       >
-        Only EMCI administrators can access the platform during maintenance. If you believe you
+        Only SecureLogic administrators can access the platform during maintenance. If you believe you
         should have access, contact your programme administrator.
       </motion.p>
 

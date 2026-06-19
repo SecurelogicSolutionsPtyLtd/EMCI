@@ -41,7 +41,7 @@ export function MaintenanceAdminPanel() {
       <div className="flex items-center gap-2 mb-3">
         <Construction className="w-4 h-4 text-slate-600" />
         <span className="text-sm font-bold text-slate-900">Maintenance mode</span>
-        <span className="text-xs text-slate-500">— blocks all users except ACCE Admin</span>
+        <span className="text-xs text-slate-500">— blocks all users except SecureLogic Admin</span>
       </div>
 
       {error && (

@@ -12,7 +12,7 @@ export function MaintenanceNotice() {
       <div>
         <p className="text-xs font-bold text-amber-900 mb-0.5">Platform under maintenance</p>
         <p className="text-xs text-amber-800 leading-relaxed">{maintenanceMessage}</p>
-        <p className="text-[11px] text-amber-700/80 mt-1.5">Only EMCI administrators can sign in during maintenance.</p>
+        <p className="text-[11px] text-amber-700/80 mt-1.5">Only SecureLogic administrators can sign in during maintenance.</p>
       </div>
     </div>
   );

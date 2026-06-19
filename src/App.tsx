@@ -43,7 +43,7 @@ import {
   type RawMidPilotStudentSurvey2026,
   type RawAnnotation,
 } from './services/dataverse';
-import { getRoleGroup, ROLE_LABELS } from './types/roles';
+import { canBypassMaintenance, getRoleGroup, ROLE_LABELS } from './types/roles';
 import { getProgramVisibleScope } from './lib/networkProgramMetrics';
 import { redactSensitiveEventsMap } from './redaction';
 import { Eye, RotateCcw } from 'lucide-react';
@@ -292,7 +292,7 @@ function AppInner() {
     return <LoginPage />;
   }
 
-  if (maintenanceMode && actualRole !== 'acce_admin') {
+  if (maintenanceMode && !canBypassMaintenance(actualRole)) {
     return <MaintenanceScreen />;
   }
 

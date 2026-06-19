@@ -19,6 +19,8 @@ import {
   ROLE_GROUP_LABELS,
   assignableRoles,
   getRoleGroup,
+  isPlatformWideAdmin,
+  canManageMaintenance,
   type AppRole,
   type RoleGroup,
 } from '../types/roles';
@@ -67,6 +69,7 @@ interface RoleConfig {
 
 function getRoleConfig(role: AppRole): RoleConfig {
   switch (role) {
+    case 'securelogic_admin':
     case 'acce_admin':
       return {
         title:          'Team Management',
@@ -184,7 +187,8 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
     if (userRole === 'de_admin') {
       return getRoleGroup(m.role) === 'de';
     }
-    return true; // acce_admin sees all
+    if (userRole && isPlatformWideAdmin(userRole)) return true;
+    return false;
   });
 
   // ── UI filters (search, group chip, active toggle) ───────────────────────
@@ -308,7 +312,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const showSchoolIdFieldInModal  = userRole === 'acce_admin' && inviteType === 'school';
+  const showSchoolIdFieldInModal  = userRole && isPlatformWideAdmin(userRole) && inviteType === 'school';
   const showSchoolIdLockedInModal = userRole === 'school_admin';
   const showCounsellorScopeInModal = inviteType === 'acce' && inviteRole === 'acce_staff';
 
@@ -363,11 +367,11 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
 
       <div className="flex-1 overflow-y-auto p-6">
 
-        {/* Maintenance mode — acce_admin only */}
-        {actualRole === 'acce_admin' && <MaintenanceAdminPanel />}
+        {/* Maintenance mode — platform admins (ACCE Admin + SecureLogic Admin) */}
+        {actualRole && canManageMaintenance(actualRole) && <MaintenanceAdminPanel />}
 
-        {/* Preview As Role — acce_admin only */}
-        {actualRole === 'acce_admin' && (
+        {/* Preview As Role — platform admins only */}
+        {actualRole && isPlatformWideAdmin(actualRole) && (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
               <Eye className="w-4 h-4 text-amber-600" />
@@ -857,7 +861,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                   </FormField>
 
                   {/* Type — shown only for acce_admin; scoped admins have a fixed type */}
-                  {userRole === 'acce_admin' && (
+                  {userRole && isPlatformWideAdmin(userRole) && (
                     <FormField label="Type" required>
                       <SearchableDropdown
                         className="w-full"
@@ -881,7 +885,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                       panelWidthClass="w-full"
                       value={inviteRole}
                       onChange={v => setInviteRole(v as AppRole)}
-                      options={(userRole === 'acce_admin' ? typeFilteredRoles : myAssignableRoles).map(r => ({
+                      options={(userRole && isPlatformWideAdmin(userRole) ? typeFilteredRoles : myAssignableRoles).map(r => ({
                         value: r,
                         label: ROLE_LABELS[r],
                       }))}

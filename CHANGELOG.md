@@ -7,9 +7,14 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-19 (latest)
 
+### Added: SecureLogic Admin super-admin role
+
+- New `securelogic_admin` role in Supabase (`emci_role` enum) with the same platform permissions as ACCE Admin. Only SecureLogic Admin bypasses maintenance mode; ACCE Admin can still view and toggle maintenance in Team Management but is blocked when maintenance is active.
+- SecureLogic Admin can assign all roles including other SecureLogic Admins; ACCE Admin cannot assign SecureLogic Admin.
+
 ### Added: Platform maintenance mode
 
-- ACCE Admin can enable maintenance mode from Team Management. When active, all users except `acce_admin` see a maintenance screen after sign-in; the login page shows a maintenance notice.
+- ACCE Admin and SecureLogic Admin can enable maintenance mode from Team Management. When active, all users except SecureLogic Admin see a maintenance screen after sign-in; the login page shows a maintenance notice.
 - Maintenance state is stored in Supabase (`emci_platform_settings`) with realtime updates across sessions. Optional `VITE_MAINTENANCE_MODE=true` env var provides an emergency lockout without a DB toggle.
 
 ### Added: Australia production Supabase project bootstrap

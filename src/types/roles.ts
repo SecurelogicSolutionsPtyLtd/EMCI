@@ -1,7 +1,8 @@
 // EMCI Role-Based Access Control
-// Six roles across three groups — each with a staff and admin sub-role.
+// Seven roles — ACCE, School, DE groups plus SecureLogic super-admin.
 
 export type AppRole =
+  | 'securelogic_admin'
   | 'acce_admin'
   | 'acce_staff'
   | 'school_admin'
@@ -34,9 +35,29 @@ export function hasCounsellorScope(scope: CounsellorScope | null | undefined): b
   return Boolean(scope.email?.trim() || scope.ownerId?.trim());
 }
 
+/** SecureLogic super-admin — full platform access including maintenance bypass. */
+export function isSecureLogicAdmin(role: AppRole): boolean {
+  return role === 'securelogic_admin';
+}
+
+/** ACCE Admin or SecureLogic Admin — network-wide team and settings access. */
+export function isPlatformWideAdmin(role: AppRole): boolean {
+  return role === 'acce_admin' || role === 'securelogic_admin';
+}
+
+/** ACCE Admin or SecureLogic Admin may toggle maintenance mode in Team Management. */
+export function canManageMaintenance(role: AppRole): boolean {
+  return isPlatformWideAdmin(role);
+}
+
+/** Only SecureLogic Admin bypasses the maintenance lockout. */
+export function canBypassMaintenance(role: AppRole | null | undefined): boolean {
+  return role === 'securelogic_admin';
+}
+
 /** True when an ACCE user (not admin) is limited to their own counsellor-owned cohort. */
 export function isCounsellorScoped(role: AppRole, scope: CounsellorScope | null | undefined): boolean {
-  if (role === 'acce_admin') return false;
+  if (isPlatformWideAdmin(role)) return false;
   if (getRoleGroup(role) !== 'acce') return false;
   return hasCounsellorScope(scope);
 }
@@ -64,24 +85,25 @@ export function studentMatchesCounsellorScope(
 // ── Group helpers ─────────────────────────────────────────────────────────────
 
 export function getRoleGroup(role: AppRole): RoleGroup {
-  if (role === 'acce_admin' || role === 'acce_staff') return 'acce';
+  if (role === 'securelogic_admin' || role === 'acce_admin' || role === 'acce_staff') return 'acce';
   if (role === 'school_admin' || role === 'school_staff') return 'school';
   return 'de';
 }
 
 export function isAdminRole(role: AppRole): boolean {
-  return role === 'acce_admin' || role === 'school_admin' || role === 'de_admin';
+  return isPlatformWideAdmin(role) || role === 'school_admin' || role === 'de_admin';
 }
 
 // ── Display labels ────────────────────────────────────────────────────────────
 
 export const ROLE_LABELS: Record<AppRole, string> = {
-  acce_admin:   'ACCE Admin',
-  acce_staff:   'ACCE Staff',
-  school_admin: 'School Admin',
-  school_staff: 'School Staff',
-  de_admin:     'DE Admin',
-  de_staff:     'DE Staff',
+  securelogic_admin: 'SecureLogic Admin',
+  acce_admin:        'ACCE Admin',
+  acce_staff:        'ACCE Staff',
+  school_admin:      'School Admin',
+  school_staff:      'School Staff',
+  de_admin:          'DE Admin',
+  de_staff:          'DE Staff',
 };
 
 export const ROLE_GROUP_LABELS: Record<RoleGroup, string> = {
@@ -108,9 +130,6 @@ export function canAccessPage(role: AppRole, page: Page, counsellorScope?: Couns
   switch (page) {
     case 'network':       return true;
     case 'school':        return group === 'acce' || group === 'school';
-    // School roles can VIEW the student journey for their own students (read-only).
-    // PDF export and write actions remain ACCE-only via separate gates.
-    // DE: read-only redacted journey (no write / PDF).
     case 'student':       return group === 'acce' || group === 'school' || group === 'de';
     case 'pdf':           return group === 'acce';
     case 'counsellors':   return group === 'acce';
@@ -118,8 +137,11 @@ export function canAccessPage(role: AppRole, page: Page, counsellorScope?: Couns
     case 'surveysearch':  return group === 'acce';
     case 'studentsearch': return group === 'acce';
     case 'team':          return isAdminRole(role);
-    // Aggregated, de-identified analytics for DE oversight (ACCE can preview).
     case 'de_analytics':  return group === 'de' || group === 'acce';
+    default: {
+      const _exhaustive: never = page;
+      return _exhaustive;
+    }
   }
 }
 
@@ -135,7 +157,7 @@ export function canViewStudentRoster(role: AppRole): boolean {
   return true;
 }
 
-/** Only ACCE roles can access write operations. */
+/** Only ACCE-tier roles can access write operations. */
 export function canWrite(role: AppRole): boolean {
   return getRoleGroup(role) === 'acce';
 }
@@ -145,13 +167,24 @@ export function canManageTeam(role: AppRole): boolean {
   return isAdminRole(role);
 }
 
-/** Only ACCE Admin may trigger AI-powered features (analysis, rating, sentiment, chat). */
+/** Platform admins may trigger AI-powered features (analysis, rating, sentiment, chat). */
 export function canUseAiFeatures(role: AppRole): boolean {
-  return role === 'acce_admin';
+  return isPlatformWideAdmin(role);
 }
 
-/** Which roles a given admin can assign. acce_admin can assign any; scoped admins only their group. */
+/** Which roles a given admin can assign. */
 export function assignableRoles(role: AppRole): AppRole[] {
+  if (role === 'securelogic_admin') {
+    return [
+      'securelogic_admin',
+      'acce_admin',
+      'acce_staff',
+      'school_admin',
+      'school_staff',
+      'de_admin',
+      'de_staff',
+    ];
+  }
   if (role === 'acce_admin') {
     return ['acce_admin', 'acce_staff', 'school_admin', 'school_staff', 'de_admin', 'de_staff'];
   }
