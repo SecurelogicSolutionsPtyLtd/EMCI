@@ -5,19 +5,23 @@
  */
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { CounsellorView } from './components/CounsellorView';
+import { AuthConfirm } from './components/auth/AuthConfirm';
 import { DataverseLab } from './components/DataverseLab';
 import { SurveySearch } from './components/SurveySearch';
 import { StudentSearch } from './components/StudentSearch';
 import { LoginPage } from './components/LoginPage';
 import { TeamManagement } from './components/TeamManagement';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { MaintenanceProvider, useMaintenance } from './context/MaintenanceContext';
+import { MaintenanceScreen } from './components/MaintenanceScreen';
 import type { Student } from './data/studentsData';
 import type { School } from './data/networkData';
 import {
   fetchStudents,
   fetchSchools,
+  fetchSystemUsers,
   fetchSessions,
   fetchAbsences,
   fetchInitialSurveys,
@@ -40,6 +44,7 @@ import {
   type RawAnnotation,
 } from './services/dataverse';
 import { getRoleGroup, ROLE_LABELS } from './types/roles';
+import { getProgramVisibleScope } from './lib/networkProgramMetrics';
 import { redactSensitiveEventsMap } from './redaction';
 import { Eye, RotateCcw } from 'lucide-react';
 import { EmciLoadingScreen } from './components/EmciLoadingScreen';
@@ -60,8 +65,10 @@ const TOKEN_URL = '/devtoken';
 // ── Inner app (inside AuthProvider) ──────────────────────────────────────────
 
 function AppInner() {
-  const { userRole, schoolId, stage, isImpersonating, clearImpersonation } = useAuth();
+  const { userRole, schoolId, counsellorScope, stage, actualRole, isImpersonating, clearImpersonation } = useAuth();
+  const { maintenanceMode } = useMaintenance();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── Auth + data state ────────────────────────────────────────────────────
   const [token, setToken]               = useState('');
@@ -101,8 +108,9 @@ function AppInner() {
     setDataLoading(true);
     setDataError(null);
     try {
+      const ownerMap = await fetchSystemUsers(tok);
       const [fetchedStudents, fetchedSchools] = await Promise.all([
-        fetchStudents(tok),
+        fetchStudents(tok, ownerMap),
         fetchSchools(tok),
       ]);
       const [
@@ -131,7 +139,7 @@ function AppInner() {
       const midStudentSurveys2026 = midStudentSurveys2026Res.status === 'fulfilled' ? midStudentSurveys2026Res.value : [] as RawMidPilotStudentSurvey2026[];
       const annotations       = annotationsRes.status       === 'fulfilled' ? annotationsRes.value       : [] as RawAnnotation[];
 
-      const enriched = enrichStudents(fetchedStudents, [], sessions, absences);
+      const enriched = enrichStudents(fetchedStudents, [], sessions, absences, ownerMap);
 
       const eventsMap: Record<string, TimelineEvent[]> = {};
       const matchesStudent = (
@@ -249,26 +257,43 @@ function AppInner() {
     }
   }, [stage, userRole, navigate]);
 
+  const roleScopedData = useMemo(() => {
+    if (!userRole) return { scopedStudents: students, scopedSchools: schools };
+    return getProgramVisibleScope(students, schools, userRole, schoolId, counsellorScope);
+  }, [students, schools, userRole, schoolId, counsellorScope]);
+
   const shellOutletContext: AppShellOutletContext = useMemo(
     () => ({
-      students,
-      schools,
+      students: roleScopedData.visibleStudents,
+      schools: roleScopedData.visibleSchools,
       userRole: userRole as NonNullable<typeof userRole>,
       token,
       loadData,
       dataError,
       studentEventsMap,
     }),
-    [students, schools, userRole, token, loadData, dataError, studentEventsMap],
+    [roleScopedData, userRole, token, loadData, dataError, studentEventsMap],
   );
 
   // ── Auth gates ────────────────────────────────────────────────────────────
+
+  // Invite-acceptance link (served from the EMCI domain). Handled before the
+  // normal gates so the one-time token is verified and the password is set
+  // before the standard MFA-enrolment flow takes over.
+  if (location.pathname === '/auth/confirm') {
+    return <AuthConfirm />;
+  }
+
   if (stage === 'loading') {
     return <EmciLoadingScreen />;
   }
 
   if (stage === 'unauthenticated' || stage === 'mfa_required' || stage === 'mfa_enroll' || stage === 'no_role') {
     return <LoginPage />;
+  }
+
+  if (maintenanceMode && actualRole !== 'acce_admin') {
+    return <MaintenanceScreen />;
   }
 
   const ImpersonationBanner = isImpersonating ? (
@@ -317,7 +342,7 @@ function AppInner() {
                 element={(
                   <RequirePage page="team">
                     <div className="h-full w-full overflow-hidden">
-                      <TeamManagement onBack={() => navigate('/dashboard')} schools={schools} />
+                      <TeamManagement onBack={() => navigate('/dashboard')} schools={roleScopedData.visibleSchools} />
                     </div>
                   </RequirePage>
                 )}
@@ -327,7 +352,7 @@ function AppInner() {
                 element={(
                   <RequirePage page="surveysearch">
                     <div className="h-full w-full overflow-hidden">
-                      <SurveySearch students={students} studentEventsMap={studentEventsMap} onBack={() => navigate('/devlab')} />
+                      <SurveySearch students={roleScopedData.visibleStudents} studentEventsMap={studentEventsMap} onBack={() => navigate('/devlab')} />
                     </div>
                   </RequirePage>
                 )}
@@ -337,7 +362,7 @@ function AppInner() {
                 element={(
                   <RequirePage page="studentsearch">
                     <div className="h-full w-full overflow-hidden">
-                      <StudentSearch students={students} schools={schools} onBack={() => navigate('/devlab')} />
+                      <StudentSearch students={roleScopedData.visibleStudents} schools={roleScopedData.visibleSchools} onBack={() => navigate('/devlab')} />
                     </div>
                   </RequirePage>
                 )}
@@ -365,7 +390,7 @@ function AppInner() {
                   path="/counsellors"
                   element={(
                     <RequirePage page="counsellors">
-                      <CounsellorView students={students} schools={schools} />
+                      <CounsellorView students={roleScopedData.visibleStudents} schools={roleScopedData.visibleSchools} />
                     </RequirePage>
                   )}
                 />
@@ -401,8 +426,10 @@ function AppInner() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppInner />
-    </AuthProvider>
+    <MaintenanceProvider>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </MaintenanceProvider>
   );
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>You've been invited to EMCI</title>
+  <title>You've been invited to the EMCI School Platform</title>
   <!--[if mso]>
   <noscript>
     <xml>
@@ -32,11 +32,10 @@
                 <tr>
                   <td style="background-color:#ec5b13;width:6px;line-height:1;">&nbsp;</td>
                   <td style="background-color:#0F172A;padding:28px 36px;">
-                    <!-- Logo -->
                     <img
-                      src="{{ .SiteURL }}/emci-logo-lockup.png"
-                      alt="EMCI"
-                      width="120"
+                      src="{{ .SiteURL }}/emci-logo-lockup-white.png"
+                      alt="EMCI — Australian Centre for Career Education"
+                      width="140"
                       style="display:block;height:auto;border:0;"
                     />
                   </td>
@@ -62,10 +61,15 @@
 
               <!-- Headline -->
               <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#0F172A;line-height:1.3;letter-spacing:-0.3px;">
-                You've been invited
+                You've been invited to the EMCI School Platform
               </h1>
+              <p style="margin:0 0 16px;font-size:14px;color:#64748B;line-height:1.6;">
+                An EMCI platform administrator has invited you to create an account on the
+                <strong style="color:#0F172A;">EMCI School Platform</strong> — the secure student tracking portal used by ACCE and participating schools.
+              </p>
               <p style="margin:0 0 24px;font-size:14px;color:#64748B;line-height:1.6;">
-                You have been invited to access the <strong style="color:#0F172A;">EMCI Student Tracking Platform</strong>.
+                Use the button below to accept your invitation and set up your login. After verification, you will be redirected to
+                <strong style="color:#0F172A;">{{ if .RedirectTo }}{{ .RedirectTo }}{{ else }}{{ .SiteURL }}{{ end }}</strong>.
               </p>
 
               <!-- Divider -->
@@ -90,18 +94,21 @@
                 <tr>
                   <td style="border-radius:8px;background-color:#2563EB;">
                     <a
-                      href="{{ .ConfirmationURL }}"
+                      href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&redirect_to={{ .RedirectTo }}"
                       style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.2px;border-radius:8px;"
                     >
-                      Accept Invitation &rarr;
+                      Accept invitation &amp; set up account
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <!-- Expiry note -->
-              <p style="margin:0 0 20px;font-size:13px;color:#94A3B8;line-height:1.6;">
-                This link will expire in <strong style="color:#64748B;">24 hours</strong>. If you did not expect this invitation, you can safely ignore this email.
+              <!-- Expiry + security note -->
+              <p style="margin:0 0 12px;font-size:13px;color:#64748B;line-height:1.6;">
+                This invitation link expires in <strong style="color:#475569;">24 hours</strong> and can only be used once.
+              </p>
+              <p style="margin:0 0 20px;font-size:13px;color:#64748B;line-height:1.6;">
+                If you were not expecting this invitation, you can safely ignore this email — no account will be created unless you click the button above. Never share this link with anyone else.
               </p>
 
               <!-- Divider -->
@@ -111,10 +118,10 @@
                 </tr>
               </table>
 
-              <!-- Fallback link -->
+              <!-- Fallback -->
               <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
                 Button not working? Copy and paste this link into your browser:<br />
-                <a href="{{ .ConfirmationURL }}" style="color:#2563EB;word-break:break-all;">{{ .ConfirmationURL }}</a>
+                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&redirect_to={{ .RedirectTo }}" style="color:#2563EB;word-break:break-all;">{{ .SiteURL }}/auth/confirm</a>
               </p>
 
             </td>
@@ -126,13 +133,15 @@
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
+                    <p style="margin:0 0 4px;font-size:11px;color:#64748B;line-height:1.6;font-weight:600;">
+                      EMCI School Platform &mdash; Australian Centre for Career Education (ACCE)
+                    </p>
                     <p style="margin:0;font-size:11px;color:#94A3B8;line-height:1.6;">
-                      &copy; {{ .SiteURL }} &mdash; EMCI Student Tracking Platform<br />
-                      This is an automated message. Please do not reply to this email.
+                      This is an automated message from a trusted EMCI system. Please do not reply to this email.<br />
+                      Official site: <a href="{{ if .RedirectTo }}{{ .RedirectTo }}{{ else }}{{ .SiteURL }}{{ end }}" style="color:#2563EB;text-decoration:none;">{{ if .RedirectTo }}{{ .RedirectTo }}{{ else }}{{ .SiteURL }}{{ end }}</a>
                     </p>
                   </td>
                   <td align="right" valign="middle">
-                    <!-- Orange accent dot group -->
                     <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background-color:#ec5b13;margin-right:4px;"></span>
                     <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background-color:#2563EB;"></span>
                   </td>

@@ -78,17 +78,18 @@ export function NetworkOverview({
   students, schools, userRole, networkTab, onNetworkTabChange,
   onSelectSchool, onSelectStudent,
 }: NetworkOverviewProps) {
-  const { schoolId } = useAuth();
+  const { schoolId, counsellorScope } = useAuth();
   const showStudentNames   = canSeeStudentNames(userRole);
   const showStudentRoster  = canViewStudentRoster(userRole);
-  const showStudentJourney = canAccessPage(userRole, 'student');
-  const canOpenSchoolDashboard = canAccessPage(userRole, 'school');
+  const showStudentJourney = canAccessPage(userRole, 'student', counsellorScope);
+  const canOpenSchoolDashboard = canAccessPage(userRole, 'school', counsellorScope);
 
   const { visibleSchools, visibleStudents } = getProgramVisibleScope(
     students,
     schools,
     userRole,
     schoolId,
+    counsellorScope,
   );
 
   const visibleStudentIds = useMemo(
@@ -581,7 +582,7 @@ export function NetworkOverview({
                                       {atRisk && (
                                         <>
                                           <span className="text-slate-300 mx-1">·</span>
-                                          <span className="text-red-500/80 font-medium">At risk</span>
+                                          <span className="text-red-500/80 font-medium">Flagged for follow up</span>
                                         </>
                                       )}
                                     </p>

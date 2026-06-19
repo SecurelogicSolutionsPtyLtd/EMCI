@@ -66,7 +66,7 @@ export function MainSidebar({
   onGoToTeam,
   userRole,
 }: MainSidebarProps) {
-  const { authUser, signOutUser } = useAuth();
+  const { authUser, signOutUser, counsellorScope } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [hovered, setHovered] = useState(false);
   const { pinMode, cyclePinMode, pinModeLabel } = useMainSidebarPin();
@@ -80,9 +80,9 @@ export function MainSidebar({
   }, [pinMode]);
 
   const showStudentRoster = canViewStudentRoster(userRole);
-  const showCounsellors    = canAccessPage(userRole, 'counsellors');
-  const showDeAnalytics    = canAccessPage(userRole, 'de_analytics');
-  const showDevLab         = canAccessPage(userRole, 'devlab');
+  const showCounsellors    = canAccessPage(userRole, 'counsellors', counsellorScope);
+  const showDeAnalytics    = canAccessPage(userRole, 'de_analytics', counsellorScope);
+  const showDevLab         = canAccessPage(userRole, 'devlab', counsellorScope);
   const showTeam           = isAdminRole(userRole);
 
   const SECONDARY_NAV = [

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { User, Session } from '@supabase/supabase-js';
+import type { User, Session, EmailOtpType } from '@supabase/supabase-js';
 import type { AppRole } from '../types/roles';
 
 const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     as string;
@@ -29,6 +29,24 @@ export async function signInWithEmail(email: string, password: string): Promise<
 
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+/**
+ * Verifies an email-link token (invite / recovery / magiclink) using its
+ * `token_hash`. Used by the custom `/auth/confirm` page so invite links can be
+ * served from the EMCI domain instead of the raw Supabase verify URL — this
+ * avoids the link being flagged/quarantined by mail security and avoids GET
+ * prefetchers consuming the one-time token (verifyOtp is a POST).
+ */
+export async function verifyEmailToken(tokenHash: string, type: EmailOtpType): Promise<void> {
+  const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+  if (error) throw error;
+}
+
+/** Sets the password for the currently authenticated user (e.g. when accepting an invite). */
+export async function setUserPassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
   if (error) throw error;
 }
 
@@ -115,10 +133,12 @@ export function mapUser(user: User): AppUser {
 // ── Role helpers ───────────────────────────────────────────────────────────────
 
 export interface UserRoleRecord {
-  role:        AppRole;
-  school_id:   string | null;
-  display_name: string | null;
-  email:       string;
+  role:               AppRole;
+  school_id:            string | null;
+  display_name:         string | null;
+  email:                string;
+  counsellor_email:     string | null;
+  dataverse_owner_id:   string | null;
 }
 
 /**
@@ -138,20 +158,22 @@ export async function getUserRole(userId: string, email: string): Promise<UserRo
 // ── Team management helpers ────────────────────────────────────────────────────
 
 export interface TeamMember {
-  id:           string;
-  user_id:      string | null;
-  email:        string;
-  display_name: string | null;
-  role:         AppRole;
-  school_id:    string | null;
-  is_active:    boolean;
-  created_at:   string;
+  id:                 string;
+  user_id:            string | null;
+  email:              string;
+  display_name:       string | null;
+  role:               AppRole;
+  school_id:          string | null;
+  counsellor_email:   string | null;
+  dataverse_owner_id: string | null;
+  is_active:          boolean;
+  created_at:         string;
 }
 
 export async function listTeamMembers(): Promise<TeamMember[]> {
   const { data, error } = await supabase
     .from('emci_user_roles')
-    .select('id, user_id, email, display_name, role, school_id, is_active, created_at')
+    .select('id, user_id, email, display_name, role, school_id, counsellor_email, dataverse_owner_id, is_active, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as TeamMember[];
@@ -162,10 +184,19 @@ export async function addTeamMember(
   role: AppRole,
   displayName?: string,
   schoolId?: string,
+  counsellorEmail?: string,
+  dataverseOwnerId?: string,
 ): Promise<void> {
   const { error } = await supabase
     .from('emci_user_roles')
-    .insert({ email, role, display_name: displayName ?? null, school_id: schoolId ?? null });
+    .insert({
+      email,
+      role,
+      display_name: displayName ?? null,
+      school_id: schoolId ?? null,
+      counsellor_email: counsellorEmail?.trim() || null,
+      dataverse_owner_id: dataverseOwnerId?.trim() || null,
+    });
   if (error) throw error;
 }
 
@@ -178,6 +209,8 @@ export async function inviteTeamMember(
   role: AppRole,
   displayName?: string,
   schoolId?: string,
+  counsellorEmail?: string,
+  dataverseOwnerId?: string,
 ): Promise<void> {
   const { data, error } = await supabase.functions.invoke('invite-user', {
     body: {
@@ -185,6 +218,8 @@ export async function inviteTeamMember(
       role,
       displayName: displayName ?? null,
       schoolId:    schoolId    ?? null,
+      counsellorEmail:   counsellorEmail?.trim() || null,
+      dataverseOwnerId:  dataverseOwnerId?.trim() || null,
     },
   });
   if (error) {
@@ -199,6 +234,21 @@ export async function updateTeamMemberRole(id: string, role: AppRole): Promise<v
   const { error } = await supabase
     .from('emci_user_roles')
     .update({ role })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function updateTeamMemberCounsellorScope(
+  id: string,
+  counsellorEmail: string | null,
+  dataverseOwnerId: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('emci_user_roles')
+    .update({
+      counsellor_email: counsellorEmail?.trim() || null,
+      dataverse_owner_id: dataverseOwnerId?.trim() || null,
+    })
     .eq('id', id);
   if (error) throw error;
 }
@@ -240,4 +290,43 @@ export async function deleteTeamMember(
     throw new Error(body?.error ?? error.message);
   }
   if (data?.error) throw new Error(data.error as string);
+}
+
+// ── Platform settings ─────────────────────────────────────────────────────────
+
+export interface PlatformSettings {
+  id:                 number;
+  maintenance_mode:   boolean;
+  maintenance_message: string | null;
+  updated_at:         string;
+  updated_by:         string | null;
+}
+
+export async function fetchPlatformSettings(): Promise<PlatformSettings | null> {
+  const { data, error } = await supabase
+    .from('emci_platform_settings')
+    .select('id, maintenance_mode, maintenance_message, updated_at, updated_by')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as PlatformSettings | null;
+}
+
+export async function updateMaintenanceMode(
+  enabled: boolean,
+  message?: string | null,
+): Promise<PlatformSettings> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('emci_platform_settings')
+    .update({
+      maintenance_mode: enabled,
+      maintenance_message: message?.trim() || null,
+      updated_by: user?.id ?? null,
+    })
+    .eq('id', 1)
+    .select('id, maintenance_mode, maintenance_message, updated_at, updated_by')
+    .single();
+  if (error) throw error;
+  return data as PlatformSettings;
 }

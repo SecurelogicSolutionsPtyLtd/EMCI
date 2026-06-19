@@ -1,7 +1,7 @@
 import type { School } from '../data/networkData';
 import type { Student } from '../data/studentsData';
-import type { AppRole } from '../types/roles';
-import { getRoleGroup } from '../types/roles';
+import type { AppRole, CounsellorScope } from '../types/roles';
+import { getRoleGroup, isCounsellorScoped, studentMatchesCounsellorScope } from '../types/roles';
 
 export interface ProgramKpiCard {
   label: string;
@@ -9,20 +9,36 @@ export interface ProgramKpiCard {
   highlight: boolean;
 }
 
-/** Same visibility rules as NetworkOverview: school roles see only their school cohort. */
+/** Same visibility rules as NetworkOverview: school roles see only their school cohort; scoped counsellors see only their students. */
 export function getProgramVisibleScope(
   students: Student[],
   schools: School[],
   userRole: AppRole,
   authSchoolId: string | null,
+  counsellorScope?: CounsellorScope | null,
 ): { visibleSchools: School[]; visibleStudents: Student[] } {
   const isSchoolRole = getRoleGroup(userRole) === 'school';
-  const visibleSchools =
-    isSchoolRole && authSchoolId ? schools.filter(s => s.id === authSchoolId) : schools;
-  const visibleStudents =
-    isSchoolRole && authSchoolId
-      ? students.filter(s => (s as { schoolId?: string }).schoolId === authSchoolId)
-      : students;
+  const scopedCounsellor = isCounsellorScoped(userRole, counsellorScope);
+
+  let visibleStudents = students;
+  if (isSchoolRole && authSchoolId) {
+    visibleStudents = students.filter(s => (s as { schoolId?: string }).schoolId === authSchoolId);
+  } else if (scopedCounsellor && counsellorScope) {
+    visibleStudents = students.filter(s => studentMatchesCounsellorScope(s, counsellorScope));
+  }
+
+  let visibleSchools = schools;
+  if (isSchoolRole && authSchoolId) {
+    visibleSchools = schools.filter(s => s.id === authSchoolId);
+  } else if (scopedCounsellor) {
+    const schoolIds = new Set(
+      visibleStudents
+        .map(s => (s as { schoolId?: string }).schoolId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    visibleSchools = schools.filter(s => schoolIds.has(s.id));
+  }
+
   return { visibleSchools, visibleStudents };
 }
 

@@ -263,7 +263,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                         {atRisk && (
                           <>
                             <span className="text-slate-300 mx-1">·</span>
-                            <span className="text-red-500/80 font-medium">At risk</span>
+                            <span className="text-red-500/80 font-medium">Flagged for follow up</span>
                           </>
                         )}
                       </p>
@@ -333,7 +333,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                             {atRisk && (
                               <>
                                 <span className="text-slate-300 mx-1">·</span>
-                                <span className="text-red-500/80 font-medium">At risk</span>
+                                <span className="text-red-500/80 font-medium">Flagged for follow up</span>
                               </>
                             )}
                           </p>

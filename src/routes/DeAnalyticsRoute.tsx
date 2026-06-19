@@ -7,13 +7,14 @@ import type { AppShellOutletContext } from './shellContext';
 
 export function DeAnalyticsRoute() {
   const { students, schools, userRole, studentEventsMap } = useOutletContext<AppShellOutletContext>();
-  const { schoolId } = useAuth();
+  const { schoolId, counsellorScope } = useAuth();
 
   const { visibleSchools, visibleStudents } = getProgramVisibleScope(
     students,
     schools,
     userRole,
     schoolId,
+    counsellorScope,
   );
 
   return (

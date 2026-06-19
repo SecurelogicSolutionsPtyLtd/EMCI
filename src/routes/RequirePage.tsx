@@ -5,8 +5,8 @@ import { canAccessPage } from '../types/roles';
 import type { Page } from '../types/roles';
 
 export function RequirePage({ page, children }: { page: Page; children: React.ReactNode }) {
-  const { userRole } = useAuth();
-  if (!userRole || !canAccessPage(userRole, page)) {
+  const { userRole, counsellorScope } = useAuth();
+  if (!userRole || !canAccessPage(userRole, page, counsellorScope)) {
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;

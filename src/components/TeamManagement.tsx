@@ -9,6 +9,7 @@ import {
   listTeamMembers,
   inviteTeamMember,
   updateTeamMemberRole,
+  updateTeamMemberCounsellorScope,
   toggleTeamMemberActive,
   deleteTeamMember,
   type TeamMember,
@@ -24,6 +25,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Eye, RotateCcw } from 'lucide-react';
 import { SearchableDropdown } from './ui/SearchableDropdown';
+import { MaintenanceAdminPanel } from './MaintenanceAdminPanel';
 
 const ROLE_GROUP_OPTIONS = [
   { value: 'acce', label: 'ACCE' },
@@ -126,12 +128,16 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
   const [inviteType,     setInviteType]     = useState<RoleGroup>(defaultInviteType);
   const [inviteRole,     setInviteRole]     = useState<AppRole>(myAssignableRoles[0] ?? 'acce_staff');
   const [inviteSchoolId, setInviteSchoolId] = useState(mySchoolId ?? '');
+  const [inviteCounsellorEmail, setInviteCounsellorEmail] = useState('');
+  const [inviteDataverseOwnerId, setInviteDataverseOwnerId] = useState('');
   const [inviteLoading,  setInviteLoading]  = useState(false);
   const [inviteError,    setInviteError]    = useState<string | null>(null);
 
   // Inline role editor
   const [editingId,   setEditingId]   = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<AppRole>('acce_staff');
+  const [editingCounsellorEmail, setEditingCounsellorEmail] = useState('');
+  const [editingDataverseOwnerId, setEditingDataverseOwnerId] = useState('');
   const [editLoading, setEditLoading] = useState(false);
 
   // Deactivation confirmation
@@ -213,6 +219,8 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
     setInviteRole(startRole);
     // school_admin: pre-fill + lock school_id to their own school
     setInviteSchoolId(userRole === 'school_admin' ? (mySchoolId ?? '') : '');
+    setInviteCounsellorEmail('');
+    setInviteDataverseOwnerId('');
     setInviteError(null);
     setShowInvite(true);
   }
@@ -223,6 +231,8 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
     const firstRole = myAssignableRoles.find(r => getRoleGroup(r) === type);
     if (firstRole) setInviteRole(firstRole);
     setInviteSchoolId('');
+    setInviteCounsellorEmail('');
+    setInviteDataverseOwnerId('');
   }
 
   async function handleInvite(e: React.FormEvent) {
@@ -236,6 +246,8 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
         inviteRole,
         inviteName.trim() || undefined,
         needsSchool && inviteSchoolId.trim() ? inviteSchoolId.trim() : undefined,
+        inviteRole === 'acce_staff' ? inviteCounsellorEmail.trim() || undefined : undefined,
+        inviteRole === 'acce_staff' ? inviteDataverseOwnerId.trim() || undefined : undefined,
       );
       setShowInvite(false);
       await load();
@@ -252,6 +264,13 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
     setEditLoading(true);
     try {
       await updateTeamMemberRole(id, editingRole);
+      if (editingRole === 'acce_staff') {
+        await updateTeamMemberCounsellorScope(
+          id,
+          editingCounsellorEmail.trim() || null,
+          editingDataverseOwnerId.trim() || null,
+        );
+      }
       setEditingId(null);
       await load();
     } catch (e: any) {
@@ -291,6 +310,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
 
   const showSchoolIdFieldInModal  = userRole === 'acce_admin' && inviteType === 'school';
   const showSchoolIdLockedInModal = userRole === 'school_admin';
+  const showCounsellorScopeInModal = inviteType === 'acce' && inviteRole === 'acce_staff';
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-50 overflow-hidden">
@@ -342,6 +362,9 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
+
+        {/* Maintenance mode — acce_admin only */}
+        {actualRole === 'acce_admin' && <MaintenanceAdminPanel />}
 
         {/* Preview As Role — acce_admin only */}
         {actualRole === 'acce_admin' && (
@@ -516,6 +539,12 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                           <div className="min-w-0">
                             <p className="font-semibold text-slate-900 truncate">{member.display_name ?? '—'}</p>
                             <p className="text-xs text-slate-400 truncate">{member.email}</p>
+                            {getRoleGroup(member.role) === 'acce' && (member.counsellor_email || member.dataverse_owner_id) && (
+                              <p className="text-[11px] text-primary/80 truncate">
+                                Scoped counsellor
+                                {member.counsellor_email ? ` · ${member.counsellor_email}` : ''}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -523,7 +552,8 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                       {/* Role — inline editor for admins */}
                       <td className="px-5 py-3.5">
                         {isEditing ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
                             <SearchableDropdown
                               value={editingRole}
                               onChange={v => setEditingRole(v as AppRole)}
@@ -547,6 +577,25 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                             >
                               Cancel
                             </button>
+                            </div>
+                            {editingRole === 'acce_staff' && (
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <input
+                                  type="email"
+                                  value={editingCounsellorEmail}
+                                  onChange={e => setEditingCounsellorEmail(e.target.value)}
+                                  placeholder="Counsellor email (optional scope)"
+                                  className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                />
+                                <input
+                                  type="text"
+                                  value={editingDataverseOwnerId}
+                                  onChange={e => setEditingDataverseOwnerId(e.target.value)}
+                                  placeholder="Dataverse owner ID (optional)"
+                                  className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                />
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-semibold ${ROLE_GROUP_COLORS[group]}`}>
@@ -595,7 +644,12 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                           {!isEditing && (
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => { setEditingId(member.id); setEditingRole(member.role); }}
+                                onClick={() => {
+                                  setEditingId(member.id);
+                                  setEditingRole(member.role);
+                                  setEditingCounsellorEmail(member.counsellor_email ?? '');
+                                  setEditingDataverseOwnerId(member.dataverse_owner_id ?? '');
+                                }}
                                 className="text-xs text-slate-500 hover:text-primary font-medium transition-colors"
                               >
                                 Edit role
@@ -866,6 +920,32 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                         </div>
                       )}
                     </FormField>
+                  )}
+
+                  {showCounsellorScopeInModal && (
+                    <>
+                      <FormField label="Counsellor email (optional — limits to owned students)">
+                        <input
+                          type="email"
+                          value={inviteCounsellorEmail}
+                          onChange={e => setInviteCounsellorEmail(e.target.value)}
+                          placeholder="Matches Dataverse systemuser email"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                        />
+                      </FormField>
+                      <FormField label="Dataverse owner ID (fallback if email unavailable)">
+                        <input
+                          type="text"
+                          value={inviteDataverseOwnerId}
+                          onChange={e => setInviteDataverseOwnerId(e.target.value)}
+                          placeholder="systemuser GUID"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                        />
+                      </FormField>
+                      <p className="text-[11px] text-slate-400 -mt-2">
+                        Leave both blank for full network access. Set at least one to scope this ACCE staff member to their own students.
+                      </p>
+                    </>
                   )}
 
                   {/* School locked — school_admin can only add within their own school */}

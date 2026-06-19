@@ -5,7 +5,71 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-16 (latest)
+## — 2026-06-19 (latest)
+
+### Added: Platform maintenance mode
+
+- ACCE Admin can enable maintenance mode from Team Management. When active, all users except `acce_admin` see a maintenance screen after sign-in; the login page shows a maintenance notice.
+- Maintenance state is stored in Supabase (`emci_platform_settings`) with realtime updates across sessions. Optional `VITE_MAINTENANCE_MODE=true` env var provides an emergency lockout without a DB toggle.
+
+### Added: Australia production Supabase project bootstrap
+
+- Added project-scoped Supabase MCP server **`supabase(EMCI prod)`** for the Australia prod project (`vklwppadgogepkeaizow`) in [`.cursor/mcp.json`](.cursor/mcp.json). Legacy dev remains on **`supabase(EMCI)`** (`yfvvroesornchrxufwut`).
+- Added consolidated schema migration [`supabase/migrations/20260619120000_initial_emci_schema.sql`](supabase/migrations/20260619120000_initial_emci_schema.sql) matching the legacy database (tables, RLS, encrypted analysis helpers).
+- Updated [`.env.example`](.env.example) with the Australia prod project ref.
+
+**Remaining prod cutover (manual):** run [`supabase/scripts/migrate-data-to-prod.ps1`](supabase/scripts/migrate-data-to-prod.ps1) to copy auth + student analysis from legacy Singapore dev into existing AU prod (Dashboard restore cannot target existing projects or change region) → copy Auth settings → update Vercel `VITE_SUPABASE_*` env vars.
+
+### Changed: Australia prod Supabase cutover progress
+
+- Applied `initial_emci_schema` migration to prod (`vklwppadgogepkeaizow`): tables, RLS, encrypted analysis helpers.
+- Copied `_analysis_key_store` encryption key from dev to prod.
+- Deployed all 8 edge functions to prod; set `APP_SITE_URL=https://acce.org.au` secret.
+
+### Added: Counsellor-scoped access for ACCE staff
+
+- ACCE staff can now be limited to their own Dataverse-owned students and schools. Scope is driven by the counsellor owner email (preferred) or Dataverse `systemuser` GUID on `emci_user_roles`, with student matching via new `counsellorEmail` / `counsellorOwnerId` fields loaded from Dataverse ([`src/services/dataverse.ts`](src/services/dataverse.ts), [`src/types/roles.ts`](src/types/roles.ts), [`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts)).
+- Scoped counsellors see a single-profile Counsellor View (no all-counsellor sidebar), filtered dashboard/schools/students, and are blocked from Dev Lab tools. Direct URLs to another counsellor's student redirect to the dashboard ([`src/components/CounsellorView.tsx`](src/components/CounsellorView.tsx), [`src/routes/StudentJourneyRoute.tsx`](src/routes/StudentJourneyRoute.tsx), [`src/App.tsx`](src/App.tsx)).
+- Team Management supports optional counsellor email / Dataverse owner ID when inviting or editing `acce_staff` users ([`src/components/TeamManagement.tsx`](src/components/TeamManagement.tsx), [`supabase/functions/invite-user/index.ts`](supabase/functions/invite-user/index.ts)).
+- Supabase: `emci_user_roles.counsellor_email` and `dataverse_owner_id` columns; `emci_resolve_user_role` returns both fields.
+
+### Fixed: Completed student profile card no longer stretches with empty white space
+
+- On completed student journeys, the identity card now sizes to its content instead of stretching to match the programme/tracking card height ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+
+---
+
+## — 2026-06-18
+
+### Changed: "At risk" wording replaced with "Flagged for follow up"
+
+- Risk-flag labels and advisory copy now read **"Flagged for follow up"** instead of "At risk" across the student register, network overview, and dashboard advisories ([`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/components/dashboard/DashboardAdvisories.tsx`](src/components/dashboard/DashboardAdvisories.tsx)).
+
+---
+
+### Fixed: Invite links now open on the EMCI domain and lead to account setup (not SSO)
+
+- Invited school/DE users were being dropped on the Microsoft SSO tab instead of the MFA setup flow, and the invite email itself was being quarantined by Microsoft Defender because its link used the raw `*.supabase.co` verify URL.
+- Invite emails now link to a new EMCI-domain confirmation page — `{{ .SiteURL }}/auth/confirm?token_hash=…&type=invite&redirect_to=…` — instead of the Supabase verify URL ([`supabase/email-templates/invite-user.html`](supabase/email-templates/invite-user.html)). Keeping the link on `acce.org.au` avoids mail-security quarantine, and using `verifyOtp` (a POST) prevents link-prefetch scanners from consuming the one-time token.
+- Added an `AuthConfirm` page that verifies the invite token, prompts the user to **create a password**, then hands off to the existing **two-factor (MFA) enrolment** flow — invited users are never shown the SSO tab ([`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx), [`src/App.tsx`](src/App.tsx)).
+- Added `verifyEmailToken()` and `setUserPassword()` helpers ([`src/services/supabase.ts`](src/services/supabase.ts)).
+- Extracted the shared branded auth layout/primitives into [`src/components/auth/AuthShell.tsx`](src/components/auth/AuthShell.tsx) so the sign-in and invite-acceptance screens stay visually identical ([`src/components/LoginPage.tsx`](src/components/LoginPage.tsx)).
+
+**Supabase Dashboard:** ensure **Authentication → URL Configuration → Site URL** is `https://acce.org.au` and that **Redirect URLs** include `https://acce.org.au/**`. Re-paste the updated **Invite user** email template. (`/auth/confirm` is already covered by the SPA rewrite in [`vercel.json`](vercel.json).)
+
+---
+
+### Changed: Invite email branding, trust signals, and redirect to acce.org.au
+
+- Updated the Supabase invite email template ([`supabase/email-templates/invite-user.html`](supabase/email-templates/invite-user.html)): clearer "EMCI School Platform" copy, white reverse logo on the navy header ([`public/emci-logo-lockup-white.png`](public/emci-logo-lockup-white.png)), ACCE sender context, security/expiry notes, and fallback text that points to `acce.org.au` instead of exposing the raw Supabase confirmation URL.
+- The `invite-user` edge function now passes `redirectTo: APP_SITE_URL` (default `https://acce.org.au`) so invite acceptance lands on the production site after verification ([`supabase/functions/invite-user/index.ts`](supabase/functions/invite-user/index.ts)).
+- Added `APP_SITE_URL` to [`.env.example`](.env.example) for the edge-function secret; set `VITE_SITE_URL=https://acce.org.au` for build-time meta tags.
+
+**Supabase Dashboard setup (one-time):** Authentication → URL Configuration — set **Site URL** to `https://acce.org.au`, add `https://acce.org.au/**` and `http://localhost:5173/**` to **Redirect URLs**. Authentication → Email Templates → **Invite user** — paste the updated HTML and set subject to e.g. `You've been invited to the EMCI School Platform`. Run `supabase secrets set APP_SITE_URL=https://acce.org.au` before deploying the edge function.
+
+---
+
+## — 2026-06-16
 
 ### Changed: School dashboard mobile responsiveness
 

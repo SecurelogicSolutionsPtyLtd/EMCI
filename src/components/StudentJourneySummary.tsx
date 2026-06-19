@@ -294,8 +294,8 @@ export function StudentJourneySummary({
 
       {isComplete ? (
         /* ── Completed: identity card (left) + programme record card (right) ── */
-        <div className="grid grid-cols-5 gap-5 items-stretch">
-          <div className="col-span-2 bg-white rounded-xl border border-slate-200 p-6 flex flex-col justify-center gap-3 min-w-0">
+        <div className="grid grid-cols-5 gap-5 items-start">
+          <div className="col-span-2 bg-white rounded-xl border border-slate-200 p-6 flex flex-col gap-3 min-w-0">
             {identityBlock}
           </div>
 

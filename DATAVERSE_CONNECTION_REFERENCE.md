@@ -66,8 +66,8 @@ Prefer:           odata.include-annotations="*"
 | `cr89a_yearlevel@OData...FormattedValue` | Year Level Label | Annotation | `student.yearLevelLabel` | Stored for display only (can be cohort name like "EMCI 2024 Students (Y9)") |
 | `cr89a_registrationcode` | Morrisby ID | String | `student.morrisbyId` | Falls back to first 8 chars of PK if null |
 | `_cr89a_wlpcschool_value` | School (lookup) | Lookup GUID | `student.schoolId` | Links to `cr89a_wlpcschoolid` |
-| `_ownerid_value` | Owner (GUID) | Owner | — | Not used directly |
-| `_ownerid_value@OData...FormattedValue` | Owner Name | Annotation | `student.counsellor` | Primary counsellor source |
+| `_ownerid_value` | Owner (GUID) | Owner | `student.counsellorOwnerId` | Mapped via `systemusers` lookup |
+| `_ownerid_value@OData...FormattedValue` | Owner Name | Annotation | `student.counsellor` | Primary counsellor display name |
 | `statecode` | State | State | — | Combined with `statuscode` |
 | `statuscode` | Status Reason | Status | `student.status` | See status decode table below |
 | `cr89a_studentinterviewed` | Interviewed | Boolean | `student.interviewed` | |
@@ -446,6 +446,8 @@ Quick reference for the `Student` interface properties and their Dataverse sourc
 | `currentStage` | Highest true boolean among stage flags | `null` |
 | `stageProgress` | Count of true stage flags (0–4) | `0` |
 | `counsellor` | `_ownerid_value@FormattedValue` (student record) | overridden by most recent session owner |
+| `counsellorOwnerId` | `_ownerid_value` (student) or session `_ownerid_value` | — |
+| `counsellorEmail` | `systemusers.internalemailaddress` / `domainname` via owner GUID | — |
 | `riskLevel` | Derived from absence count | `'none'` |
 | `interviewed` | `cr89a_studentinterviewed` | — |
 | `hasProfile` | `cr89a_studenthasaprofile` | — |

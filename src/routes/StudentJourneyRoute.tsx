@@ -6,7 +6,7 @@ import { StudentJourneySummary } from '../components/StudentJourneySummary';
 import { StudentJourneyModal } from '../components/StudentJourneyModal';
 import { StudentAssistantChat } from '../components/StudentAssistantChat';
 import { useAuth } from '../context/AuthContext';
-import { canAccessPage, canSeeStudentNames, canUseAiFeatures, getRoleGroup } from '../types/roles';
+import { canAccessPage, canSeeStudentNames, canUseAiFeatures, getRoleGroup, isCounsellorScoped, studentMatchesCounsellorScope } from '../types/roles';
 import type { AppShellOutletContext } from './shellContext';
 import { isPlausibleRecordIdParam } from '../lib/recordIdParam';
 import {
@@ -21,7 +21,7 @@ export function StudentJourneyRoute() {
   const navigate = useNavigate();
   const { students, schools, userRole, studentEventsMap } =
     useOutletContext<AppShellOutletContext>();
-  const { schoolId: authSchoolId } = useAuth();
+  const { schoolId: authSchoolId, counsellorScope } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +72,15 @@ export function StudentJourneyRoute() {
     getRoleGroup(userRole) === 'school' &&
     authSchoolId &&
     (selectedStudent as { schoolId?: string }).schoolId !== authSchoolId
+  ) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (
+    selectedStudent &&
+    isCounsellorScoped(userRole, counsellorScope) &&
+    counsellorScope &&
+    !studentMatchesCounsellorScope(selectedStudent, counsellorScope)
   ) {
     return <Navigate to="/dashboard" replace />;
   }

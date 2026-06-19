@@ -144,6 +144,7 @@ interface RawSchool {
 export interface RawActivity {
   activityid: string;
   subject: string | null;
+  _ownerid_value: string | null;
   _regardingobjectid_value: string | null;
   '_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname'?: string | null;
   '_ownerid_value@OData.Community.Display.V1.FormattedValue'?: string | null;
@@ -260,12 +261,75 @@ function studentIdFromActivity(raw: RawActivity): string | null {
   return null;
 }
 
+// ── Dataverse systemuser lookup (counsellor owner email / name) ───
+
+export interface OwnerIdentity {
+  email: string;
+  name:  string;
+}
+
+export type OwnerLookup = Map<string, OwnerIdentity>;
+
+interface RawSystemUser {
+  systemuserid: string;
+  fullname: string | null;
+  internalemailaddress: string | null;
+  domainname: string | null;
+}
+
+function resolveOwnerFromMap(
+  ownerId: string | null | undefined,
+  ownerMap: OwnerLookup,
+  formattedName?: string | null,
+): { ownerId?: string; email?: string; name: string } {
+  const name = formattedName?.trim() ?? '';
+  if (!ownerId) return { name };
+  const entry = ownerMap.get(ownerId.toLowerCase());
+  return {
+    ownerId,
+    email: entry?.email || undefined,
+    name:  entry?.name || name,
+  };
+}
+
+export async function fetchSystemUsers(token: string): Promise<OwnerLookup> {
+  const select = 'systemuserid,fullname,internalemailaddress,domainname';
+  const map: OwnerLookup = new Map();
+  let url: string | undefined = `${BASE_URL}/systemusers?$select=${select}`;
+
+  while (url) {
+    const res = await fetch(url, { headers: dvHeaders(token) });
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`[EMCI] System users fetch failed (${res.status}): ${text.slice(0, 200)}`);
+      return map;
+    }
+    const data = await res.json() as { value: RawSystemUser[]; '@odata.nextLink'?: string };
+    for (const user of data.value ?? []) {
+      const email = (user.internalemailaddress ?? user.domainname ?? '').trim().toLowerCase();
+      if (!email) continue;
+      map.set(user.systemuserid.toLowerCase(), {
+        email,
+        name: user.fullname?.trim() ?? '',
+      });
+    }
+    url = data['@odata.nextLink'];
+  }
+
+  return map;
+}
+
 // ── Mapper: RawStudent → Student ──────────────────────────────────
-function mapStudent(raw: RawStudent): Student & { schoolId: string } {
+function mapStudent(raw: RawStudent, ownerMap: OwnerLookup): Student & { schoolId: string } {
   const stage = deriveStage(raw);
 
   const yearLevel      = decodeYearLevel(raw.cr89a_yearlevel);
   const yearLevelLabel = raw['cr89a_yearlevel@OData.Community.Display.V1.FormattedValue'] ?? undefined;
+  const owner = resolveOwnerFromMap(
+    raw._ownerid_value,
+    ownerMap,
+    raw['_ownerid_value@OData.Community.Display.V1.FormattedValue'],
+  );
 
   return {
     id:            raw.cr89a_wlpcstudentid,
@@ -282,7 +346,9 @@ function mapStudent(raw: RawStudent): Student & { schoolId: string } {
     stageProgress: deriveProgress(raw),
     riskLevel:     'none',
     absenceCount:  0,
-    counsellor:    raw['_ownerid_value@OData.Community.Display.V1.FormattedValue'] ?? '',
+    counsellor:         owner.name,
+    counsellorOwnerId:  owner.ownerId,
+    counsellorEmail:    owner.email,
     interviewed:   raw.cr89a_studentinterviewed,
     hasProfile:    raw.cr89a_studenthasaprofile,
     studentType:   raw['new_studenttypemultiselect@OData.Community.Display.V1.FormattedValue'] ?? raw.new_studenttypemultiselect ?? 'Standard',
@@ -414,15 +480,21 @@ const STUDENT_SELECT = [
   'cr89a_studentdeactivationyeargroup',
 ].join(',');
 
-export async function fetchStudents(token: string): Promise<(Student & { schoolId: string })[]> {
+export async function fetchStudents(
+  token: string,
+  ownerMap?: OwnerLookup,
+): Promise<(Student & { schoolId: string })[]> {
   const url = `${BASE_URL}/cr89a_wlpcstudents?$select=${STUDENT_SELECT}`;
-  const res  = await fetch(url, { headers: dvHeaders(token) });
+  const [res, resolvedOwnerMap] = await Promise.all([
+    fetch(url, { headers: dvHeaders(token) }),
+    ownerMap ? Promise.resolve(ownerMap) : fetchSystemUsers(token),
+  ]);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Students fetch failed (${res.status}): ${text.slice(0, 200)}`);
   }
   const data = await res.json() as { value: RawStudent[] };
-  return (data.value ?? []).map(mapStudent);
+  return (data.value ?? []).map(raw => mapStudent(raw, resolvedOwnerMap));
 }
 
 // ── Fetch all schools ──────────────────────────────────────────────
@@ -527,6 +599,7 @@ export function enrichStudents(
   journeys: RawJourney[],
   sessions: RawSession[],
   absences: RawAbsence[],
+  ownerMap: OwnerLookup = new Map(),
 ): (Student & { schoolId: string })[] {
   // Build per-student maps for fast lookup
   const journeyByStudent = new Map<string, RawJourney>();
@@ -566,9 +639,18 @@ export function enrichStudents(
     const sortedSessions = [...studentSessions].sort(
       (a, b) => (b.createdon ?? '').localeCompare(a.createdon ?? ''),
     );
-    const counsellor =
-      (sortedSessions[0]?.['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
-      ?? student.counsellor;
+    const latestSession = sortedSessions[0];
+    const sessionOwnerId = latestSession?._ownerid_value ?? null;
+    const effectiveOwnerId = sessionOwnerId ?? student.counsellorOwnerId ?? null;
+    const owner = resolveOwnerFromMap(
+      effectiveOwnerId,
+      ownerMap,
+      (latestSession?.['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
+        ?? student.counsellor,
+    );
+    const counsellor = owner.name || student.counsellor;
+    const counsellorOwnerId = owner.ownerId;
+    const counsellorEmail = owner.email ?? student.counsellorEmail;
 
     // ── riskLevel: derived from absence count (unexplained/frequent) ─
     // No explicit risk field in journeys — derive from absence frequency.
@@ -586,7 +668,15 @@ export function enrichStudents(
     dates.sort((a, b) => b.localeCompare(a));
     const lastActivity = dates[0] ?? student.lastActivity;
 
-    return { ...student, counsellor, riskLevel, absenceCount, lastActivity };
+    return {
+      ...student,
+      counsellor,
+      counsellorOwnerId,
+      counsellorEmail,
+      riskLevel,
+      absenceCount,
+      lastActivity,
+    };
   });
 }
 

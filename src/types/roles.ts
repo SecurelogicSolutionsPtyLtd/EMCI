@@ -23,6 +23,44 @@ export type Page =
   | 'team'
   | 'de_analytics';
 
+/** Dataverse counsellor identity used to scope acce_staff to their own students. */
+export interface CounsellorScope {
+  email:   string | null;
+  ownerId: string | null;
+}
+
+export function hasCounsellorScope(scope: CounsellorScope | null | undefined): boolean {
+  if (!scope) return false;
+  return Boolean(scope.email?.trim() || scope.ownerId?.trim());
+}
+
+/** True when an ACCE user (not admin) is limited to their own counsellor-owned cohort. */
+export function isCounsellorScoped(role: AppRole, scope: CounsellorScope | null | undefined): boolean {
+  if (role === 'acce_admin') return false;
+  if (getRoleGroup(role) !== 'acce') return false;
+  return hasCounsellorScope(scope);
+}
+
+/** Whether a student belongs to the signed-in counsellor's scope. */
+export function studentMatchesCounsellorScope(
+  student: { counsellorEmail?: string; counsellorOwnerId?: string },
+  scope: CounsellorScope,
+): boolean {
+  const scopeEmail = scope.email?.trim().toLowerCase();
+  if (scopeEmail) {
+    const studentEmail = student.counsellorEmail?.trim().toLowerCase();
+    if (studentEmail && studentEmail === scopeEmail) return true;
+  }
+
+  const scopeOwnerId = scope.ownerId?.trim().toLowerCase();
+  if (scopeOwnerId) {
+    const studentOwnerId = student.counsellorOwnerId?.trim().toLowerCase();
+    if (studentOwnerId && studentOwnerId === scopeOwnerId) return true;
+  }
+
+  return false;
+}
+
 // ── Group helpers ─────────────────────────────────────────────────────────────
 
 export function getRoleGroup(role: AppRole): RoleGroup {
@@ -54,7 +92,18 @@ export const ROLE_GROUP_LABELS: Record<RoleGroup, string> = {
 
 // ── Page-level permission gate ────────────────────────────────────────────────
 
-export function canAccessPage(role: AppRole, page: Page): boolean {
+export function canAccessPage(role: AppRole, page: Page, counsellorScope?: CounsellorScope | null): boolean {
+  if (isCounsellorScoped(role, counsellorScope)) {
+    switch (page) {
+      case 'devlab':
+      case 'surveysearch':
+      case 'studentsearch':
+        return false;
+      default:
+        break;
+    }
+  }
+
   const group = getRoleGroup(role);
   switch (page) {
     case 'network':       return true;

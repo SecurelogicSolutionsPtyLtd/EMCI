@@ -25,7 +25,11 @@ EMCI operates across a multi-stakeholder ecosystem. Access is split across three
 **Authentication:** Microsoft SSO (Azure AD)  
 **Access Level:** Full Read / Write — network-wide, no restrictions
 
-ACCE Users are internal staff of the ACCE / EMCI organisation. This single role covers all internal staff who deliver, manage, oversee, or technically support the EMCI programme — including counsellors, programme managers, executives, and system administrators. ACCE Users have unrestricted access to the platform.
+ACCE Users are internal staff of the ACCE / EMCI organisation. This single role covers all internal staff who deliver, manage, oversee, or technically support the EMCI programme — including counsellors, programme managers, executives, and system administrators.
+
+**Full-access ACCE staff** (`acce_admin`, or `acce_staff` with no counsellor mapping) have unrestricted network-wide access.
+
+**Scoped counsellors** (`acce_staff` with `counsellor_email` and/or `dataverse_owner_id` set in Team Management) see only students owned by that Dataverse counsellor identity, schools where they have assigned students, and their own Counsellor View profile. They cannot access Dev Lab tools or another counsellor's students via direct URL.
 
 #### What They Can Do
 - View the full Network Overview (all KPI cards, all school cards, all regional breakdowns)

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, mapUser, getUserRole, isMfaVerified, signOut, type AppUser } from '../services/supabase';
-import type { AppRole } from '../types/roles';
+import type { AppRole, CounsellorScope } from '../types/roles';
 import { getRoleGroup } from '../types/roles';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -21,6 +21,8 @@ export interface AuthContextValue {
   actualRole: AppRole | null;
   /** Effective school ID — preview school when impersonating, otherwise actual. */
   schoolId:   string | null;
+  /** Dataverse counsellor identity for scoped acce_staff (always the real login, not preview). */
+  counsellorScope: CounsellorScope | null;
   stage:      AuthStage;
   isImpersonating: boolean;
   setImpersonation: (role: AppRole, schoolId: string | null) => void;
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authUser,       setAuthUser]       = useState<AppUser | null>(null);
   const [actualRole,     setActualRole]     = useState<AppRole | null>(null);
   const [actualSchoolId, setActualSchoolId] = useState<string | null>(null);
+  const [counsellorScope, setCounsellorScope] = useState<CounsellorScope | null>(null);
   const [stage,          setStage]          = useState<AuthStage>('loading');
   // Always reflects the latest stage value — used by the onAuthStateChange closure
   // to avoid a non-silent resolve() while the user is mid-MFA-flow.
@@ -103,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthUser(null);
       setActualRole(null);
       setActualSchoolId(null);
+      setCounsellorScope(null);
       clearImpersonation();
       setStage('unauthenticated');
       return;
@@ -116,12 +120,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!roleRecord) {
       setActualRole(null);
       setActualSchoolId(null);
+      setCounsellorScope(null);
       setStage('no_role');
       return;
     }
 
     setActualRole(roleRecord.role);
     setActualSchoolId(roleRecord.school_id);
+    setCounsellorScope({
+      email:   roleRecord.counsellor_email ?? null,
+      ownerId: roleRecord.dataverse_owner_id ?? null,
+    });
 
     // ACCE users authenticate via Microsoft SSO — no MFA requirement
     if (getRoleGroup(roleRecord.role) === 'acce') {
@@ -151,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthUser(null);
         setActualRole(null);
         setActualSchoolId(null);
+        setCounsellorScope(null);
         clearImpersonation();
         setStage('unauthenticated');
       } else {
@@ -172,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userRole,
       actualRole,
       schoolId,
+      counsellorScope,
       stage,
       isImpersonating,
       setImpersonation,

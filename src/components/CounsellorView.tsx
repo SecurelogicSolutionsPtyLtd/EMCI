@@ -10,7 +10,7 @@ import { SearchableDropdown } from './ui/SearchableDropdown';
 import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
 import { useAuth } from '../context/AuthContext';
-import { canAccessPage } from '../types/roles';
+import { canAccessPage, isCounsellorScoped } from '../types/roles';
 
 const PAGE_SIZE = 10;
 
@@ -78,17 +78,34 @@ function StatChip({ label, value, color }: { label: string; value: number; color
 
 export function CounsellorView({ students, schools }: CounsellorViewProps) {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
-  const showStudentJourney = canAccessPage(userRole, 'student');
+  const { userRole, counsellorScope, authUser } = useAuth();
+  const showStudentJourney = canAccessPage(userRole, 'student', counsellorScope);
+  const isScopedView = isCounsellorScoped(userRole, counsellorScope);
 
-  // Derive unique counsellor list from students
-  const counsellors: DerivedCounsellor[] = Array.from(
-    new Set(students.map(s => s.counsellor).filter(Boolean))
-  ).map((name, i) => ({ id: `c-${i}`, name }));
+  // Derive unique counsellor list from students (scoped users see only themselves)
+  const counsellors: DerivedCounsellor[] = useMemo(() => {
+    if (isScopedView) {
+      const name =
+        students.find(s => s.counsellor.trim())?.counsellor
+        ?? authUser?.displayName
+        ?? 'My students';
+      return [{ id: 'self', name }];
+    }
+    return Array.from(
+      new Set(students.map(s => s.counsellor).filter(Boolean)),
+    ).map((name, i) => ({ id: `c-${i}`, name }));
+  }, [students, isScopedView, authUser?.displayName]);
 
   const [selected, setSelected] = useState<DerivedCounsellor>(counsellors[0] ?? { id: '', name: '' });
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>('all');
   const [rosterPage, setRosterPage] = useState(1);
+
+  React.useEffect(() => {
+    if (counsellors.length === 0) return;
+    if (!counsellors.some(c => c.id === selected.id)) {
+      setSelected(counsellors[0]!);
+    }
+  }, [counsellors, selected.id]);
 
   const stats = counsellorStats(selected.name, students, schools);
 
@@ -163,7 +180,8 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
     <div className="h-full min-h-0 w-full flex flex-col bg-slate-50 overflow-hidden">
       <div className="flex-1 flex min-h-0 overflow-hidden">
 
-        {/* ── Counsellor sidebar ────────────────────────────── */}
+        {/* ── Counsellor sidebar (hidden for scoped counsellors) ── */}
+        {!isScopedView && (
         <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto">
           <div className="px-5 pt-5 pb-3">
             <p className="text-[11px] uppercase tracking-widest font-bold text-slate-400 mb-3">Counsellors</p>
@@ -196,6 +214,7 @@ export function CounsellorView({ students, schools }: CounsellorViewProps) {
             })}
           </div>
         </aside>
+        )}
 
         {/* ── Main detail panel ─────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">

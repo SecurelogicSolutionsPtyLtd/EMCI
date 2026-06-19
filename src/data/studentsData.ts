@@ -23,6 +23,10 @@ export interface Student {
   /** Count of linked absence records (Dataverse); demo seeds align with risk tiers. */
   absenceCount: number;
   counsellor: string;
+  /** Dataverse `systemuser` GUID for the effective counsellor (student owner or latest session owner). */
+  counsellorOwnerId?: string;
+  /** Dataverse owner email when available (`internalemailaddress` / `domainname`). */
+  counsellorEmail?: string;
   interviewed: boolean;
   hasProfile: boolean;
   studentType: string;

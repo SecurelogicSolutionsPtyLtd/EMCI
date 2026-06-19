@@ -15,7 +15,7 @@ import { DashboardAdvisories } from './dashboard/DashboardAdvisories';
 export function DashboardHome() {
   const navigate = useNavigate();
   const { students, schools, userRole } = useOutletContext<AppShellOutletContext>();
-  const { schoolId } = useAuth();
+  const { schoolId, counsellorScope } = useAuth();
   const showStudentRoster = canViewStudentRoster(userRole);
   const showStudentNames = canSeeStudentNames(userRole);
 
@@ -24,6 +24,7 @@ export function DashboardHome() {
     schools,
     userRole,
     schoolId,
+    counsellorScope,
   );
   const kpis = buildProgramKpiCards(visibleSchools, visibleStudents);
   const atRiskCount = visibleStudents.filter(s => s.riskLevel !== 'none').length;
