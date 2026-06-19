@@ -31,8 +31,9 @@ CREATE POLICY platform_admin_all ON public.emci_user_roles
   USING (emci_is_platform_admin())
   WITH CHECK (emci_is_platform_admin());
 
+-- Only SecureLogic Admin may toggle maintenance mode.
 DROP POLICY IF EXISTS platform_settings_update ON public.emci_platform_settings;
 CREATE POLICY platform_settings_update ON public.emci_platform_settings
   FOR UPDATE TO authenticated
-  USING (emci_is_platform_admin())
-  WITH CHECK (emci_is_platform_admin());
+  USING (emci_get_my_role() = 'securelogic_admin')
+  WITH CHECK (emci_get_my_role() = 'securelogic_admin');

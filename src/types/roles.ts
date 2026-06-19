@@ -45,9 +45,9 @@ export function isPlatformWideAdmin(role: AppRole): boolean {
   return role === 'acce_admin' || role === 'securelogic_admin';
 }
 
-/** ACCE Admin or SecureLogic Admin may toggle maintenance mode in Team Management. */
+/** Only SecureLogic Admin may toggle maintenance mode in Team Management. */
 export function canManageMaintenance(role: AppRole): boolean {
-  return isPlatformWideAdmin(role);
+  return role === 'securelogic_admin';
 }
 
 /** Only SecureLogic Admin bypasses the maintenance lockout. */
