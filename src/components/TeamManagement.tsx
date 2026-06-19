@@ -367,8 +367,8 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
 
       <div className="flex-1 overflow-y-auto p-6">
 
-        {/* Maintenance mode — platform admins (ACCE Admin + SecureLogic Admin) */}
-        {actualRole && canManageMaintenance(actualRole) && <MaintenanceAdminPanel />}
+        {/* Maintenance mode — SecureLogic Admin only (respects Preview as role) */}
+        {userRole && canManageMaintenance(userRole) && <MaintenanceAdminPanel />}
 
         {/* Preview As Role — platform admins only */}
         {actualRole && isPlatformWideAdmin(actualRole) && (
