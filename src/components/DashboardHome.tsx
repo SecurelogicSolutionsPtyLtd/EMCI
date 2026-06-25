@@ -47,7 +47,7 @@ export function DashboardHome() {
         {/* ── Official letterhead ──────────────────────────────── */}
         <DashboardLetterhead
           eyebrow="EMCI · Official Programme Overview"
-          title="Early & Meaningful Career Intelligence"
+          title="Enhanced My Career Insights (Pilot Program)"
           subtitle={scopeLabel}
         />
 

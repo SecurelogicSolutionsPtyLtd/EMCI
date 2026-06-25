@@ -2,7 +2,7 @@ EMCI LOGO PACKAGE — 600 DPI EXPORTS
 ==================================
 
 Official organisation name used:
-Early and Meaningful Career Intelligence
+Enhanced My Career Insights (Pilot Program)
 
 Master files:
 - 01_Vector_Master_SVG contains scalable, outlined vector artwork.

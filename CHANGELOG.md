@@ -5,7 +5,16 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-19 (latest)
+## — 2026-06-26 (latest)
+
+### Changed: Programme name
+
+- Renamed the full programme name from "Early and Meaningful Career Intelligence" to "Enhanced My Career Insights (Pilot Program)" across user-facing copy and metadata ([`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx) letterhead, [`index.html`](index.html) meta tags, [`package.json`](package.json), [`README.md`](README.md), [`Assets/Logos/README.txt`](Assets/Logos/README.txt)).
+- The `EMCI` acronym is retained throughout (code identifiers, filenames, DB schema, env vars) since "Enhanced My Career Insights" still abbreviates to EMCI.
+
+---
+
+## — 2026-06-19
 
 ### Added: SecureLogic Admin super-admin role
 
