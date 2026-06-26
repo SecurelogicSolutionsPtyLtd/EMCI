@@ -45,6 +45,7 @@ import {
 } from './services/dataverse';
 import { canBypassMaintenance, getRoleGroup, ROLE_LABELS } from './types/roles';
 import { getProgramVisibleScope } from './lib/networkProgramMetrics';
+import { listTeamMembers, type TeamMember } from './services/supabase';
 import { redactSensitiveEventsMap } from './redaction';
 import { Eye, RotateCcw } from 'lucide-react';
 import { EmciLoadingScreen } from './components/EmciLoadingScreen';
@@ -83,6 +84,7 @@ function AppInner() {
   const hasLoadedRef                    = useRef(false);
 
   const [studentEventsMap, setStudentEventsMap] = useState<Record<string, TimelineEvent[]>>({});
+  const [teamMembers, setTeamMembers]           = useState<TeamMember[]>([]);
 
   const schoolHomeAppliedRef = useRef<string | null>(null);
   const deHomeAppliedRef     = useRef<string | null>(null);
@@ -228,6 +230,25 @@ function AppInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
+  // ── Team roster for programme KPI counsellor active/inactive resolution ──
+  useEffect(() => {
+    if (stage !== 'ready') {
+      setTeamMembers([]);
+      return;
+    }
+    let cancelled = false;
+    listTeamMembers()
+      .then(members => {
+        if (!cancelled) setTeamMembers(members);
+      })
+      .catch(() => {
+        if (!cancelled) setTeamMembers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stage]);
+
   // ── School-role home: once per role+schoolId, navigate to canonical school URL ──
   useEffect(() => {
     if (stage !== 'ready' || !userRole) return;
@@ -271,8 +292,9 @@ function AppInner() {
       loadData,
       dataError,
       studentEventsMap,
+      teamMembers,
     }),
-    [roleScopedData, userRole, token, loadData, dataError, studentEventsMap],
+    [roleScopedData, userRole, token, loadData, dataError, studentEventsMap, teamMembers],
   );
 
   // ── Auth gates ────────────────────────────────────────────────────────────

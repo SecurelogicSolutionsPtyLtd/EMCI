@@ -7,6 +7,26 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-26 (latest)
 
+### Fixed: Supabase client startup when env is missing
+
+- Added clear validation in [`src/services/supabase.ts`](src/services/supabase.ts) when `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing or still a placeholder — replaces the cryptic `supabaseUrl is required` error with setup instructions.
+- Local dev requires a `.env` file (copy from [`.env.example`](.env.example)); restart `npm run dev` after creating or editing env vars.
+
+### Added: Surgical fix skill
+
+- Added [`.agents/skills/surgical-fix/SKILL.md`](.agents/skills/surgical-fix/SKILL.md) — blast-radius-aware workflow for minimal bug fixes (inspect → map dependencies → change only what is needed → verify).
+
+### Changed: Dashboard programme KPI metrics (Phase 1)
+
+- Dashboard and Schools directory KPI strip now shows **Total Schools (Pilot Lifetime)**, **Active Schools**, **Inactive Schools**, **Active Counsellors**, and **Total Counsellors** alongside existing student metrics ([`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+- Test/demo schools (e.g. Secure Logic, names containing "test" or "demo") are excluded from programme statistics; the dashboard schools snapshot uses the same filtered scope ([`src/lib/programStatsFilters.ts`](src/lib/programStatsFilters.ts)).
+- Counsellor counts are derived from Dataverse owner identity (not display-name strings alone); active counsellors require at least one active student assignment and exclude platform-deactivated team members and test accounts.
+
+### Added: Phase delivery workflow
+
+- Added [docs/emci-portal-phase-map.md](docs/emci-portal-phase-map.md) — phased task map with AI/human verification states for portal updates.
+- Linked [To do updates.md](To%20do%20updates.md) checklist to the phase map; use the personal **`phase-delivery`** Cursor skill to execute tasks.
+
 ### Changed: Programme name
 
 - Renamed the full programme name from "Early and Meaningful Career Intelligence" to "Enhanced My Career Insights (Pilot Program)" across user-facing copy and metadata ([`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx) letterhead, [`index.html`](index.html) meta tags, [`package.json`](package.json), [`README.md`](README.md), [`Assets/Logos/README.txt`](Assets/Logos/README.txt)).

@@ -2,8 +2,18 @@ import { createClient } from '@supabase/supabase-js';
 import type { User, Session, EmailOtpType } from '@supabase/supabase-js';
 import type { AppRole } from '../types/roles';
 
-const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+function requireViteEnv(name: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string {
+  const value = import.meta.env[name]?.trim();
+  if (!value || value === 'your-supabase-anon-key') {
+    throw new Error(
+      `${name} is missing or still a placeholder. Copy .env.example to .env, set Supabase credentials (Dashboard → Project Settings → API), then restart the dev server.`,
+    );
+  }
+  return value;
+}
+
+const supabaseUrl     = requireViteEnv('VITE_SUPABASE_URL');
+const supabaseAnonKey = requireViteEnv('VITE_SUPABASE_ANON_KEY');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

@@ -5,7 +5,7 @@ import { LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../types/roles';
 import type { AppShellOutletContext } from '../routes/shellContext';
-import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
+import { buildProgramKpiCards, getProgramStatsScope, getProgramVisibleScope, resolveProgramStatsOptions } from '../lib/networkProgramMetrics';
 import { DashboardStageDistribution } from './dashboard/DashboardStageDistribution';
 import { DashboardSchoolsSnapshot } from './dashboard/DashboardSchoolsSnapshot';
 import { DashboardQuickAccess } from './dashboard/DashboardQuickAccess';
@@ -14,7 +14,7 @@ import { DashboardAdvisories } from './dashboard/DashboardAdvisories';
 
 export function DashboardHome() {
   const navigate = useNavigate();
-  const { students, schools, userRole } = useOutletContext<AppShellOutletContext>();
+  const { students, schools, userRole, teamMembers } = useOutletContext<AppShellOutletContext>();
   const { schoolId, counsellorScope } = useAuth();
   const showStudentRoster = canViewStudentRoster(userRole);
   const showStudentNames = canSeeStudentNames(userRole);
@@ -26,8 +26,13 @@ export function DashboardHome() {
     schoolId,
     counsellorScope,
   );
-  const kpis = buildProgramKpiCards(visibleSchools, visibleStudents);
-  const atRiskCount = visibleStudents.filter(s => s.riskLevel !== 'none').length;
+  const kpis = buildProgramKpiCards(
+    visibleSchools,
+    visibleStudents,
+    resolveProgramStatsOptions(teamMembers),
+  );
+  const { statsSchools, statsStudents } = getProgramStatsScope(visibleSchools, visibleStudents);
+  const atRiskCount = statsStudents.filter(s => s.riskLevel !== 'none').length;
 
   const scopeLabel =
     visibleSchools.length === 1
@@ -53,7 +58,7 @@ export function DashboardHome() {
 
         {/* ── KPI strip ────────────────────────────────────────── */}
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 divide-x divide-y xl:divide-y-0 divide-slate-100">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 divide-x divide-y xl:divide-y-0 divide-slate-100">
             {kpis.map((k, i) => (
               <motion.div
                 key={k.label}
@@ -75,12 +80,12 @@ export function DashboardHome() {
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
           {/* Left column — programme data */}
           <div className="xl:col-span-8 space-y-6 min-w-0">
-            <DashboardStageDistribution students={visibleStudents} />
+            <DashboardStageDistribution students={statsStudents} />
 
-            {visibleSchools.length > 1 && (
+            {statsSchools.length > 1 && (
               <DashboardSchoolsSnapshot
-                schools={visibleSchools}
-                students={visibleStudents}
+                schools={statsSchools}
+                students={statsStudents}
                 onOpenSchools={() => navigate('/schools')}
                 onSelectSchool={
                   canAccessPage(userRole, 'school')

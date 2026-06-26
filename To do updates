@@ -1,3 +1,0 @@
-major changes:
-for the DE staff/admin role. Student names need to be redacted. 
-However, it may go a little deeper than that. there are some related tables that relate to the student that are also displayed - like for example, emci sessions, emci absences, etc. where the cousellor is able to specify information about the student that isn't consistent. for example, james spelt as Jamees or mispelt. this will cause issues with redaction, so we'll need to plan this out accordingly to analyse the student view and redact anything that may relate to related name.

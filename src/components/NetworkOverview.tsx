@@ -12,7 +12,8 @@ import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../type
 import { studentPseudonym } from '../lib/studentRedaction';
 import { useAuth } from '../context/AuthContext';
 import type { NetworkMainTab } from './layout/MainSidebar';
-import { buildProgramKpiCards, getProgramVisibleScope } from '../lib/networkProgramMetrics';
+import { buildProgramKpiCards, getProgramVisibleScope, resolveProgramStatsOptions } from '../lib/networkProgramMetrics';
+import type { TeamMember } from '../services/supabase';
 import { programmeProgressPct, ratingOverallColorClass } from '../lib/stageProgress';
 import { useStudentRatingScores } from '../hooks/useStudentRatingScores';
 import {
@@ -27,6 +28,7 @@ interface NetworkOverviewProps {
   students: Student[];
   schools: School[];
   userRole: AppRole;
+  teamMembers?: TeamMember[];
   networkTab: NetworkMainTab;
   onNetworkTabChange: (tab: NetworkMainTab) => void;
   onSelectSchool: (school: School) => void;
@@ -75,7 +77,7 @@ function rosterStageFilterLabel(key: string) {
 type View = 'schools' | 'students';
 
 export function NetworkOverview({
-  students, schools, userRole, networkTab, onNetworkTabChange,
+  students, schools, userRole, teamMembers = [], networkTab, onNetworkTabChange,
   onSelectSchool, onSelectStudent,
 }: NetworkOverviewProps) {
   const { schoolId, counsellorScope } = useAuth();
@@ -244,7 +246,11 @@ export function NetworkOverview({
     rosterPageNumbers.push(i);
   }
 
-  const KPIS = buildProgramKpiCards(visibleSchools, visibleStudents);
+  const KPIS = buildProgramKpiCards(
+    visibleSchools,
+    visibleStudents,
+    resolveProgramStatsOptions(teamMembers),
+  );
 
   // Clamp the active view if the role can't see the roster.
   // Using a derived value avoids a setState-during-render loop.
@@ -268,7 +274,7 @@ export function NetworkOverview({
 
               {/* KPI strip */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="grid grid-cols-6 divide-x divide-slate-100">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 divide-x divide-y xl:divide-y-0 divide-slate-100">
                   {KPIS.map((k, i) => (
                     <motion.div
                       key={k.label}
