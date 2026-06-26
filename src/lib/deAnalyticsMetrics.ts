@@ -44,6 +44,11 @@ export const COHORT_COLORS: Record<Cohort, string> = {
   Standard:           '#64748B', // slate
 };
 
+/** User-facing cohort label; maps legacy At Risk cohort to Follow Up. */
+export function formatCohortLabel(cohort: Cohort): string {
+  return cohort === 'At Risk' ? 'Follow Up' : cohort;
+}
+
 const COHORT_MATCHERS: { cohort: Cohort; pattern: RegExp }[] = [
   { cohort: 'Disability',       pattern: /disab/i },
   { cohort: 'Koorie',           pattern: /koorie|aborigin|torres|first\s*nations|indigenous/i },

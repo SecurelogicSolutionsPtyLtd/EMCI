@@ -56,6 +56,36 @@ export function formatYearLevelLine(
   return `Year ${y}`;
 }
 
+const AT_RISK_TYPE_PATTERN = /^at[\s-]?risk$/i;
+
+/** User-facing studentType label; maps legacy "At Risk" values to Follow Up. */
+export function formatStudentTypeLabel(studentType: string | undefined | null): string {
+  if (!studentType?.trim()) return '—';
+  return studentType
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => (AT_RISK_TYPE_PATTERN.test(part) ? 'Follow Up' : part))
+    .join('; ');
+}
+
+/** User-facing label for follow-up severity (legacy `riskLevel` field). */
+export function formatFollowUpLevelLabel(level: string | undefined | null): string {
+  if (!level?.trim()) return '—';
+  switch (level.trim().toLowerCase()) {
+    case 'none':
+      return 'None';
+    case 'low':
+      return 'Low';
+    case 'medium':
+      return 'Medium';
+    case 'high':
+      return 'High';
+    default:
+      return level.charAt(0).toUpperCase() + level.slice(1);
+  }
+}
+
 export const schoolStudents: Student[] = [
   {
     id: 'stu-1',

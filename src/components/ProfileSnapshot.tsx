@@ -3,7 +3,7 @@ import {
   EyeOff, UserX, Mail, User2, CalendarX,
   UserCheck, BookOpen, Tag, School,
 } from 'lucide-react';
-import { type Student, formatYearLevelLine } from '../data/studentsData';
+import { type Student, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import { studentPseudonym } from '../lib/studentRedaction';
 
 interface ProfileSnapshotProps {
@@ -164,7 +164,7 @@ export function ProfileSnapshot({ student, schoolName, hidePii = false }: Profil
         <DetailRow
           icon={Tag}
           label="Student Type"
-          value={student?.studentType ?? '—'}
+          value={student ? formatStudentTypeLabel(student.studentType) : '—'}
         />
 
         {/* Counsellor */}

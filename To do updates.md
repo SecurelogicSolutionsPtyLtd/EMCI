@@ -41,7 +41,7 @@
 
 ## Student Tab – Terminology Changes
 
-- [ ] Change **"At Risk"** → **"Follow Up"**
+- [ ] Change **"At Risk"** → **"Follow Up"** *(P2-T1 — AI complete; pending human verification)*
 
 ---
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import type { CompletionGapRow } from '../../lib/deAnalyticsMetrics';
+import { formatCohortLabel, type CompletionGapRow } from '../../lib/deAnalyticsMetrics';
 
 interface CompletionGapSectionProps {
   rows: CompletionGapRow[];
@@ -29,7 +29,7 @@ export function CompletionGapSection({ rows }: CompletionGapSectionProps) {
             return (
               <div key={r.cohort} className="flex items-center gap-3">
                 <div className="w-32 shrink-0 text-xs font-medium text-slate-700 truncate">
-                  {r.cohort}
+                  {formatCohortLabel(r.cohort)}
                   <span className="text-slate-400 font-normal"> ({r.count})</span>
                 </div>
                 <div className="flex-1 flex items-center">

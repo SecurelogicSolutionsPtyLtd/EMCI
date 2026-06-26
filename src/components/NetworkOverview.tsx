@@ -6,7 +6,7 @@ import {
   AlertTriangle, BookOpen, EyeOff,
 } from 'lucide-react';
 import type { School } from '../data/networkData';
-import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
+import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import type { AppRole } from '../types/roles';
 import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../types/roles';
 import { studentPseudonym } from '../lib/studentRedaction';
@@ -189,7 +189,7 @@ export function NetworkOverview({
     ).sort((a, b) => a.localeCompare(b));
     return [
       { value: 'all', label: 'All Types' },
-      ...types.map(t => ({ value: t, label: t })),
+      ...types.map(t => ({ value: t, label: formatStudentTypeLabel(t) })),
     ];
   }, [visibleStudents]);
 
@@ -588,7 +588,7 @@ export function NetworkOverview({
                                       {atRisk && (
                                         <>
                                           <span className="text-slate-300 mx-1">·</span>
-                                          <span className="text-red-500/80 font-medium">Flagged for follow up</span>
+                                          <span className="text-red-500/80 font-medium">Follow Up</span>
                                         </>
                                       )}
                                     </p>

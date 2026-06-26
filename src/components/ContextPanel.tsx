@@ -2,7 +2,7 @@ import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { AlertTriangle, Clock, X, User, Info, MoreVertical, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { type Student, formatYearLevelLine } from '../data/studentsData';
+import { type Student, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import type { SurveyField } from '../services/surveyFields';
 import { buildRedactedOverview } from '../lib/studentRedaction';
 
@@ -241,7 +241,7 @@ export function ContextPanel({ student, selectedEvent, onClose, hidePii = false 
               <div className="flex flex-col gap-2">
                 <ContextRow
                   label="Student Type"
-                  value={student?.studentType || '—'}
+                  value={student ? formatStudentTypeLabel(student.studentType) : '—'}
                 />
                 {!hidePii && (
                   <ContextRow

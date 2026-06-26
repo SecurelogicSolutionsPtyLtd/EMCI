@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import type { CohortOutcome } from '../../lib/deAnalyticsMetrics';
+import { formatCohortLabel, type CohortOutcome } from '../../lib/deAnalyticsMetrics';
 
 interface CohortOutcomesSectionProps {
   rows: CohortOutcome[];
@@ -32,7 +32,7 @@ export function CohortOutcomesSection({ rows }: CohortOutcomesSectionProps) {
   }
 
   const data = rows.map(r => ({
-    cohort: r.cohort,
+    cohort: formatCohortLabel(r.cohort),
     completionRate: r.completionRate,
     capRate: r.capRate,
     wexRate: r.wexRate,
@@ -74,7 +74,7 @@ export function CohortOutcomesSection({ rows }: CohortOutcomesSectionProps) {
           <tbody>
             {rows.map(r => (
               <tr key={r.cohort} className="border-b border-slate-100 last:border-0">
-                <td className="py-2 pr-4 font-medium text-slate-700">{r.cohort}</td>
+                <td className="py-2 pr-4 font-medium text-slate-700">{formatCohortLabel(r.cohort)}</td>
                 <td className="py-2 px-3 text-right text-slate-600">{r.count}</td>
                 <td className="py-2 px-3 text-right text-slate-600">{r.completionRate}%</td>
                 <td className="py-2 px-3 text-right text-slate-600">{r.capRate}%</td>

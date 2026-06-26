@@ -10,7 +10,7 @@ import {
   Cell,
 } from 'recharts';
 import type { Student } from '../../data/studentsData';
-import { ALL_COHORTS, buildStageFunnel, type Cohort } from '../../lib/deAnalyticsMetrics';
+import { ALL_COHORTS, buildStageFunnel, formatCohortLabel, type Cohort } from '../../lib/deAnalyticsMetrics';
 import { SearchableDropdown } from '../ui/SearchableDropdown';
 
 interface StageFunnelSectionProps {
@@ -35,7 +35,7 @@ export function StageFunnelSection({ students }: StageFunnelSectionProps) {
   const options = useMemo(
     () => [
       { value: 'All', label: 'All cohorts' },
-      ...ALL_COHORTS.map(c => ({ value: c, label: c })),
+      ...ALL_COHORTS.map(c => ({ value: c, label: formatCohortLabel(c) })),
     ],
     [],
   );

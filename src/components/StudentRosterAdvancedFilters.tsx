@@ -58,8 +58,8 @@ const PROGRESS_OPTIONS: SearchableDropdownOption[] = [
   { value: 'complete', label: 'Job ready' },
 ];
 
-const RISK_OPTIONS: SearchableDropdownOption[] = [
-  { value: 'all', label: 'Any risk' },
+const FOLLOW_UP_LEVEL_OPTIONS: SearchableDropdownOption[] = [
+  { value: 'all', label: 'Any level' },
   { value: 'none', label: 'None' },
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
@@ -250,12 +250,12 @@ export function StudentRosterAdvancedFilters({
                   />
                 </FilterField>
 
-                <FilterField label="Risk level">
+                <FilterField label="Follow Up">
                   <SearchableDropdown
                     value={filters.risk}
                     onChange={v => patch({ risk: v })}
-                    options={RISK_OPTIONS}
-                    placeholder="Any risk"
+                    options={FOLLOW_UP_LEVEL_OPTIONS}
+                    placeholder="Any level"
                     searchable={false}
                     panelWidthClass="w-48"
                     triggerClassName="!py-2 !text-sm"

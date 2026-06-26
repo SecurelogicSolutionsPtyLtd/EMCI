@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Search, MoreVertical, AlertTriangle, BookOpen } from 'lucide-react';
-import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
+import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import { programmeProgressPct } from '../lib/stageProgress';
 import {
   DEFAULT_ROSTER_FILTERS,
@@ -74,7 +74,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
   const studentTypeFilterOptions = useMemo(() => {
     const types = Array.from(new Set(students.map(s => s.studentType).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b));
-    return [{ value: 'all', label: 'All Types' }, ...types.map(t => ({ value: t, label: t }))];
+    return [{ value: 'all', label: 'All Types' }, ...types.map(t => ({ value: t, label: formatStudentTypeLabel(t) }))];
   }, [students]);
 
   const yearFilterOptions = useMemo(
@@ -263,7 +263,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                         {atRisk && (
                           <>
                             <span className="text-slate-300 mx-1">·</span>
-                            <span className="text-red-500/80 font-medium">Flagged for follow up</span>
+                            <span className="text-red-500/80 font-medium">Follow Up</span>
                           </>
                         )}
                       </p>
@@ -333,7 +333,7 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                             {atRisk && (
                               <>
                                 <span className="text-slate-300 mx-1">·</span>
-                                <span className="text-red-500/80 font-medium">Flagged for follow up</span>
+                                <span className="text-red-500/80 font-medium">Follow Up</span>
                               </>
                             )}
                           </p>

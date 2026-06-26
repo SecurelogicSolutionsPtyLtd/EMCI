@@ -5,7 +5,7 @@ import {
   CheckCircle2, Circle, BookOpen, SlidersHorizontal, RotateCcw, Star,
 } from 'lucide-react';
 import { SearchableDropdown } from './ui/SearchableDropdown';
-import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatYearLevelLine } from '../data/studentsData';
+import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatFollowUpLevelLabel, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import type { School } from '../data/networkData';
 
 interface StudentSearchProps {
@@ -48,7 +48,7 @@ const ALL_FIELDS: { key: keyof Student | '_schoolName'; label: string; type: 'te
   { key: 'yearLevel',       label: 'Year Level',        type: 'select' },
   { key: 'status',          label: 'Status',            type: 'select' },
   { key: 'currentStage',    label: 'Current Stage',     type: 'select' },
-  { key: 'riskLevel',       label: 'Risk Level',        type: 'select' },
+  { key: 'riskLevel',       label: 'Follow Up',         type: 'select' },
   { key: 'counsellor',      label: 'Counsellor',        type: 'select' },
   { key: '_schoolName',     label: 'School',            type: 'select' },
   { key: 'studentType',     label: 'Student Type',      type: 'select' },
@@ -133,10 +133,10 @@ function StudentRow({
           )}
         </div>
 
-        {/* Risk */}
+        {/* Follow Up */}
         <div className="w-20 shrink-0">
           <Badge cls={RISK_COLORS[student.riskLevel]}>
-            {student.riskLevel === 'none' ? 'None' : student.riskLevel.charAt(0).toUpperCase() + student.riskLevel.slice(1)}
+            {formatFollowUpLevelLabel(student.riskLevel)}
           </Badge>
         </div>
 
@@ -182,8 +182,8 @@ function StudentRow({
                   { label: 'Status',           value: student.status },
                   { label: 'Stage',            value: student.currentStage ? STAGE_LABELS[student.currentStage] : 'Not started' },
                   { label: 'Stage Progress',   value: `${student.stageProgress} / 4` },
-                  { label: 'Risk Level',       value: student.riskLevel },
-                  { label: 'Student Type',     value: student.studentType },
+                  { label: 'Follow Up',        value: formatFollowUpLevelLabel(student.riskLevel) },
+                  { label: 'Student Type',     value: formatStudentTypeLabel(student.studentType) },
                   { label: 'Interviewed',      value: student.interviewed ? 'Yes' : 'No' },
                   { label: 'Has Profile',      value: student.hasProfile ? 'Yes' : 'No' },
                   { label: 'Last Activity',    value: student.lastActivity ?? '—' },
@@ -258,7 +258,7 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
   );
 
   const riskFilterDropdownOptions = useMemo(
-    () => [{ value: '', label: 'Risk Level' }, ...riskOptions.map(r => ({ value: r, label: r }))],
+    () => [{ value: '', label: 'Follow Up' }, ...riskOptions.map(r => ({ value: r, label: formatFollowUpLevelLabel(r) }))],
     [riskOptions],
   );
 
@@ -273,7 +273,7 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
   );
 
   const typeFilterDropdownOptions = useMemo(
-    () => [{ value: '', label: 'Student Type' }, ...typeOptions.map(t => ({ value: t, label: t }))],
+    () => [{ value: '', label: 'Student Type' }, ...typeOptions.map(t => ({ value: t, label: formatStudentTypeLabel(t) }))],
     [typeOptions],
   );
 
@@ -408,7 +408,7 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
                 <SearchableDropdown allValue="" value={yearFilter} onChange={setYearFilter} options={yearFilterDropdownOptions} placeholder="Year Level" searchPlaceholder="Search year levels…" panelWidthClass="w-48" />
                 <SearchableDropdown allValue="" value={statusFilter} onChange={setStatusFilter} options={statusFilterDropdownOptions} placeholder="Status" searchPlaceholder="Search statuses…" panelWidthClass="w-48" />
                 <SearchableDropdown allValue="" value={stageFilter} onChange={setStageFilter} options={stageFilterDropdownOptions} placeholder="Stage" searchPlaceholder="Search stages…" panelWidthClass="w-52" />
-                <SearchableDropdown allValue="" value={riskFilter} onChange={setRiskFilter} options={riskFilterDropdownOptions} placeholder="Risk Level" searchPlaceholder="Search risk levels…" panelWidthClass="w-48" />
+                <SearchableDropdown allValue="" value={riskFilter} onChange={setRiskFilter} options={riskFilterDropdownOptions} placeholder="Follow Up" searchPlaceholder="Search follow up levels…" panelWidthClass="w-48" />
                 <SearchableDropdown allValue="" value={counsellorFilter} onChange={setCounsellorFilter} options={counsellorFilterDropdownOptions} placeholder="Counsellor" searchPlaceholder="Search counsellors…" panelWidthClass="w-56" />
                 <SearchableDropdown allValue="" value={schoolFilter} onChange={setSchoolFilter} options={schoolFilterDropdownOptions} placeholder="School" searchPlaceholder="Search schools…" panelWidthClass="w-64" />
                 <SearchableDropdown allValue="" value={typeFilter} onChange={setTypeFilter} options={typeFilterDropdownOptions} placeholder="Student Type" searchPlaceholder="Search types…" panelWidthClass="w-52" />
@@ -430,7 +430,7 @@ export function StudentSearch({ students, schools, onBack }: StudentSearchProps)
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">Year</span>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">School</span>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage</span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Risk</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Follow Up</span>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Flags</span>
           <div />

@@ -7,6 +7,12 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-26 (latest)
 
+### Changed: "At Risk" user-facing copy renamed to "Follow Up"
+
+- Student roster filters, type badges, profile fields, PDF export, and DE cohort charts now display **Follow Up** instead of **At Risk**; legacy `studentType` and cohort keys are unchanged internally ([`src/data/studentsData.ts`](src/data/studentsData.ts), [`src/lib/deAnalyticsMetrics.ts`](src/lib/deAnalyticsMetrics.ts)).
+- Dashboard and school advisories, plus roster risk subtitles, now use **Follow Up** wording ([`src/components/dashboard/DashboardAdvisories.tsx`](src/components/dashboard/DashboardAdvisories.tsx), [`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+- Student roster advanced filters and search now label the severity filter **Follow Up** (replacing "Risk level") with **Any level** / None / Low / Medium / High options ([`src/components/StudentRosterAdvancedFilters.tsx`](src/components/StudentRosterAdvancedFilters.tsx), [`src/components/StudentSearch.tsx`](src/components/StudentSearch.tsx)).
+
 ### Fixed: Supabase client startup when env is missing
 
 - Added clear validation in [`src/services/supabase.ts`](src/services/supabase.ts) when `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing or still a placeholder — replaces the cryptic `supabaseUrl is required` error with setup instructions.

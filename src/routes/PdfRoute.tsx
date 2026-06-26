@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { PdfPreview, type PdfStudentVoiceQuote, type PdfNextAction } from '../components/PdfPreview';
-import { formatYearLevelLine, type StageKey } from '../data/studentsData';
+import { formatStudentTypeLabel, formatYearLevelLine, type StageKey } from '../data/studentsData';
 import { useAuth } from '../context/AuthContext';
 import { canAccessPage, getRoleGroup } from '../types/roles';
 import { computeQuickInsights } from '../lib/studentInsights';
@@ -113,7 +113,7 @@ export function PdfRoute() {
         schoolName={studentSchoolName ?? '—'}
         counsellor={selectedStudent?.counsellor ?? '—'}
         yearLevelDisplay={selectedStudent ? formatYearLevelLine(selectedStudent) : '—'}
-        studentType={selectedStudent?.studentType ?? '—'}
+        studentType={selectedStudent ? formatStudentTypeLabel(selectedStudent.studentType) : '—'}
         status={selectedStudent?.status ?? 'Inactive'}
         stageLabel={stageLabel}
         trackingScore={rating?.overall ?? null}

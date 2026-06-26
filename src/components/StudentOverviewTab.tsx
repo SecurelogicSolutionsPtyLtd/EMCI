@@ -1,5 +1,5 @@
 import { BookOpen, UserCheck, CalendarX, CheckCircle2 } from 'lucide-react';
-import type { Student } from '../data/studentsData';
+import { formatStudentTypeLabel, type Student } from '../data/studentsData';
 
 interface StatCardProps {
   label: string;
@@ -71,7 +71,7 @@ export function StudentOverviewTab({ student }: StudentOverviewTabProps) {
         />
         <StatCard
           label="Student Type"
-          value={student.studentType}
+          value={formatStudentTypeLabel(student.studentType)}
           icon={CheckCircle2}
         />
       </div>
