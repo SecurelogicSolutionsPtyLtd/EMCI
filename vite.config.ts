@@ -37,6 +37,22 @@ export default defineConfig(({ mode }) => {
               res.end('Method Not Allowed');
               return;
             }
+
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+
+            if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET) {
+              const missing = [
+                !TENANT_ID     && 'TENANT_ID',
+                !CLIENT_ID     && 'CLIENT_ID',
+                !CLIENT_SECRET && 'CLIENT_SECRET',
+              ].filter(Boolean).join(', ');
+              console.error(`[devtoken] Missing env vars: ${missing}. Check your .env file.`);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: `Server misconfiguration: missing env vars (${missing}). See .env.example.` }));
+              return;
+            }
+
             try {
               const body = new URLSearchParams({
                 client_id:     CLIENT_ID,
@@ -49,14 +65,26 @@ export default defineConfig(({ mode }) => {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body:    body.toString(),
               });
-              const data = await tokenRes.json() as Record<string, unknown>;
-              res.setHeader('Content-Type', 'application/json');
-              res.setHeader('Access-Control-Allow-Origin', '*');
+              const raw  = await tokenRes.text();
+              let data: Record<string, unknown>;
+              try {
+                data = JSON.parse(raw) as Record<string, unknown>;
+              } catch {
+                console.error(`[devtoken] Azure AD returned non-JSON (status ${tokenRes.status}):`, raw.slice(0, 200));
+                res.statusCode = 502;
+                res.end(JSON.stringify({ error: 'Azure AD returned an unexpected response. Check TENANT_ID/CLIENT_ID in .env.' }));
+                return;
+              }
+              if (!tokenRes.ok) {
+                console.error(`[devtoken] Azure AD error (${tokenRes.status}):`, data);
+              }
               res.statusCode = tokenRes.status;
               res.end(JSON.stringify(data));
-            } catch (e: any) {
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : 'Internal error';
+              console.error('[devtoken] Fetch to Azure AD failed:', msg);
               res.statusCode = 500;
-              res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
+              res.end(JSON.stringify({ error: msg }));
             }
           });
         },
