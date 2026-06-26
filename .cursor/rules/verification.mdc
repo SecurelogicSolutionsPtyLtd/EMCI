@@ -1,0 +1,29 @@
+---
+description: Verify changes before claiming done — run checks and report results
+alwaysApply: true
+---
+
+# Verification Rule
+
+After making changes, verify the implementation.
+
+Where possible:
+- run typecheck
+- run lint
+- run tests
+- check build errors
+- test the affected flow manually
+- verify empty, error, and success states
+
+If verification cannot be run, clearly state that it was not run and explain what should be checked manually.
+
+# Final Response Rule
+
+At the end of a task, report:
+- Files changed
+- What changed
+- What was intentionally not changed
+- Verification run
+- Known risks or follow-up checks
+
+Do not claim something is fixed unless it was verified.

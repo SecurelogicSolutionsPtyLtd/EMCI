@@ -1,0 +1,30 @@
+---
+description: Production-quality code — no demos, mocks, or client-only security
+alwaysApply: true
+---
+
+# Production Readiness Rule
+
+Treat all code as production code. Do not write demo-only code.
+
+Avoid:
+- hardcoded mock data unless explicitly requested
+- fake auth checks
+- console.log debugging left in code
+- silent catch blocks
+- broad `any` types
+- unvalidated inputs
+- client-side-only security checks
+- unhandled promise rejections
+- optimistic success messages before confirmation
+
+Use real validation, real errors, and clear fallback behaviour.
+
+Security:
+- validate user input on the server
+- enforce authorization server-side
+- never expose secrets, service-role keys, or tokens in frontend code
+- do not leak internal errors or sensitive data to users or logs
+- do not bypass RLS with client-side logic
+
+UI: keep layouts simple and purposeful. Every element needs a clear user purpose. Include loading, empty, and error states. No fake metrics, placeholder dashboards, or decorative bloat.

@@ -1,0 +1,24 @@
+---
+description: Inspect and reuse existing code before adding anything new
+alwaysApply: true
+---
+
+# Existing Code First Rule
+
+Before implementing anything, inspect the existing codebase.
+
+Use existing:
+- components
+- API clients
+- types
+- validation patterns
+- error handling patterns
+- folder structure
+- naming conventions
+- styling system
+
+Do not create a second version of something that already exists.
+
+If existing code is messy, improve the smallest necessary part instead of rebuilding the whole feature.
+
+For database/Supabase work: check existing schema, generated types, and RLS assumptions before writing queries. Do not invent table or column names.

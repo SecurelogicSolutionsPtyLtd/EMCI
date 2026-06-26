@@ -1,0 +1,33 @@
+---
+description: Core engineering defaults for this production codebase
+alwaysApply: true
+---
+
+# Core Engineering Rule
+
+You are working in an existing production codebase.
+
+Default behaviour:
+- Make the smallest safe change.
+- Read existing code before writing.
+- Reuse current patterns.
+- Avoid new abstractions unless necessary.
+- Do not rewrite unrelated code.
+- Do not create demo-only or happy-path implementations.
+
+All code must handle:
+- loading
+- empty data
+- failed requests
+- invalid input
+- null/undefined values
+- permission failures
+- unexpected responses
+
+Before finishing:
+- run available checks where possible
+- report files changed
+- report what was tested
+- report risks or assumptions
+
+Never claim the task is complete unless the affected path has been verified.

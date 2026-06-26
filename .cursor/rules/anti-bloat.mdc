@@ -1,0 +1,22 @@
+---
+description: Minimal diffs — no unnecessary files, abstractions, or rewrites
+alwaysApply: true
+---
+
+# Anti-Bloat Engineering Rule
+
+Do not create new files, abstractions, services, hooks, utilities, or components unless they are clearly required.
+
+Before writing code:
+1. Search for existing patterns.
+2. Reuse existing functions/components where possible.
+3. Prefer small edits over rewrites.
+4. Do not introduce new state management, libraries, folders, or architecture without asking.
+
+When changing code:
+- Keep the diff minimal.
+- Do not refactor unrelated code.
+- Do not rename things unless required.
+- Do not add comments explaining obvious code.
+- Do not create "future-proof" abstractions.
+- Do not add placeholder features.

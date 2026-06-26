@@ -1,0 +1,24 @@
+---
+description: Handle failures and edge cases — never assume the ideal case
+alwaysApply: true
+---
+
+# No Happy Path Code Rule
+
+Do not assume the ideal case.
+
+Every implementation must handle:
+- loading states
+- empty states
+- null or undefined values
+- failed API calls
+- invalid user input
+- permission issues
+- duplicate submissions
+- slow network responses
+- unexpected backend responses
+
+Before finalising, explain:
+1. What can fail.
+2. How this code handles failure.
+3. What edge cases are still not covered.
