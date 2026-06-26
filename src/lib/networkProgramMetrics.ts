@@ -7,6 +7,7 @@ import {
   filterStatsSchools,
   filterStatsStudents,
   isDeactivatedCounsellor,
+  isExcludedFromProgramStats,
   isExcludedTestCounsellor,
   type DeactivatedCounsellorKeys,
 } from './programStatsFilters';
@@ -33,23 +34,32 @@ export function getProgramVisibleScope(
   const isSchoolRole = getRoleGroup(userRole) === 'school';
   const scopedCounsellor = isCounsellorScoped(userRole, counsellorScope);
 
-  let visibleStudents = students;
+  // Drop test/demo/vendor schools (and their students) from every program view —
+  // roster, filters, and search — not just KPI aggregates.
+  const baseSchools = filterStatsSchools(schools);
+  const excludedSchoolIds = new Set(
+    schools.filter(s => isExcludedFromProgramStats(s)).map(s => s.id),
+  );
+
+  let visibleStudents = students.filter(
+    s => !excludedSchoolIds.has((s as { schoolId?: string }).schoolId ?? ''),
+  );
   if (isSchoolRole && authSchoolId) {
-    visibleStudents = students.filter(s => (s as { schoolId?: string }).schoolId === authSchoolId);
+    visibleStudents = visibleStudents.filter(s => (s as { schoolId?: string }).schoolId === authSchoolId);
   } else if (scopedCounsellor && counsellorScope) {
-    visibleStudents = students.filter(s => studentMatchesCounsellorScope(s, counsellorScope));
+    visibleStudents = visibleStudents.filter(s => studentMatchesCounsellorScope(s, counsellorScope));
   }
 
-  let visibleSchools = schools;
+  let visibleSchools = baseSchools;
   if (isSchoolRole && authSchoolId) {
-    visibleSchools = schools.filter(s => s.id === authSchoolId);
+    visibleSchools = baseSchools.filter(s => s.id === authSchoolId);
   } else if (scopedCounsellor) {
     const schoolIds = new Set(
       visibleStudents
         .map(s => (s as { schoolId?: string }).schoolId)
         .filter((id): id is string => Boolean(id)),
     );
-    visibleSchools = schools.filter(s => schoolIds.has(s.id));
+    visibleSchools = baseSchools.filter(s => schoolIds.has(s.id));
   }
 
   return { visibleSchools, visibleStudents };
