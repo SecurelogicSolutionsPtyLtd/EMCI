@@ -7,7 +7,7 @@
  */
 
 export interface SensitiveCategory {
-  name: 'medical' | 'disability' | 'family' | 'welfare';
+  name: 'medical' | 'disability' | 'family' | 'welfare' | 'wellbeing';
   patterns: RegExp[];
 }
 
@@ -67,6 +67,11 @@ export const SENSITIVE_CATEGORIES: SensitiveCategory[] = [
       /\b(?:custody|foster care|kinship care|out[- ]of[- ]home care)\b/i,
       /\b(?:divorced?|separat(?:ed|ion))\b/i,
       /\bsingle[- ]parent\b/i,
+      /\b(?:grand(?:parents?|mother|father|ma|pa)|nan|nana|aunt(?:y|ie)?|uncle|cousins?|sibling|siblings)\b/i,
+      /\bliv(?:es?|ing)\s+(?:primarily\s+|mainly\s+|mostly\s+)?with\b/i,
+      /\bliving\s+(?:arrangements?|situation)\b/i,
+      /\bfamily\s+(?:situation|circumstances|background|history|breakdown|dynamics|conflict|issues|problems|instability)\b/i,
+      /\bcomplex\s+family\b/i,
     ],
   },
   {
@@ -81,6 +86,20 @@ export const SENSITIVE_CATEGORIES: SensitiveCategory[] = [
       /\bfinancial (?:hardship|difficulty|stress)\b/i,
       /\brefugee\b/i,
       /\b(?:juvenile justice|youth justice|police)\b/i,
+    ],
+  },
+  {
+    name: 'wellbeing',
+    patterns: [
+      /\btrauma(?:tic|tised|tized)?\b/i,
+      /\btrauma[- ]informed\b/i,
+      /\babscond(?:s|ed|ing)?\b/i,
+      /\bemotional(?:ly)?\s+(?:dys)?regulat(?:e|es|ed|ing|ion)\b/i,
+      /\b(?:dys)?regulat(?:ed|ion)\b/i,
+      /\bself[- ]regulat\w*\b/i,
+      /\bbehaviou?ral\s+(?:issues?|concerns?|difficult(?:y|ies)|challeng\w+|support|plan)\b/i,
+      /\b(?:emotional|psychological)\s+(?:wellbeing|distress|needs?|support)\b/i,
+      /\battachment\b/i,
     ],
   },
 ];

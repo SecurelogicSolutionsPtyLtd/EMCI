@@ -32,7 +32,7 @@ export interface CounsellorScope {
 
 export function hasCounsellorScope(scope: CounsellorScope | null | undefined): boolean {
   if (!scope) return false;
-  return Boolean(scope.email?.trim() || scope.ownerId?.trim());
+  return Boolean(scope.ownerId?.trim());
 }
 
 /** SecureLogic super-admin — full platform access including maintenance bypass. */
@@ -62,24 +62,15 @@ export function isCounsellorScoped(role: AppRole, scope: CounsellorScope | null 
   return hasCounsellorScope(scope);
 }
 
-/** Whether a student belongs to the signed-in counsellor's scope. */
+/** Whether a student belongs to the signed-in counsellor's scope (Dataverse owner GUID only). */
 export function studentMatchesCounsellorScope(
-  student: { counsellorEmail?: string; counsellorOwnerId?: string },
+  student: { counsellorOwnerId?: string },
   scope: CounsellorScope,
 ): boolean {
-  const scopeEmail = scope.email?.trim().toLowerCase();
-  if (scopeEmail) {
-    const studentEmail = student.counsellorEmail?.trim().toLowerCase();
-    if (studentEmail && studentEmail === scopeEmail) return true;
-  }
-
   const scopeOwnerId = scope.ownerId?.trim().toLowerCase();
-  if (scopeOwnerId) {
-    const studentOwnerId = student.counsellorOwnerId?.trim().toLowerCase();
-    if (studentOwnerId && studentOwnerId === scopeOwnerId) return true;
-  }
-
-  return false;
+  if (!scopeOwnerId) return false;
+  const studentOwnerId = student.counsellorOwnerId?.trim().toLowerCase();
+  return Boolean(studentOwnerId && studentOwnerId === scopeOwnerId);
 }
 
 // ── Group helpers ─────────────────────────────────────────────────────────────

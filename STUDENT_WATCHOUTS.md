@@ -24,7 +24,7 @@ Factual contradictions — high trust, no AI needed.
 | Watch-out | Trigger / threshold | Severity |
 |-----------|--------------------|----------|
 | Stalled journey | In progress and idle **> 60 days** (AI `stalled`) | Watch |
-| Attendance risk | `absenceCount > 5` (AI `attendance_risk`) | Watch |
+| Attendance issues | `absenceCount > 5` (AI `attendance_risk`) | Watch |
 | Disengaging | AI `disengaged` + low Engagement score | Watch |
 | No career plan late | AI `no_career_plan` and `stageProgress ≥ 3` | Action |
 | Equity escalation | `supportNeed = high` and band `needs_attention` | Action |
@@ -36,7 +36,7 @@ Factual contradictions — high trust, no AI needed.
 
 | Signal | Trigger | Severity |
 |--------|---------|----------|
-| Thriving | AI `thriving`, or band `on_track` with `supportNeed = high` | Positive |
+| Engaged | AI `thriving`, or band `on_track` with `supportNeed = high` | Positive |
 
 ---
 

@@ -87,8 +87,8 @@ export function buildStudentMetricCards(
       label: 'Absences',
       value: student.absenceCount,
       icon: AlertTriangle,
-      iconColor: student.riskLevel !== 'none' ? 'text-amber-500/80' : 'text-slate-400',
-      barColor: student.riskLevel !== 'none' ? 'bg-amber-500' : 'bg-slate-300',
+      iconColor: student.absenceCount > 0 ? 'text-amber-500/80' : 'text-slate-400',
+      barColor: student.absenceCount > 0 ? 'bg-amber-500' : 'bg-slate-300',
       barPct: Math.min(student.absenceCount * 25, 100),
     },
     {

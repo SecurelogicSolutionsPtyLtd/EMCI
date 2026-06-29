@@ -37,7 +37,7 @@ export function DashboardSchoolsSnapshot({
 
   return (
     <section className="space-y-3">
-      <DashboardSectionHeading>Schools Register — Largest Cohorts</DashboardSectionHeading>
+      <DashboardSectionHeading>Schools / Campuses Register — Largest Cohorts</DashboardSectionHeading>
 
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
@@ -98,7 +98,7 @@ export function DashboardSchoolsSnapshot({
           onClick={onOpenSchools}
           className="w-full px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider hover:text-primary transition-colors"
         >
-          View full schools directory
+          View full schools / campuses directory
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

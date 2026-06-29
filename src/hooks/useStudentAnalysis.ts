@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
@@ -11,6 +11,10 @@ import {
   ANALYSIS_MIN_STAGE_PROGRESS,
   type QuickInsights,
 } from '../lib/studentInsights';
+import {
+  INACTIVE_STUDENT_SUMMARY,
+  isInactiveStudent,
+} from '../lib/inactiveStudentCopy';
 import {
   parseStoredAnalysis,
   serializeAnalysis,
@@ -63,12 +67,6 @@ export function useStudentAnalysis(
   schoolName?: string,
 ) {
   const [state, setState] = useState<AnalysisState>({ status: 'idle' });
-  // True once the initial DB cache check has resolved (hit or miss) so the
-  // auto-trigger below doesn't race with an in-flight RPC result.
-  const [dbChecked, setDbChecked] = useState(false);
-  // Tracks which student ID we've already auto-triggered for so we never call
-  // generate() more than once per student per session.
-  const autoTriggeredRef = useRef<string | null>(null);
 
   const sourceHash = useMemo(
     () => (student ? buildAnalysisSourceFingerprint(student, events) : ''),
@@ -78,14 +76,21 @@ export function useStudentAnalysis(
   // Load any previously stored analysis for this student on mount / student change.
   useEffect(() => {
     if (!student) return;
+    if (isInactiveStudent(student)) {
+      setState({
+        status:     'success',
+        analysis:   INACTIVE_STUDENT_SUMMARY,
+        highlights: [],
+        sourceHash: null,
+      });
+      return;
+    }
     let cancelled = false;
-    setDbChecked(false);
 
     supabase
       .rpc('get_student_analysis_record', { p_student_id: student.id })
       .then(({ data }) => {
         if (cancelled) return;
-        setDbChecked(true);
         if (!data) return;
         const record = data as StoredAnalysisRecord;
         if (!record.analysis) return;
@@ -103,6 +108,7 @@ export function useStudentAnalysis(
 
   const generate = useCallback(async () => {
     if (!student) return;
+    if (isInactiveStudent(student)) return;
     setState({ status: 'loading' });
 
     const insights: QuickInsights = computeQuickInsights(student, events);
@@ -160,20 +166,6 @@ export function useStudentAnalysis(
     () => deriveAnalysisDisplayState(student?.stageProgress ?? 0, state, sourceHash),
     [student?.stageProgress, state, sourceHash],
   );
-
-  // Auto-generate on page load once the DB cache check has resolved.
-  // Fires when there is no analysis yet ('ready') or when the stored one is
-  // out of date ('stale'). Skips students who already have a current result.
-  // Uses autoTriggeredRef so we only call generate() once per student per
-  // session, even if displayState briefly re-evaluates.
-  useEffect(() => {
-    if (!student) return;
-    if (!dbChecked) return;
-    if (displayState !== 'ready' && displayState !== 'stale') return;
-    if (autoTriggeredRef.current === student.id) return;
-    autoTriggeredRef.current = student.id;
-    generate();
-  }, [student, dbChecked, displayState, generate]);
 
   return { state, displayState, generate, sourceHash };
 }

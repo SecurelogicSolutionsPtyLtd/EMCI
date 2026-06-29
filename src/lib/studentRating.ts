@@ -4,8 +4,8 @@
  * The `rate-student` edge function applies a fixed rubric and returns bounded
  * category scores (0–100 or null) plus flags and a confidence read. This module
  * builds the compact input packet the AI grades, and deterministically turns the
- * AI's category scores into an overall score, band, support need and triage —
- * so the maths and ethics live in code, not in the model.
+ * AI's category scores into an overall score and band — so the maths live in
+ * code, not in the model.
  */
 
 import type { Student } from '../data/studentsData';
@@ -60,7 +60,6 @@ export interface AiRating {
 // ── Finalised output (what the UI consumes) ────────────────────────────────────
 
 export type RatingBand = 'on_track' | 'progressing' | 'monitoring' | 'needs_attention';
-export type SupportNeed = 'standard' | 'elevated' | 'high';
 
 export interface FinalCategory {
   key:    RatingCategoryKey;
@@ -75,26 +74,25 @@ export interface StudentRating {
   band:       RatingBand;
   categories: FinalCategory[];
   flags:      RatingFlag[];
-  supportNeed: SupportNeed;
   confidence: RatingConfidence;
 }
 
 // ── Rubric weights (must sum to 100) ───────────────────────────────────────────
 
-const CATEGORY_WEIGHTS: Record<RatingCategoryKey, number> = {
+export const CATEGORY_WEIGHTS: Record<RatingCategoryKey, number> = {
   engagement:           20,
   career_outcomes:      25,
-  work_readiness:       20,
+  work_readiness:       25,
   attendance_momentum:  15,
-  growth_sentiment:     20,
+  growth_sentiment:     15,
 };
 
 const CATEGORY_LABELS: Record<RatingCategoryKey, string> = {
   engagement:          'Engagement',
-  career_outcomes:     'Career outcomes',
-  work_readiness:      'Work readiness',
-  attendance_momentum: 'Attendance & momentum',
-  growth_sentiment:    'Growth & sentiment',
+  career_outcomes:     'Career Planning & Exploration',
+  work_readiness:      'Work Readiness',
+  attendance_momentum: 'Attendance & Momentum',
+  growth_sentiment:    'Student Sentiment',
 };
 
 // ── Packet builder (input the AI grades) ───────────────────────────────────────
@@ -121,6 +119,77 @@ export interface RatingPacket {
 }
 
 const MAX_NOTES_CHARS   = 4000;
+
+// ── Score eligibility (P5-T2) + CRM creation grace period (P5-T3) ─────────────
+
+/** Minimum real EMCI sessions before a tracking score may be calculated. */
+export const MIN_EMCI_SESSIONS_FOR_SCORE = 2;
+
+/** Days after CRM record creation before tracking scores may be calculated. */
+export const CRM_CREATION_GRACE_PERIOD_DAYS = 30;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export interface ScoreEligibilityGates {
+  emciSessionCount: number;
+}
+
+export interface ScoreEligibility extends ScoreEligibilityGates {
+  /** True when the student record is younger than {@link CRM_CREATION_GRACE_PERIOD_DAYS}. */
+  withinCrmCreationGracePeriod: boolean;
+  eligible: boolean;
+}
+
+function isRealEmciSession(ev: TimelineEvent): boolean {
+  return ev.type === 'session' && ev.id.startsWith('session-');
+}
+
+function countRealEmciSessions(events: TimelineEvent[]): number {
+  return events.reduce((n, ev) => (isRealEmciSession(ev) ? n + 1 : n), 0);
+}
+
+/** True when the CRM record is still within the post-creation grace window. */
+export function isWithinCrmCreationGracePeriod(
+  student: Pick<Student, 'createdAt'>,
+  referenceDate: Date = new Date(),
+): boolean {
+  const createdAt = student.createdAt?.trim();
+  if (!createdAt) return false;
+
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+
+  const msSinceCreation = referenceDate.getTime() - created.getTime();
+  if (msSinceCreation < 0) return true;
+
+  return msSinceCreation < CRM_CREATION_GRACE_PERIOD_DAYS * MS_PER_DAY;
+}
+
+export function checkScoreEligibility(
+  events: TimelineEvent[],
+  student?: Pick<Student, 'createdAt'>,
+  referenceDate?: Date,
+): ScoreEligibility {
+  const emciSessionCount = countRealEmciSessions(events);
+  const gatesMet         = emciSessionCount >= MIN_EMCI_SESSIONS_FOR_SCORE;
+  const withinCrmCreationGracePeriod = student
+    ? isWithinCrmCreationGracePeriod(student, referenceDate)
+    : false;
+
+  return {
+    emciSessionCount,
+    withinCrmCreationGracePeriod,
+    eligible: gatesMet && !withinCrmCreationGracePeriod,
+  };
+}
+
+export function isScoreEligible(
+  events: TimelineEvent[],
+  student?: Pick<Student, 'createdAt'>,
+  referenceDate?: Date,
+): boolean {
+  return checkScoreEligibility(events, student, referenceDate).eligible;
+}
 
 function detectInterventionAreas(events: TimelineEvent[]): RatingPacket['interventionAreas'] {
   const haystack = events
@@ -166,21 +235,6 @@ export function buildRatingPacket(student: Student, events: TimelineEvent[]): Ra
   };
 }
 
-// ── Support need (ethics: context only, never lowers the score) ─────────────────
-
-const PRIORITY_COHORT_PATTERN = /disab|koorie|aborigin|torres|out[\s-]?of[\s-]?home|oohc|youth justice|refugee|eal\b|priority|at[\s-]?risk/i;
-
-export function deriveSupportNeed(student: Student): SupportNeed {
-  const type = student.studentType ?? '';
-  const cohortMatches = (type.match(PRIORITY_COHORT_PATTERN) ? 1 : 0)
-    + (/,|;|\band\b/.test(type) && PRIORITY_COHORT_PATTERN.test(type) ? 1 : 0);
-  const yearPressure = student.yearLevel >= 11 ? 1 : 0;
-  const weight = cohortMatches + yearPressure;
-  if (weight >= 2) return 'high';
-  if (weight >= 1) return 'elevated';
-  return 'standard';
-}
-
 // ── Finalisation (deterministic; the maths lives here, not in the model) ────────
 
 function clampScore(n: number | null): number | null {
@@ -205,7 +259,47 @@ function normalizeFlag(flag: string): RatingFlag {
   return flag as RatingFlag;
 }
 
-export function finaliseRating(ai: AiRating, student: Student): StudentRating {
+function computeWeightedOverall(categories: FinalCategory[]): number {
+  let weightedSum = 0;
+  let weightUsed  = 0;
+  for (const c of categories) {
+    if (c.score === null) continue;
+    weightedSum += c.score * c.weight;
+    weightUsed  += c.weight;
+  }
+  return weightUsed > 0 ? Math.round(weightedSum / weightUsed) : 0;
+}
+
+/** Re-applies current rubric weights/labels and recomputes the composite score. */
+export function reapplyRubricWeights(rating: StudentRating): StudentRating {
+  const byKey = new Map<RatingCategoryKey, FinalCategory>();
+  for (const c of rating.categories) {
+    byKey.set(normalizeCategoryKey(c.key as string), c);
+  }
+
+  const categories: FinalCategory[] = RATING_CATEGORY_KEYS.map(key => {
+    const existing = byKey.get(key);
+    return {
+      key,
+      label:  CATEGORY_LABELS[key],
+      score:  existing?.score ?? null,
+      weight: CATEGORY_WEIGHTS[key],
+      reason: existing?.reason ?? '',
+    };
+  });
+
+  const overall = computeWeightedOverall(categories);
+
+  return {
+    overall,
+    band:       bandFromScore(overall),
+    categories,
+    flags:      rating.flags,
+    confidence: rating.confidence,
+  };
+}
+
+export function finaliseRating(ai: AiRating): StudentRating {
   const byKey = new Map<RatingCategoryKey, AiRatingCategory>();
   for (const c of ai.categories) byKey.set(normalizeCategoryKey(c.key), c);
 
@@ -217,21 +311,13 @@ export function finaliseRating(ai: AiRating, student: Student): StudentRating {
     reason: byKey.get(key)?.reason ?? '',
   }));
 
-  let weightedSum = 0;
-  let weightUsed  = 0;
-  for (const c of categories) {
-    if (c.score === null) continue;
-    weightedSum += c.score * c.weight;
-    weightUsed  += c.weight;
-  }
-  const overall = weightUsed > 0 ? Math.round(weightedSum / weightUsed) : 0;
+  const overall = computeWeightedOverall(categories);
 
   return {
     overall,
-    band:        bandFromScore(overall),
+    band:       bandFromScore(overall),
     categories,
-    flags:       (ai.flags ?? []).map(normalizeFlag),
-    supportNeed: deriveSupportNeed(student),
-    confidence:  ai.confidence ?? 'low',
+    flags:      (ai.flags ?? []).map(normalizeFlag),
+    confidence: ai.confidence ?? 'low',
   };
 }

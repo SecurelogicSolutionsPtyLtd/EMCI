@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { LayoutDashboard } from 'lucide-react';
@@ -6,15 +6,19 @@ import { useAuth } from '../context/AuthContext';
 import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../types/roles';
 import type { AppShellOutletContext } from '../routes/shellContext';
 import { buildProgramKpiCards, getProgramStatsScope, getProgramVisibleScope, resolveProgramStatsOptions } from '../lib/networkProgramMetrics';
+import { isFlaggedForFollowUp } from '../lib/deAnalyticsMetrics';
+import { countPriorityAlerts } from '../lib/priorityAlerts';
+import { useStudentRatingScores } from '../hooks/useStudentRatingScores';
 import { DashboardStageDistribution } from './dashboard/DashboardStageDistribution';
 import { DashboardSchoolsSnapshot } from './dashboard/DashboardSchoolsSnapshot';
 import { DashboardQuickAccess } from './dashboard/DashboardQuickAccess';
 import { DashboardLetterhead } from './dashboard/DashboardLetterhead';
 import { DashboardAdvisories } from './dashboard/DashboardAdvisories';
+import { EMCI_BRAND, EMCI_PROGRAM_NAME } from '../lib/programNaming';
 
 export function DashboardHome() {
   const navigate = useNavigate();
-  const { students, schools, userRole, teamMembers } = useOutletContext<AppShellOutletContext>();
+  const { students, schools, userRole, teamMembers, studentEventsMap, ownerMap, inactiveCounsellorOverrides } = useOutletContext<AppShellOutletContext>();
   const { schoolId, counsellorScope } = useAuth();
   const showStudentRoster = canViewStudentRoster(userRole);
   const showStudentNames = canSeeStudentNames(userRole);
@@ -29,15 +33,18 @@ export function DashboardHome() {
   const kpis = buildProgramKpiCards(
     visibleSchools,
     visibleStudents,
-    resolveProgramStatsOptions(teamMembers),
+    resolveProgramStatsOptions(teamMembers, ownerMap, inactiveCounsellorOverrides),
   );
   const { statsSchools, statsStudents } = getProgramStatsScope(visibleSchools, visibleStudents);
-  const atRiskCount = statsStudents.filter(s => s.riskLevel !== 'none').length;
+  const atRiskCount = statsStudents.filter(isFlaggedForFollowUp).length;
+  const statsStudentIds = useMemo(() => statsStudents.map(s => s.id), [statsStudents]);
+  const { ratingFlags } = useStudentRatingScores(statsStudentIds);
+  const priorityAlertCount = countPriorityAlerts(statsStudents, studentEventsMap, ratingFlags);
 
   const scopeLabel =
     visibleSchools.length === 1
       ? visibleSchools[0].name
-      : `${visibleSchools.length} participating schools — network-wide scope`;
+      : 'Network-wide scope';
 
   return (
     <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-slate-50">
@@ -52,13 +59,13 @@ export function DashboardHome() {
         {/* ── Official letterhead ──────────────────────────────── */}
         <DashboardLetterhead
           eyebrow="EMCI · Official Programme Overview"
-          title="Enhanced My Career Insights (Pilot Program)"
+          title={EMCI_PROGRAM_NAME}
           subtitle={scopeLabel}
         />
 
         {/* ── KPI strip ────────────────────────────────────────── */}
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 divide-x divide-y xl:divide-y-0 divide-slate-100">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 divide-x divide-y xl:divide-y-0 divide-slate-100">
             {kpis.map((k, i) => (
               <motion.div
                 key={k.label}
@@ -100,6 +107,7 @@ export function DashboardHome() {
           <div className="xl:col-span-4 space-y-6 min-w-0">
             <DashboardAdvisories
               atRiskCount={atRiskCount}
+              priorityAlertCount={priorityAlertCount}
               scopeSuffix="within your scope"
               onReviewRoster={showStudentRoster ? () => navigate('/students') : undefined}
             />
@@ -115,7 +123,7 @@ export function DashboardHome() {
 
         {/* ── Official footer rule ─────────────────────────────── */}
         <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          <span>EMCI Student Management Platform</span>
+          <span>{EMCI_BRAND}</span>
           <span>Confidential — internal use only</span>
         </div>
       </div>

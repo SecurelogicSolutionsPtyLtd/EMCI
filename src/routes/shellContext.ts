@@ -1,8 +1,8 @@
 import type { Student } from '../data/studentsData';
 import type { School } from '../data/networkData';
 import type { AppRole } from '../types/roles';
-import type { TimelineEvent } from '../services/dataverse';
-import type { TeamMember } from '../services/supabase';
+import type { TimelineEvent, OwnerLookup } from '../services/dataverse';
+import type { TeamMember, InactiveCounsellorOverride } from '../services/supabase';
 
 export interface AppShellOutletContext {
   students: Student[];
@@ -13,4 +13,6 @@ export interface AppShellOutletContext {
   dataError: string | null;
   studentEventsMap: Record<string, TimelineEvent[]>;
   teamMembers: TeamMember[];
+  ownerMap: OwnerLookup;
+  inactiveCounsellorOverrides: InactiveCounsellorOverride[];
 }

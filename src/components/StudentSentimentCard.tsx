@@ -8,6 +8,10 @@ interface StudentSentimentCardProps {
   student:    Student;
   events:     TimelineEvent[];
   schoolName?: string;
+  /** Load cached sentiment only — no AI generation (inactive historical view). */
+  loadStoredOnly?: boolean;
+  /** Adjust labels when shown under inactive historical data. */
+  historical?: boolean;
 }
 
 const SENTIMENT_CONFIG: Record<
@@ -21,7 +25,7 @@ const SENTIMENT_CONFIG: Record<
 
 const QUOTE_STYLE: Record<SentimentQuote['sentiment'], { rule: string; tag: string; tagLabel: string }> = {
   positive: { rule: 'border-emerald-400', tag: 'bg-emerald-50 text-emerald-700 border-emerald-200', tagLabel: 'Positive' },
-  negative: { rule: 'border-red-400',     tag: 'bg-red-50 text-red-700 border-red-200',             tagLabel: 'Concern'  },
+  negative: { rule: 'border-red-400',     tag: 'bg-red-50 text-red-700 border-red-200',             tagLabel: 'Follow Up'  },
   neutral:  { rule: 'border-slate-300',   tag: 'bg-slate-50 text-slate-500 border-slate-200',       tagLabel: 'Neutral'  },
 };
 
@@ -63,25 +67,39 @@ function QuoteCard({ quote, index }: { quote: SentimentQuote; index: number }) {
   );
 }
 
-export function StudentSentimentCard({ student, events, schoolName }: StudentSentimentCardProps) {
-  const { state, generate } = useStudentSentiment(student, events, schoolName);
-
-  // Silently suppress until the request has resolved one way or another.
-  if (state.status === 'idle' || state.status === 'error') return null;
+export function StudentSentimentCard({
+  student,
+  events,
+  schoolName,
+  loadStoredOnly = false,
+  historical = false,
+}: StudentSentimentCardProps) {
+  const { state, displayState, generate } = useStudentSentiment(student, events, schoolName, { loadStoredOnly });
 
   const hasContent =
-    state.status === 'success' && state.sentiment !== 'insufficient_data';
+    state.status === 'success' &&
+    state.sentiment !== 'insufficient_data';
+  // Before career guidance the hook never auto-generates, so `state` stays
+  // `idle` — surface the empty state rather than an endless analysing spinner.
+  const isTooEarly = !loadStoredOnly && displayState === 'too_early' && !hasContent;
   const isInsufficient =
-    state.status === 'success' && state.sentiment === 'insufficient_data';
+    isTooEarly ||
+    (state.status === 'success' && state.sentiment === 'insufficient_data');
+  const isPending =
+    !isTooEarly && (state.status === 'idle' || state.status === 'loading');
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="h-full bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
 
       <ReportCardHeader
         title="Student Voice & Sentiment"
-        subtitle="Recorded survey responses, session feedback & programme notes"
+        subtitle={
+          historical
+            ? 'Archived survey responses, session feedback & programme notes'
+            : 'Recorded survey responses, session feedback & programme notes'
+        }
       >
-        {hasContent && (
+        {!loadStoredOnly && state.status === 'success' && state.sentiment !== 'insufficient_data' && (
           <>
             <SentimentBadge sentiment={state.sentiment} />
             <button
@@ -95,11 +113,36 @@ export function StudentSentimentCard({ student, events, schoolName }: StudentSen
         )}
       </ReportCardHeader>
 
-      <div className="p-6">
-        {state.status === 'loading' && (
+      <div className="p-6 flex-1">
+        {loadStoredOnly && isPending && (
+          <div className="flex items-center gap-3 px-4 py-5 rounded-lg bg-slate-50 border border-slate-100">
+            <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+            <span className="text-sm text-slate-500">Loading historical voice data…</span>
+          </div>
+        )}
+
+        {isPending && !loadStoredOnly && (
           <div className="flex items-center gap-3 px-4 py-5 rounded-lg bg-slate-50 border border-slate-100">
             <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
             <span className="text-sm text-slate-500">Analysing student voice and sentiment…</span>
+          </div>
+        )}
+
+        {state.status === 'error' && (
+          <div className="flex flex-col items-center text-center px-4 py-6">
+            <p className="text-base font-semibold text-slate-900">
+              Sentiment analysis unavailable
+            </p>
+            <p className="mt-1.5 mb-4 text-sm text-slate-600 max-w-sm leading-relaxed">
+              {state.message}
+            </p>
+            <button
+              onClick={generate}
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Try again
+            </button>
           </div>
         )}
 
@@ -112,11 +155,12 @@ export function StudentSentimentCard({ student, events, schoolName }: StudentSen
               className="w-28 h-28 mb-4 select-none pointer-events-none"
             />
             <p className="text-base font-semibold text-slate-900">
-              No student voice data on record
+              {historical ? 'No historical voice data on record' : 'No student voice data on record'}
             </p>
             <p className="mt-1.5 text-sm text-slate-600 max-w-sm leading-relaxed">
-              Sentiment analysis will appear here once survey responses or session
-              feedback have been recorded for this student.
+              {historical
+                ? 'No archived survey responses or session feedback were stored for this student.'
+                : 'Sentiment analysis will appear here once survey responses or session feedback have been recorded for this student.'}
             </p>
           </div>
         )}

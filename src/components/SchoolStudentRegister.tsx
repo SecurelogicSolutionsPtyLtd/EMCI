@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Search, MoreVertical, AlertTriangle, BookOpen } from 'lucide-react';
+import { Search, MoreVertical, BookOpen } from 'lucide-react';
 import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import { programmeProgressPct } from '../lib/stageProgress';
+import { isFlaggedForFollowUp } from '../lib/deAnalyticsMetrics';
+import { hasPriorityAlertWithFlags } from '../lib/priorityAlerts';
+import { useStudentRatingScores } from '../hooks/useStudentRatingScores';
+import type { AppShellOutletContext } from '../routes/shellContext';
 import {
   DEFAULT_ROSTER_FILTERS,
   StudentRosterAdvancedFilters,
@@ -10,6 +15,7 @@ import {
   type RosterFilterState,
 } from './StudentRosterAdvancedFilters';
 import { SearchableDropdown } from './ui/SearchableDropdown';
+import { StudentRosterNameMeta } from './StudentRosterNameMeta';
 
 interface SchoolStudentRegisterProps {
   students: Student[];
@@ -38,12 +44,15 @@ function getInitials(student: Student) {
 
 function getProgressBarColor(student: Student) {
   if (student.currentStage === 'complete') return 'bg-emerald-500';
-  if (student.riskLevel !== 'none') return 'bg-red-400';
+  if (isFlaggedForFollowUp(student)) return 'bg-red-400';
   return 'bg-primary';
 }
 
 /** School cohort roster card: search/filter toolbar, table, and pagination. */
 export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStudentRegisterProps) {
+  const { studentEventsMap } = useOutletContext<AppShellOutletContext>();
+  const studentIds = useMemo(() => students.map(s => s.id), [students]);
+  const { ratingFlags } = useStudentRatingScores(studentIds);
   const [search, setSearch] = useState('');
   const [rosterFilters, setRosterFilters] = useState<RosterFilterState>(DEFAULT_ROSTER_FILTERS);
   const [page, setPage] = useState(1);
@@ -192,7 +201,12 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
           </div>
         ) : (
           paginated.map((student, idx) => {
-            const atRisk     = student.riskLevel !== 'none';
+            const atRisk = isFlaggedForFollowUp(student);
+            const needsAttention = hasPriorityAlertWithFlags(
+              student,
+              studentEventsMap[student.id] ?? [],
+              ratingFlags.get(student.id),
+            );
             const initials   = getInitials(student);
             const pct        = programmeProgressPct(student.stageProgress);
             const barColor   = getProgressBarColor(student);
@@ -209,7 +223,9 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                 onClick={onSelectStudent ? () => onSelectStudent(student) : undefined}
               >
                 <div className="flex items-start gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                    needsAttention ? 'bg-rose-50 text-rose-600' : atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'
+                  }`}>
                     {initials}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -219,7 +235,6 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                           <span className="font-bold text-slate-900">
                             {student.firstName} {student.lastName}
                           </span>
-                          {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {formatYearLevelLine(student)} · {student.counsellor ?? '—'}
@@ -257,17 +272,13 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                       <span className="text-xs font-medium text-slate-500 tabular-nums shrink-0">{pct}%</span>
                     </div>
 
-                    {(student.absenceCount > 0 || atRisk) && (
-                      <p className="text-xs text-slate-500 mt-2 tabular-nums">
-                        <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
-                        {atRisk && (
-                          <>
-                            <span className="text-slate-300 mx-1">·</span>
-                            <span className="text-red-500/80 font-medium">Follow Up</span>
-                          </>
-                        )}
-                      </p>
-                    )}
+                    <div className="mt-2">
+                      <StudentRosterNameMeta
+                        student={student}
+                        showFollowUp={atRisk}
+                        showNeedsAttention={needsAttention}
+                      />
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -300,7 +311,12 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
               </tr>
             ) : (
               paginated.map((student, idx) => {
-                const atRisk     = student.riskLevel !== 'none';
+                const atRisk = isFlaggedForFollowUp(student);
+                const needsAttention = hasPriorityAlertWithFlags(
+                  student,
+                  studentEventsMap[student.id] ?? [],
+                  ratingFlags.get(student.id),
+                );
                 const initials   = getInitials(student);
                 const pct        = programmeProgressPct(student.stageProgress);
                 const barColor   = getProgressBarColor(student);
@@ -318,7 +334,9 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                    needsAttention ? 'bg-rose-50 text-rose-600' : atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'
+                  }`}>
                           {initials}
                         </div>
                         <div className="flex flex-col min-w-0 gap-0.5">
@@ -326,17 +344,12 @@ export function SchoolStudentRegister({ students, onSelectStudent }: SchoolStude
                             <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
                               {student.firstName} {student.lastName}
                             </span>
-                            {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                           </div>
-                          <p className="text-xs text-slate-500 tabular-nums">
-                            <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
-                            {atRisk && (
-                              <>
-                                <span className="text-slate-300 mx-1">·</span>
-                                <span className="text-red-500/80 font-medium">Follow Up</span>
-                              </>
-                            )}
-                          </p>
+                          <StudentRosterNameMeta
+                        student={student}
+                        showFollowUp={atRisk}
+                        showNeedsAttention={needsAttention}
+                      />
                         </div>
                       </div>
                     </td>

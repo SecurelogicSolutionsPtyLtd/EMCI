@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { type Student, formatYearLevelLine } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
+import { RedactedText } from './ui/RedactedText';
 
 interface SurveySearchProps {
   students: Student[];
@@ -116,7 +117,7 @@ function SurveyCard({ event, index }: { event: TimelineEvent; index: number }) {
               {/* Description */}
               {event.description && event.description !== 'No survey responses recorded yet.' && (
                 <p className="text-xs text-slate-500 mt-3 mb-3 italic leading-relaxed">
-                  {event.description}
+                  <RedactedText text={event.description} />
                 </p>
               )}
 
@@ -128,7 +129,7 @@ function SurveyCard({ event, index }: { event: TimelineEvent; index: number }) {
                         {f.label}
                       </p>
                       <p className="text-xs font-semibold text-slate-700 leading-snug">
-                        {f.value || '—'}
+                        <RedactedText text={f.value || '—'} />
                       </p>
                     </div>
                   ))}
@@ -144,7 +145,9 @@ function SurveyCard({ event, index }: { event: TimelineEvent; index: number }) {
               {event.notes && event.notes.trim() && (
                 <div className="mt-3 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600 mb-1">Notes</p>
-                  <p className="text-xs text-amber-800 leading-relaxed">{event.notes}</p>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <RedactedText text={event.notes} />
+                  </p>
                 </div>
               )}
             </div>

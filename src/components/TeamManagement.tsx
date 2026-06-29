@@ -438,7 +438,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                           options={schools.map(s => ({ value: s.id, label: s.name }))}
                           placeholder="Select a school…"
                           allValue=""
-                          searchPlaceholder="Search schools…"
+                          searchPlaceholder="Search schools / campuses…"
                           panelWidthClass="w-64"
                           triggerClassName="min-w-[200px]"
                         />
@@ -908,7 +908,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
                           options={schools.map(s => ({ value: s.id, label: s.name }))}
                           placeholder="Select a school…"
                           allValue=""
-                          searchPlaceholder="Search schools…"
+                          searchPlaceholder="Search schools / campuses…"
                         />
                       ) : (
                         <div className="relative">

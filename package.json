@@ -1,6 +1,6 @@
 {
   "name": "emci-student-intelligence-interface",
-  "description": "EMCI Student Intelligence Interface — Enhanced My Career Insights (Pilot Program) platform by SecureLogic Solutions.",
+  "description": "EMCI — Enhanced My Career Insights (Pilot Program) platform by SecureLogic Solutions.",
   "author": "Zac Swalling",
   "private": true,
   "version": "0.0.0",
@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/lib/studentRedaction.test.ts src/redaction/smartRedaction.test.ts"
+    "test": "tsx --test src/lib/studentRedaction.test.ts src/redaction/smartRedaction.test.ts src/lib/networkProgramMetrics.test.ts src/lib/studentFollowUp.test.ts src/lib/inactiveStudentCopy.test.ts src/lib/programNaming.test.ts src/lib/studentWatchouts.test.ts src/lib/priorityAlerts.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -29,10 +29,8 @@
     "motion": "^12.23.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.30.3",
     "recharts": "^3.8.1",
-    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "vite": "^6.2.0"
   },

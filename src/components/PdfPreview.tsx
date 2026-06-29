@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { Student } from '../data/studentsData';
 import { exportElementToPdf } from '../lib/exportElementToPdf';
+import { EMCI_BRAND } from '../lib/programNaming';
 
 // ── Public data shapes ───────────────────────────────────────────────────────
 
@@ -194,7 +195,7 @@ export function PdfPreview(props: PdfPreviewProps) {
             <span className="text-primary font-semibold">PDF Export</span>
           </nav>
           <h1 className="text-base font-black tracking-tight text-slate-900">Student Summary</h1>
-          <p className="text-[11px] text-slate-400">Official EMCI summary for parent/stakeholder review</p>
+          <p className="text-[11px] text-slate-400">Official {EMCI_BRAND} summary for parent/stakeholder review</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -229,11 +230,10 @@ export function PdfPreview(props: PdfPreviewProps) {
           {/* ── Header ─────────────────────────────────────────────── */}
           <header className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <img src="/emci-logo-lockup.png" alt="EMCI" className="h-9 w-auto" />
+              <img src="/emci-logo-lockup.png" alt={EMCI_BRAND} className="h-9 w-auto" />
               <div className="border-l border-slate-200 pl-4 leading-snug">
-                <p className="text-[11px] font-semibold text-slate-700">Education, Monitoring</p>
-                <p className="text-[11px] font-semibold text-slate-700">&amp; Curriculum Improvement</p>
-                <p className="text-[11px] font-semibold text-primary">Department</p>
+                <p className="text-[11px] font-semibold text-slate-700">Enhanced My Career Insights</p>
+                <p className="text-[11px] font-semibold text-primary">(Pilot Program)</p>
               </div>
             </div>
             <div className="flex items-center gap-3">

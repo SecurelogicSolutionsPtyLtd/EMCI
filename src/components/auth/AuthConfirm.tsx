@@ -5,6 +5,7 @@ import { Loader2, Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-rea
 import { verifyEmailToken, setUserPassword } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { AuthShell, SectionHeader, ErrorBanner, INPUT_CLASS, BTN_PRIMARY } from './AuthShell';
+import { EMCI_BRAND, EMCI_PLATFORM_ADMINISTRATOR } from '../../lib/programNaming';
 
 // ── AuthConfirm ───────────────────────────────────────────────────────────────
 // Handles the EMCI-domain invite link: /auth/confirm?token_hash=…&type=invite
@@ -42,7 +43,7 @@ export function AuthConfirm() {
     const type      = (params.get('type') ?? 'invite') as EmailOtpType;
 
     if (!tokenHash) {
-      setError('This invitation link is missing its security token. Please request a new invite from your EMCI administrator.');
+      setError(`This invitation link is missing its security token. Please request a new invite from your ${EMCI_PLATFORM_ADMINISTRATOR}.`);
       setPhase('error');
       return;
     }
@@ -52,7 +53,7 @@ export function AuthConfirm() {
         await verifyEmailToken(tokenHash, type);
         setPhase('set_password');
       } catch {
-        setError('This invitation link is invalid or has expired. Please ask your EMCI administrator to send a new invite.');
+        setError(`This invitation link is invalid or has expired. Please ask your ${EMCI_PLATFORM_ADMINISTRATOR} to send a new invite.`);
         setPhase('error');
       }
     })();
@@ -120,7 +121,7 @@ export function AuthConfirm() {
       <SectionHeader
         icon={<Lock className="w-5 h-5 text-primary" />}
         title="Create your password"
-        subtitle="Set a password to finish activating your EMCI account. You'll set up two-factor authentication next."
+        subtitle={`Set a password to finish activating your ${EMCI_BRAND} account. You'll set up two-factor authentication next.`}
       />
       {error && <ErrorBanner message={error} />}
       <form onSubmit={handleSetPassword} className="space-y-3">

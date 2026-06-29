@@ -67,6 +67,9 @@ export function applyAiSpans(text: string, spans: string[]): string {
   let out = text;
   for (const span of spans) {
     if (span.trim().length < 2) continue;
+    // span is escapeRegExp()-sanitised; no metacharacters reach the pattern (no ReDoS).
+    // gi flags require a RegExp for case-insensitive global replace.
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
     out = out.replace(new RegExp(escapeRegExp(span), 'gi'), SENSITIVE_TOKEN);
   }
   return out;

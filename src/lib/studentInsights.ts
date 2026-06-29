@@ -402,6 +402,39 @@ export function buildTimelineNotes(student: Student, events: TimelineEvent[]): T
     .slice(-MAX_TIMELINE_NOTES);
 }
 
+/** Labels that indicate student voice rather than counsellor observations (mirrors sentiment-student). */
+const STUDENT_VOICE_LABELS = /satisfaction|useful|helpful|interest|feel|found|like|enjoy|want|goal|strength|challenge|difficult|hope|career|school/i;
+
+/**
+ * Returns true when timeline data includes survey answers, session feedback, or
+ * notes the sentiment analyser can work with. Mirrors the edge-function gate so
+ * we do not invoke AI when there is nothing to analyse.
+ */
+export function hasStudentVoiceData(student: Student, events: TimelineEvent[]): boolean {
+  for (const shift of buildSurveyShifts(events)) {
+    for (const value of Object.values(shift.fields)) {
+      if (value.trim()) return true;
+    }
+  }
+
+  for (const session of buildSessionDetails(events)) {
+    if (session.fields['Session Satisfaction']?.trim()) return true;
+    if (session.fields['Found Useful']?.trim()) return true;
+    for (const [label, value] of Object.entries(session.fields)) {
+      if (label === 'Session Satisfaction' || label === 'Found Useful') continue;
+      if (STUDENT_VOICE_LABELS.test(label) && value.trim()) return true;
+    }
+  }
+
+  for (const note of buildTimelineNotes(student, events)) {
+    if (STUDENT_VOICE_LABELS.test(note.note) || STUDENT_VOICE_LABELS.test(note.title)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /** Minimum stage progress before an EMCI analysis is meaningful (career guidance). */
 export const ANALYSIS_MIN_STAGE_PROGRESS = 3;
 

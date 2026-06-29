@@ -9,6 +9,7 @@ import type { Student } from '../data/studentsData';
 import type { TimelineEvent } from '../services/dataverse';
 import { deriveStudentEvents } from '../services/dataverse';
 import type { SurveyField } from '../services/surveyFields';
+import { RedactedText } from './ui/RedactedText';
 
 interface TimelineCoreProps {
   student: Student | null;
@@ -182,7 +183,11 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Referral</span>
                         </div>
                         <span className="text-xs font-mono text-slate-400">{format(parseISO(refEvent.date), 'dd MMM yyyy')}</span>
-                        {refEvent.notes && <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{refEvent.notes}</p>}
+                        {refEvent.notes && (
+                          <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                            <RedactedText text={refEvent.notes} />
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -195,7 +200,11 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Consent</span>
                         </div>
                         <span className="text-xs font-mono text-slate-400">{format(parseISO(consentEvent.date), 'dd MMM yyyy')}</span>
-                        {consentEvent.notes && <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{consentEvent.notes}</p>}
+                        {consentEvent.notes && (
+                          <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                            <RedactedText text={consentEvent.notes} />
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -228,7 +237,9 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="text-sm font-bold text-primary">{event.title}</span>
                   <span className="text-xs font-mono text-slate-400">{format(parseISO(event.date), 'dd MMM yyyy')}</span>
-                  <p className="text-sm text-slate-600 mt-1 leading-relaxed">{event.notes}</p>
+                  <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                    <RedactedText text={event.notes} />
+                  </p>
                 </div>
               </motion.div>
             );
@@ -297,7 +308,9 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                   </div>
 
                   {event.description && (
-                    <p className="text-xs text-slate-500 line-clamp-2 mt-1">{event.description}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2 mt-1">
+                      <RedactedText text={event.description} />
+                    </p>
                   )}
 
                   {/* Tags */}
@@ -410,7 +423,9 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                       <AlignLeft className="w-3.5 h-3.5 text-slate-400" />
                       <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Description</span>
                     </div>
-                    <p className="text-sm text-slate-700 leading-relaxed">{modalEvent.description}</p>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      <RedactedText text={modalEvent.description} />
+                    </p>
                   </div>
                 )}
 
@@ -423,7 +438,9 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                     {(modalEvent.surveyFields as SurveyField[]).map((field, i) => (
                       <div key={i} className="flex flex-col gap-0.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{field.label}</span>
-                        <span className="text-sm text-slate-700 leading-relaxed">{field.value}</span>
+                        <span className="text-sm text-slate-700 leading-relaxed">
+                          <RedactedText text={field.value} />
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -445,7 +462,9 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                       {modalEvent.relatedSession.fields.map((field, i) => (
                         <div key={i} className="flex flex-col gap-0.5">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{field.label}</span>
-                          <span className="text-sm text-slate-700 leading-relaxed">{field.value}</span>
+                          <span className="text-sm text-slate-700 leading-relaxed">
+                          <RedactedText text={field.value} />
+                        </span>
                         </div>
                       ))}
                     </div>
@@ -455,7 +474,9 @@ export function TimelineCore({ student, events: propEvents }: TimelineCoreProps)
                   modalEvent.description && modalEvent.description !== 'No survey responses recorded yet.' ? (
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Notes</span>
-                      <p className="text-sm text-slate-600 leading-relaxed">{modalEvent.description}</p>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        <RedactedText text={modalEvent.description} />
+                      </p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2 py-6 text-center bg-slate-50 rounded-xl border border-slate-100">

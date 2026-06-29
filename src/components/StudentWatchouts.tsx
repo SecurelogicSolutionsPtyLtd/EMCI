@@ -43,12 +43,11 @@ const WATCHOUT_INFO: Record<string, string> = {
   'profile-no-interview': 'A Morrisby profile exists but no interview has been recorded. The follow-up interview that turns the profile into a plan may be outstanding.',
   'consent-stall': 'At consent over 90 days but still before the guidance stage. Consent or onboarding may be stuck — worth chasing so the student can start.',
   'deactivated-active': 'A deactivation has been recorded yet the student is still marked Active. The two records disagree — confirm the correct status.',
-  'high-absences': 'More than five absences have been recorded. A pattern of absence can signal disengagement or negative sentiment worth exploring.',
+  'attendance-issues': 'More than five absences have been recorded, or the AI rating flagged attendance risk. A pattern of absence can signal disengagement worth exploring.',
   'no-career-plan': 'In Career Guidance with sessions logged but still no Career Action Plan. The plan is the key output of guidance.',
   'sentiment-concern': 'The AI review of notes and survey comments picked up possible negative sentiment. Review the notes directly before acting.',
   'disengaged': 'The AI rating detected signs of disengagement alongside a low engagement score. Worth a check-in to re-engage the student.',
-  'equity-escalation': 'A priority-cohort student is tracking in the needs-attention band with high support needs. Prioritise follow-up to close the gap.',
-  'thriving': 'Signals point to a student doing well — recognise the progress and keep the momentum going.',
+  'engaged': 'Signals point to a student doing well — recognise the progress and keep the momentum going.',
 };
 
 export function StudentWatchouts({ watchouts, max = 4, subtle = false }: StudentWatchoutsProps) {

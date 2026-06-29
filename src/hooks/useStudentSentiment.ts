@@ -8,8 +8,10 @@ import {
   buildSessionDetails,
   buildTimelineNotes,
   buildAnalysisSourceFingerprint,
+  hasStudentVoiceData,
   ANALYSIS_MIN_STAGE_PROGRESS,
 } from '../lib/studentInsights';
+import { isInactiveStudent } from '../lib/inactiveStudentCopy';
 import {
   parseStoredSentiment,
   serializeSentiment,
@@ -36,6 +38,16 @@ export type SentimentDisplayState =
 interface StoredSentimentRecord {
   sentiment?:   string;
   source_hash?: string | null;
+}
+
+function insufficientSentimentState(sourceHash: string): Extract<SentimentState, { status: 'success' }> {
+  return {
+    status:     'success',
+    sentiment:  'insufficient_data',
+    summary:    '',
+    quotes:     [],
+    sourceHash,
+  };
 }
 
 function sanitizeQuotes(input: unknown): SentimentQuote[] {
@@ -76,6 +88,7 @@ export function useStudentSentiment(
   student:    Student | null,
   events:     TimelineEvent[],
   schoolName?: string,
+  options?:   { loadStoredOnly?: boolean },
 ) {
   const [state, setState] = useState<SentimentState>({ status: 'idle' });
   const [dbChecked, setDbChecked] = useState(false);
@@ -86,8 +99,18 @@ export function useStudentSentiment(
     [student, events],
   );
 
+  const hasVoiceData = useMemo(
+    () => (student ? hasStudentVoiceData(student, events) : false),
+    [student, events],
+  );
+
   useEffect(() => {
     if (!student) return;
+    if (isInactiveStudent(student) && !options?.loadStoredOnly) {
+      setDbChecked(true);
+      setState({ status: 'idle' });
+      return;
+    }
     let cancelled = false;
     setDbChecked(false);
 
@@ -96,13 +119,22 @@ export function useStudentSentiment(
       .then(({ data }) => {
         if (cancelled) return;
         setDbChecked(true);
-        if (!data) return;
 
-        const record = data as StoredSentimentRecord;
-        if (!record.sentiment) return;
+        const record = data as StoredSentimentRecord | null;
+        if (!record?.sentiment) {
+          if (options?.loadStoredOnly) {
+            setState(insufficientSentimentState(sourceHash));
+          }
+          return;
+        }
 
         const parsed = parseStoredSentiment(record.sentiment);
-        if (!parsed) return;
+        if (!parsed) {
+          if (options?.loadStoredOnly) {
+            setState(insufficientSentimentState(sourceHash));
+          }
+          return;
+        }
 
         setState({
           status:     'success',
@@ -114,11 +146,18 @@ export function useStudentSentiment(
       });
 
     return () => { cancelled = true; };
-  }, [student?.id]);
+  }, [student?.id, options?.loadStoredOnly]);
 
   const generate = useCallback(async () => {
     if (!student) return;
+    if (isInactiveStudent(student)) return;
     if (student.stageProgress < ANALYSIS_MIN_STAGE_PROGRESS) return;
+
+    const fingerprint = buildAnalysisSourceFingerprint(student, events);
+    if (!hasStudentVoiceData(student, events)) {
+      setState(insufficientSentimentState(fingerprint));
+      return;
+    }
 
     setState({ status: 'loading' });
 
@@ -126,7 +165,6 @@ export function useStudentSentiment(
     const surveyShifts   = buildSurveyShifts(events);
     const sessionDetails = buildSessionDetails(events);
     const timelineNotes  = buildTimelineNotes(student, events);
-    const fingerprint    = buildAnalysisSourceFingerprint(student, events);
 
     const { data, error } = await supabase.functions.invoke('sentiment-student', {
       body: {
@@ -188,12 +226,22 @@ export function useStudentSentiment(
 
   useEffect(() => {
     if (!student) return;
+    if (isInactiveStudent(student)) return;
+    if (options?.loadStoredOnly) return;
     if (!dbChecked) return;
     if (displayState !== 'ready' && displayState !== 'stale') return;
-    if (autoTriggeredRef.current === student.id) return;
-    autoTriggeredRef.current = student.id;
+
+    const triggerKey = `${student.id}:${sourceHash}`;
+    if (autoTriggeredRef.current === triggerKey) return;
+    autoTriggeredRef.current = triggerKey;
+
+    if (!hasVoiceData) {
+      setState(insufficientSentimentState(sourceHash));
+      return;
+    }
+
     generate();
-  }, [student, dbChecked, displayState, generate]);
+  }, [student, dbChecked, displayState, generate, hasVoiceData, sourceHash, options?.loadStoredOnly]);
 
   return { state, displayState, generate, sourceHash };
 }

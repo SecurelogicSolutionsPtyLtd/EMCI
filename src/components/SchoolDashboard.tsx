@@ -1,16 +1,22 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import { Building2 } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 import type { Student } from '../data/studentsData';
 import type { School } from '../data/networkData';
+import type { AppShellOutletContext } from '../routes/shellContext';
 import { buildSchoolMetricCards } from '../lib/metricCards';
+import { isFlaggedForFollowUp } from '../lib/deAnalyticsMetrics';
+import { countPriorityAlerts } from '../lib/priorityAlerts';
+import { useStudentRatingScores } from '../hooks/useStudentRatingScores';
 import { DashboardLetterhead } from './dashboard/DashboardLetterhead';
 import { DashboardAdvisories } from './dashboard/DashboardAdvisories';
 import { DashboardSectionHeading } from './dashboard/DashboardSectionHeading';
 import { DashboardStageDistribution } from './dashboard/DashboardStageDistribution';
 import { SchoolParticularsPanel } from './dashboard/SchoolParticularsPanel';
 import { SchoolStudentRegister } from './SchoolStudentRegister';
+import { EMCI_BRAND } from '../lib/programNaming';
 
 interface SchoolDashboardProps {
   students: Student[];
@@ -25,6 +31,7 @@ const SCHOOL_STATUS_BADGE: Record<string, string> = {
 };
 
 export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDashboardProps) {
+  const { studentEventsMap } = useOutletContext<AppShellOutletContext>();
   const schoolStudents = school
     ? students.filter(s => (s as any).schoolId === school.id || !school.id)
     : students;
@@ -33,7 +40,10 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
   const active     = schoolStudents.filter(s => s.status === 'Active').length;
   const inProgress = schoolStudents.filter(s => s.stageProgress > 0 && s.currentStage !== 'complete').length;
   const completed  = schoolStudents.filter(s => s.currentStage === 'complete').length;
-  const atRiskCount = schoolStudents.filter(s => s.riskLevel !== 'none').length;
+  const atRiskCount = schoolStudents.filter(isFlaggedForFollowUp).length;
+  const schoolStudentIds = useMemo(() => schoolStudents.map(s => s.id), [schoolStudents]);
+  const { ratingFlags } = useStudentRatingScores(schoolStudentIds);
+  const priorityAlertCount = countPriorityAlerts(schoolStudents, studentEventsMap, ratingFlags);
 
   const metricCards = buildSchoolMetricCards(total, active, inProgress, completed);
 
@@ -104,7 +114,11 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
 
             {/* Right column — advisories & particulars */}
             <div className="xl:col-span-4 space-y-6 min-w-0">
-              <DashboardAdvisories atRiskCount={atRiskCount} scopeSuffix="at this school" />
+              <DashboardAdvisories
+                atRiskCount={atRiskCount}
+                priorityAlertCount={priorityAlertCount}
+                scopeSuffix="at this school"
+              />
               <DashboardStageDistribution students={schoolStudents} />
               {school && <SchoolParticularsPanel school={school} />}
             </div>
@@ -112,7 +126,7 @@ export function SchoolDashboard({ students, school, onSelectStudent }: SchoolDas
 
           {/* ── Official footer rule ─────────────────────────────── */}
           <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-            <span className="leading-relaxed">EMCI Student Management Platform · Last synced {format(new Date(), 'dd MMM yyyy, h:mm aa')}</span>
+            <span className="leading-relaxed">{EMCI_BRAND} · Last synced {format(new Date(), 'dd MMM yyyy, h:mm aa')}</span>
             <span className="shrink-0">Confidential — internal use only</span>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { FileText, User, AlignLeft, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { TimelineEvent } from '../services/dataverse';
 import type { SurveyField } from '../services/surveyFields';
+import { RedactedText } from './ui/RedactedText';
 
 // ── Safe date helpers ─────────────────────────────────────────────────────────
 
@@ -157,7 +158,9 @@ function EventDrawer({ event, onClose }: DrawerProps) {
                 <AlignLeft className="w-3 h-3 text-slate-400" />
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Description</span>
               </div>
-              <p className="text-sm text-slate-700 leading-relaxed">{event.description}</p>
+              <p className="text-sm text-slate-700 leading-relaxed">
+                <RedactedText text={event.description} />
+              </p>
             </div>
           )}
 
@@ -170,7 +173,9 @@ function EventDrawer({ event, onClose }: DrawerProps) {
               {(event.surveyFields as SurveyField[]).map((field, i) => (
                 <div key={i} className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-slate-500">{field.label}</span>
-                  <span className="text-sm text-slate-800 leading-relaxed">{field.value}</span>
+                  <span className="text-sm text-slate-800 leading-relaxed">
+                    <RedactedText text={field.value} />
+                  </span>
                 </div>
               ))}
             </div>
@@ -192,7 +197,9 @@ function EventDrawer({ event, onClose }: DrawerProps) {
                 {event.relatedSession.fields.map((field, i) => (
                   <div key={i} className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-500">{field.label}</span>
-                    <span className="text-sm text-slate-800 leading-relaxed">{field.value}</span>
+                    <span className="text-sm text-slate-800 leading-relaxed">
+                    <RedactedText text={field.value} />
+                  </span>
                   </div>
                 ))}
               </div>
@@ -201,7 +208,9 @@ function EventDrawer({ event, onClose }: DrawerProps) {
             event.notes && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes</span>
-                <p className="text-sm text-slate-700 leading-relaxed">{event.notes}</p>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  <RedactedText text={event.notes} />
+                </p>
               </div>
             )
           )}

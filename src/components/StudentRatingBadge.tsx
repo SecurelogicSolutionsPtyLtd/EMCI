@@ -48,6 +48,8 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function StudentRatingBadge({ state, generate }: StudentRatingBadgeProps) {
+  if (state.status === 'ineligible') return null;
+
   // ── Empty / error state: clickable gauge icon ──
   if (state.status === 'idle' || state.status === 'error') {
     const isError = state.status === 'error';

@@ -81,8 +81,14 @@ describe('computeWatchouts — deterministic', () => {
     assert.ok(ids(s, [session(new Date().toISOString())]).includes('deactivated-active'));
   });
 
-  it('flags high absences', () => {
-    assert.ok(ids({ ...baseStudent, absenceCount: 6 }, [session(new Date().toISOString())]).includes('high-absences'));
+  it('flags attendance issues when absences are high', () => {
+    const w = computeWatchouts(
+      { ...baseStudent, absenceCount: 6 },
+      [session(new Date().toISOString())],
+    );
+    const issue = w.find(x => x.id === 'attendance-issues');
+    assert.ok(issue);
+    assert.equal(issue!.label, 'Attendance Issues');
   });
 
   it('stays quiet for a healthy, recently-active student', () => {
@@ -102,6 +108,12 @@ describe('computeWatchouts — deterministic', () => {
   });
 });
 
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString();
+}
+
 describe('computeWatchouts — AI-flag derived', () => {
   function rating(partial: Partial<StudentRating>): StudentRating {
     return {
@@ -109,7 +121,6 @@ describe('computeWatchouts — AI-flag derived', () => {
       band: 'on_track',
       categories: [],
       flags: [],
-      supportNeed: 'standard',
       confidence: 'high',
       ...partial,
     };
@@ -124,16 +135,60 @@ describe('computeWatchouts — AI-flag derived', () => {
     assert.match(concern!.detail ?? '', /verify/i);
   });
 
-  it('marks a high-support on-track student as positive', () => {
+  it('labels the AI thriving flag as Engaged', () => {
     const recent = session(new Date().toISOString());
-    const w = computeWatchouts(baseStudent, [recent], rating({ band: 'on_track', supportNeed: 'high' }));
-    assert.ok(w.some(x => x.id === 'thriving' && x.severity === 'positive'));
+    const w = computeWatchouts(baseStudent, [recent], rating({ flags: ['thriving'] }));
+    const engaged = w.find(x => x.id === 'engaged');
+    assert.ok(engaged);
+    assert.equal(engaged!.label, 'Engaged');
+  });
+
+  it('adds attendance issues from the AI attendance_risk flag', () => {
+    const recent = session(new Date().toISOString());
+    const w = computeWatchouts(baseStudent, [recent], rating({ flags: ['attendance_risk'] }));
+    assert.ok(w.some(x => x.id === 'attendance-issues' && x.label === 'Attendance Issues'));
+  });
+
+  it('adds disengaged, stalled, and no_career_plan from AI flags as priority actions', () => {
+    const recent = session(new Date().toISOString());
+    const w = computeWatchouts(
+      baseStudent,
+      [recent],
+      rating({ flags: ['disengaged', 'stalled', 'no_career_plan'] }),
+    );
+    const disengaged = w.find(x => x.id === 'disengaged');
+    const stalled = w.find(x => x.id === 'stalled');
+    const noPlan = w.find(x => x.id === 'no-career-plan');
+    assert.ok(disengaged);
+    assert.equal(disengaged!.severity, 'action');
+    assert.equal(disengaged!.label, 'Disengaged');
+    assert.ok(stalled);
+    assert.equal(stalled!.label, 'Stalled');
+    assert.ok(noPlan);
+    assert.equal(noPlan!.label, 'No Career Plan');
+  });
+
+  it('labels deterministic no-career-plan and stalled watch-outs as priority actions', () => {
+    const stalledStudent: Student = {
+      ...baseStudent,
+      lastActivity: daysAgo(75),
+    };
+    const stalledWatch = computeWatchouts(stalledStudent, []).find(x => x.id === 'stalled');
+    assert.ok(stalledWatch);
+    assert.equal(stalledWatch!.severity, 'action');
+    assert.equal(stalledWatch!.label, 'Stalled');
+
+    const noPlan = computeWatchouts(baseStudent, [session(new Date().toISOString())]).find(x => x.id === 'no-career-plan');
+    assert.ok(noPlan);
+    assert.equal(noPlan!.severity, 'action');
+    assert.equal(noPlan!.label, 'No Career Plan');
   });
 
   it('orders actions before watches before positives', () => {
     const recent = session(new Date().toISOString());
     const s: Student = { ...baseStudent, hasProfile: false, absenceCount: 6 };
     const w = computeWatchouts(s, [recent], rating({ flags: ['sentiment_concern', 'thriving'] }));
+    assert.ok(w.some(x => x.id === 'engaged'));
     const order = w.map(x => x.severity);
     const sorted = [...order].sort((a, b) =>
       ({ action: 0, watch: 1, positive: 2 })[a] - ({ action: 0, watch: 1, positive: 2 })[b]);

@@ -4,6 +4,8 @@ import { AlertTriangle, Clock, X, User, Info, MoreVertical, FileText } from 'luc
 import { motion, AnimatePresence } from 'motion/react';
 import { type Student, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
 import type { SurveyField } from '../services/surveyFields';
+import { RedactedText } from './ui/RedactedText';
+import { INACTIVE_STUDENT_SUMMARY } from '../lib/inactiveStudentCopy';
 import { buildRedactedOverview } from '../lib/studentRedaction';
 
 interface ContextPanelProps {
@@ -33,6 +35,7 @@ function BooleanDot({ value }: { value: boolean }) {
 
 function buildOverview(student: Student | null): string {
   if (!student) return '—';
+  if (student.status === 'Inactive') return INACTIVE_STUDENT_SUMMARY;
   const name = `${student.firstName} ${student.lastName}`.trim();
   const yearPhrase =
     !student.yearLevel && !student.yearLevelLabel?.trim()
@@ -137,7 +140,7 @@ export function ContextPanel({ student, selectedEvent, onClose, hidePii = false 
                         {field.label}
                       </span>
                       <span className="text-sm text-slate-800 font-medium leading-snug">
-                        {field.value}
+                        <RedactedText text={field.value} />
                       </span>
                     </div>
                   ))}
@@ -152,7 +155,7 @@ export function ContextPanel({ student, selectedEvent, onClose, hidePii = false 
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Description</span>
                 <p className="text-sm text-slate-700 leading-relaxed border-l-2 border-primary/30 pl-3 py-1">
-                  {selectedEvent.description}
+                  <RedactedText text={selectedEvent.description} />
                 </p>
               </div>
             )}
@@ -165,7 +168,7 @@ export function ContextPanel({ student, selectedEvent, onClose, hidePii = false 
                   {selectedEvent.type === 'session' ? 'Session Notes' : 'Notes'}
                 </span>
                 <p className="text-sm text-slate-700 leading-relaxed border-l-2 border-primary/30 pl-3 py-1">
-                  {selectedEvent.notes}
+                  <RedactedText text={selectedEvent.notes} />
                 </p>
               </div>
             )}
@@ -177,7 +180,7 @@ export function ContextPanel({ student, selectedEvent, onClose, hidePii = false 
                 <ul className="flex flex-col gap-2">
                   {selectedEvent.linkedInterventions.map((intervention: string, idx: number) => (
                     <li key={idx} className="text-sm font-medium text-slate-700 bg-slate-100 px-3 py-2 rounded border border-slate-200/50">
-                      {intervention}
+                      <RedactedText text={intervention} />
                     </li>
                   ))}
                 </ul>
@@ -195,7 +198,9 @@ export function ContextPanel({ student, selectedEvent, onClose, hidePii = false 
                   {selectedEvent.recommendedActions.map((action: string, idx: number) => (
                     <li key={idx} className="text-sm text-slate-700 flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
-                      <span className="leading-tight">{action}</span>
+                      <span className="leading-tight">
+                        <RedactedText text={action} />
+                      </span>
                     </li>
                   ))}
                 </ul>

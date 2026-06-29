@@ -110,8 +110,12 @@ function applyLiteralRedaction(text: string, literals: string[]): string {
   let out = text;
   for (const literal of literals) {
     const escaped = escapeRegExp(literal);
+    // escaped is escapeRegExp()-sanitised literal text; no metacharacters can reach the
+    // pattern, so there is no ReDoS surface. gi flags require a RegExp.
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
     const re = new RegExp(`\\b${escaped}\\b`, 'gi');
     out = out.replace(re, REDACTED_TOKEN);
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
     const loose = new RegExp(escaped, 'gi');
     if (literal.length >= 5) {
       out = out.replace(loose, REDACTED_TOKEN);
@@ -215,9 +219,12 @@ export function redactTimelineEvents(
   }));
 }
 
+import { INACTIVE_STUDENT_SUMMARY } from './inactiveStudentCopy';
+
 /** Generic overview prose for DE (no name or year cohort). */
 export function buildRedactedOverview(student: Student | null): string {
   if (!student) return '—';
+  if (student.status === 'Inactive') return INACTIVE_STUDENT_SUMMARY;
   const stageMap: Record<string, string> = {
     referral:        'has recently been referred into the programme',
     consent:         'has completed the referral and is awaiting consent',

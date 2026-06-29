@@ -1,4 +1,4 @@
-# EMCI Student Intelligence Interface
+# EMCI — Enhanced My Career Insights (Pilot Program)
 # Private authenticated platform — search engine indexing is disabled.
 
 User-agent: *

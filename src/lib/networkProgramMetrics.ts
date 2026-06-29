@@ -3,15 +3,19 @@ import type { Student } from '../data/studentsData';
 import type { AppRole, CounsellorScope } from '../types/roles';
 import { getRoleGroup, isCounsellorScoped, studentMatchesCounsellorScope } from '../types/roles';
 import {
-  buildDeactivatedCounsellorKeys,
+  counsellorRosterKey,
   filterStatsSchools,
   filterStatsStudents,
+  filterViewableSchools,
   isDeactivatedCounsellor,
   isExcludedFromProgramStats,
   isExcludedTestCounsellor,
+  resolveInactiveCounsellorKeys,
+  emptyDeactivatedCounsellorKeys,
   type DeactivatedCounsellorKeys,
 } from './programStatsFilters';
-import type { TeamMember } from '../services/supabase';
+import type { TeamMember, InactiveCounsellorOverride } from '../services/supabase';
+import type { OwnerLookup } from '../services/dataverse';
 
 export interface ProgramKpiCard {
   label: string;
@@ -62,29 +66,28 @@ export function getProgramVisibleScope(
     visibleSchools = baseSchools.filter(s => schoolIds.has(s.id));
   }
 
-  return { visibleSchools, visibleStudents };
-}
+  const retainSchoolId = isSchoolRole && authSchoolId ? authSchoolId : null;
+  visibleSchools = filterViewableSchools(visibleSchools, { retainSchoolId });
+  const allowedSchoolIds = new Set(visibleSchools.map(s => s.id));
+  visibleStudents = visibleStudents.filter(s => {
+    const schoolId = (s as { schoolId?: string }).schoolId;
+    return Boolean(schoolId && allowedSchoolIds.has(schoolId));
+  });
 
-function counsellorIdentityKey(student: Student): string | null {
-  const ownerId = student.counsellorOwnerId?.trim().toLowerCase();
-  if (ownerId) return `id:${ownerId}`;
-  const email = student.counsellorEmail?.trim().toLowerCase();
-  if (email) return `email:${email}`;
-  const name = student.counsellor?.trim().toLowerCase();
-  if (name) return `name:${name}`;
-  return null;
+  return { visibleSchools, visibleStudents };
 }
 
 interface CounsellorAssignment {
   ownerId?: string;
   email?: string;
+  name?: string;
   hasActiveStudent: boolean;
 }
 
-function countProgramCounsellors(
+function countActiveProgramCounsellors(
   students: Student[],
   deactivated: DeactivatedCounsellorKeys,
-): { activeCounsellors: number; totalCounsellors: number } {
+): number {
   const assignments = new Map<string, CounsellorAssignment>();
 
   for (const student of students) {
@@ -92,12 +95,13 @@ function countProgramCounsellors(
       continue;
     }
 
-    const key = counsellorIdentityKey(student);
+    const key = counsellorRosterKey(student);
     if (!key) continue;
 
     const existing = assignments.get(key) ?? {
       ownerId: student.counsellorOwnerId ?? undefined,
       email: student.counsellorEmail ?? undefined,
+      name: student.counsellor ?? undefined,
       hasActiveStudent: false,
     };
     if (student.status === 'Active') {
@@ -106,11 +110,9 @@ function countProgramCounsellors(
     assignments.set(key, existing);
   }
 
-  let totalCounsellors = 0;
   let activeCounsellors = 0;
 
   for (const assignment of assignments.values()) {
-    totalCounsellors += 1;
     if (
       assignment.hasActiveStudent &&
       !isDeactivatedCounsellor(assignment, deactivated)
@@ -119,12 +121,17 @@ function countProgramCounsellors(
     }
   }
 
-  return { activeCounsellors, totalCounsellors };
+  return activeCounsellors;
 }
 
-export function resolveProgramStatsOptions(teamMembers?: TeamMember[]): ProgramStatsOptions {
-  if (!teamMembers?.length) return {};
-  return { deactivatedCounsellors: buildDeactivatedCounsellorKeys(teamMembers) };
+export function resolveProgramStatsOptions(
+  teamMembers?: TeamMember[],
+  ownerMap?: OwnerLookup,
+  inactiveOverrides?: InactiveCounsellorOverride[],
+): ProgramStatsOptions {
+  const inactive = resolveInactiveCounsellorKeys(teamMembers, ownerMap, inactiveOverrides);
+  if (!inactive.ownerIds.size && !inactive.emails.size && !inactive.names.size) return {};
+  return { deactivatedCounsellors: inactive };
 }
 
 export function buildProgramKpiCards(
@@ -142,25 +149,20 @@ export function buildProgramKpiCards(
 
   const totalStudents = statsStudents.length;
   const totalActive = statsStudents.filter(s => s.status === 'Active').length;
-  const totalInProgress = statsStudents.filter(
-    s => s.stageProgress > 0 && s.currentStage !== 'complete',
-  ).length;
   const totalCompleted = statsStudents.filter(s => s.currentStage === 'complete').length;
   const completedPct = totalStudents > 0 ? Math.round((totalCompleted / totalStudents) * 100) : 0;
 
-  const deactivated = statsOptions.deactivatedCounsellors ?? { ownerIds: new Set(), emails: new Set() };
-  const { activeCounsellors, totalCounsellors } = countProgramCounsellors(statsStudents, deactivated);
+  const deactivated = statsOptions.deactivatedCounsellors ?? emptyDeactivatedCounsellorKeys();
+  const activeCounsellors = countActiveProgramCounsellors(statsStudents, deactivated);
 
   return [
-    { label: 'Total Schools (Pilot Lifetime)', value: totalSchoolsPilot, highlight: false },
-    { label: 'Active Schools', value: activeSchools, highlight: false },
-    { label: 'Inactive Schools', value: inactiveSchools, highlight: false },
-    { label: 'Total Students', value: totalStudents.toLocaleString('en-AU'), highlight: false },
+    { label: 'Total Schools / Campuses (Pilot Lifetime)', value: totalSchoolsPilot, highlight: false },
+    { label: 'Active Schools / Campuses', value: activeSchools, highlight: false },
+    { label: 'Inactive Schools / Campuses', value: inactiveSchools, highlight: false },
+    { label: 'Total Students (Pilot Lifetime)', value: totalStudents.toLocaleString('en-AU'), highlight: false },
     { label: 'Active Students', value: totalActive.toLocaleString('en-AU'), highlight: false },
-    { label: 'In Progress', value: totalInProgress.toLocaleString('en-AU'), highlight: false },
     { label: 'Completed %', value: `${completedPct}%`, highlight: true },
     { label: 'Active Counsellors', value: activeCounsellors, highlight: false },
-    { label: 'Total Counsellors', value: totalCounsellors, highlight: false },
   ];
 }
 

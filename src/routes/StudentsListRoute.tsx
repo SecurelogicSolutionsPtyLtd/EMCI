@@ -9,7 +9,7 @@ import type { AppShellOutletContext } from './shellContext';
 
 export function StudentsListRoute() {
   const navigate = useNavigate();
-  const { students, schools, userRole, teamMembers } = useOutletContext<AppShellOutletContext>();
+  const { students, schools, userRole, teamMembers, ownerMap, inactiveCounsellorOverrides } = useOutletContext<AppShellOutletContext>();
 
   function handleSelectSchool(school: School) {
     if (!canAccessPage(userRole, 'school')) return;
@@ -30,6 +30,8 @@ export function StudentsListRoute() {
       students={students}
       schools={schools}
       teamMembers={teamMembers}
+      ownerMap={ownerMap}
+      inactiveCounsellorOverrides={inactiveCounsellorOverrides}
       userRole={userRole}
       networkTab="students"
       onNetworkTabChange={onNetworkTabChange}

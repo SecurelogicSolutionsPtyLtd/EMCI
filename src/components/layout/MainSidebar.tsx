@@ -8,7 +8,6 @@ import {
   LogOut,
   Loader2,
   LayoutDashboard,
-  BarChart3,
   PanelLeft,
   PanelLeftClose,
   Pin,
@@ -17,6 +16,7 @@ import type { AppRole } from '../../types/roles';
 import { canAccessPage, canViewStudentRoster, isAdminRole, ROLE_LABELS } from '../../types/roles';
 import { useAuth } from '../../context/AuthContext';
 import { useMainSidebarPin, type SidebarPinMode } from '../../hooks/useMainSidebarPin';
+import { EMCI_PROGRAM_NAME } from '../../lib/programNaming';
 
 export type NetworkMainTab = 'schools' | 'students';
 
@@ -25,12 +25,10 @@ interface MainSidebarProps {
   schoolsNavActive: boolean;
   studentsNavActive: boolean;
   counsellorsNavActive: boolean;
-  deAnalyticsActive: boolean;
   onGoToDashboard: () => void;
   onGoToSchools: () => void;
   onGoToStudents: () => void;
   onGoToCounsellors: () => void;
-  onGoToDeAnalytics: () => void;
   onGoToDevLab: () => void;
   onGoToTeam: () => void;
   userRole: AppRole;
@@ -56,12 +54,10 @@ export function MainSidebar({
   schoolsNavActive,
   studentsNavActive,
   counsellorsNavActive,
-  deAnalyticsActive,
   onGoToDashboard,
   onGoToSchools,
   onGoToStudents,
   onGoToCounsellors,
-  onGoToDeAnalytics,
   onGoToDevLab,
   onGoToTeam,
   userRole,
@@ -81,15 +77,13 @@ export function MainSidebar({
 
   const showStudentRoster = canViewStudentRoster(userRole);
   const showCounsellors    = canAccessPage(userRole, 'counsellors', counsellorScope);
-  const showDeAnalytics    = canAccessPage(userRole, 'de_analytics', counsellorScope);
   const showDevLab         = canAccessPage(userRole, 'devlab', counsellorScope);
   const showTeam           = isAdminRole(userRole);
 
   const SECONDARY_NAV = [
-    { label: 'Schools',      icon: Building2,  show: true,                onClick: onGoToSchools,     isActive: schoolsNavActive },
+    { label: 'Schools / Campuses', icon: Building2, show: true, onClick: onGoToSchools, isActive: schoolsNavActive },
     { label: 'Students',     icon: Users,      show: showStudentRoster,   onClick: onGoToStudents,    isActive: studentsNavActive },
     { label: 'Counsellors',  icon: UserCheck,  show: showCounsellors,     onClick: onGoToCounsellors, isActive: counsellorsNavActive },
-    { label: 'DE Analytics', icon: BarChart3,  show: showDeAnalytics,     onClick: onGoToDeAnalytics, isActive: deAnalyticsActive },
   ].filter(item => item.show);
 
   const labelClass = `whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-200 ${
@@ -114,7 +108,7 @@ export function MainSidebar({
           />
           <div className={`min-w-0 flex-1 ${labelClass}`}>
             <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">EMCI</h1>
-            <p className="text-xs text-slate-500 leading-tight">Student Management Platform</p>
+            <p className="text-xs text-slate-500 leading-tight">{EMCI_PROGRAM_NAME}</p>
           </div>
         </div>
         <div className={expanded ? undefined : 'px-2'}>

@@ -1,5 +1,5 @@
 /**
- * EMCI Student Intelligence Interface — root application shell.
+ * EMCI — Enhanced My Career Insights (Pilot Program) — root application shell.
  *
  * @author Zac Swalling
  */
@@ -16,12 +16,15 @@ import { TeamManagement } from './components/TeamManagement';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MaintenanceProvider, useMaintenance } from './context/MaintenanceContext';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
+import { EMCI_BRAND } from './lib/programNaming';
+import { isScoreEligible } from './lib/studentRating';
 import type { Student } from './data/studentsData';
 import type { School } from './data/networkData';
 import {
   fetchStudents,
   fetchSchools,
   fetchSystemUsers,
+  type OwnerLookup,
   fetchSessions,
   fetchAbsences,
   fetchInitialSurveys,
@@ -45,7 +48,7 @@ import {
 } from './services/dataverse';
 import { canBypassMaintenance, getRoleGroup, ROLE_LABELS } from './types/roles';
 import { getProgramVisibleScope } from './lib/networkProgramMetrics';
-import { listTeamMembers, type TeamMember } from './services/supabase';
+import { listTeamMembers, listInactiveCounsellorOverrides, type TeamMember, type InactiveCounsellorOverride } from './services/supabase';
 import { redactSensitiveEventsMap } from './redaction';
 import { Eye, RotateCcw } from 'lucide-react';
 import { EmciLoadingScreen } from './components/EmciLoadingScreen';
@@ -85,6 +88,8 @@ function AppInner() {
 
   const [studentEventsMap, setStudentEventsMap] = useState<Record<string, TimelineEvent[]>>({});
   const [teamMembers, setTeamMembers]           = useState<TeamMember[]>([]);
+  const [ownerMap, setOwnerMap]                 = useState<OwnerLookup>(new Map());
+  const [inactiveCounsellorOverrides, setInactiveCounsellorOverrides] = useState<InactiveCounsellorOverride[]>([]);
 
   const schoolHomeAppliedRef = useRef<string | null>(null);
   const deHomeAppliedRef     = useRef<string | null>(null);
@@ -111,6 +116,7 @@ function AppInner() {
     setDataError(null);
     try {
       const ownerMap = await fetchSystemUsers(tok);
+      setOwnerMap(ownerMap);
       const [fetchedStudents, fetchedSchools] = await Promise.all([
         fetchStudents(tok, ownerMap),
         fetchSchools(tok),
@@ -187,13 +193,19 @@ function AppInner() {
         );
       }
 
-      setStudents(enriched);
+      const redactedEventsMap = redactSensitiveEventsMap(eventsMap);
+      const enrichedWithEligibility = enriched.map(s => ({
+        ...s,
+        scoreEligible: isScoreEligible(redactedEventsMap[s.id] ?? [], s),
+      }));
+
+      setStudents(enrichedWithEligibility);
       setSchools(fetchedSchools);
       // Sensitive info (health, disability, family, contact details) is
       // redacted at this choke point so no consumer ever sees raw data.
-      setStudentEventsMap(redactSensitiveEventsMap(eventsMap));
+      setStudentEventsMap(redactedEventsMap);
       hasLoadedRef.current = true;
-      return enriched;
+      return enrichedWithEligibility;
     } catch (e: any) {
       setDataError(e.message ?? 'Failed to load data from Dataverse');
       return null;
@@ -230,19 +242,26 @@ function AppInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  // ── Team roster for programme KPI counsellor active/inactive resolution ──
+  // ── Team roster + inactive counsellor overrides for KPI / Counsellor View ──
   useEffect(() => {
     if (stage !== 'ready') {
       setTeamMembers([]);
+      setInactiveCounsellorOverrides([]);
       return;
     }
     let cancelled = false;
-    listTeamMembers()
-      .then(members => {
-        if (!cancelled) setTeamMembers(members);
+    Promise.all([listTeamMembers(), listInactiveCounsellorOverrides()])
+      .then(([members, overrides]) => {
+        if (!cancelled) {
+          setTeamMembers(members);
+          setInactiveCounsellorOverrides(overrides);
+        }
       })
       .catch(() => {
-        if (!cancelled) setTeamMembers([]);
+        if (!cancelled) {
+          setTeamMembers([]);
+          setInactiveCounsellorOverrides([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -279,7 +298,7 @@ function AppInner() {
   }, [stage, userRole, navigate]);
 
   const roleScopedData = useMemo(() => {
-    if (!userRole) return { scopedStudents: students, scopedSchools: schools };
+    if (!userRole) return { visibleStudents: students, visibleSchools: schools };
     return getProgramVisibleScope(students, schools, userRole, schoolId, counsellorScope);
   }, [students, schools, userRole, schoolId, counsellorScope]);
 
@@ -293,8 +312,10 @@ function AppInner() {
       dataError,
       studentEventsMap,
       teamMembers,
+      ownerMap,
+      inactiveCounsellorOverrides,
     }),
-    [roleScopedData, userRole, token, loadData, dataError, studentEventsMap, teamMembers],
+    [roleScopedData, userRole, token, loadData, dataError, studentEventsMap, teamMembers, ownerMap, inactiveCounsellorOverrides],
   );
 
   // ── Auth gates ────────────────────────────────────────────────────────────
@@ -345,7 +366,7 @@ function AppInner() {
         {ImpersonationBanner}
         <EmciLoadingScreen
           message={isConnectingToPlatform
-            ? 'Connecting to the Student Management Platform…'
+            ? `Connecting to ${EMCI_BRAND}…`
             : 'Loading programme data…'}
         />
       </>
@@ -412,7 +433,13 @@ function AppInner() {
                   path="/counsellors"
                   element={(
                     <RequirePage page="counsellors">
-                      <CounsellorView students={roleScopedData.visibleStudents} schools={roleScopedData.visibleSchools} />
+                      <CounsellorView
+                        students={roleScopedData.visibleStudents}
+                        schools={roleScopedData.visibleSchools}
+                        ownerMap={ownerMap}
+                        teamMembers={teamMembers}
+                        inactiveCounsellorOverrides={inactiveCounsellorOverrides}
+                      />
                     </RequirePage>
                   )}
                 />

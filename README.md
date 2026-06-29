@@ -1,4 +1,4 @@
-# EMCI — Student Intelligence Interface
+# EMCI — Enhanced My Career Insights (Pilot Program)
 
 A purpose-built dashboard for EMCI counsellors and programme administrators to track, manage, and report on student career guidance journeys across a network of schools.
 

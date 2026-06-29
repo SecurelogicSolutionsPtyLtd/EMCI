@@ -5,6 +5,7 @@ import {
   supabase,
   type PlatformSettings,
 } from '../services/supabase';
+import { EMCI_PLATFORM } from '../lib/programNaming';
 
 const ENV_MAINTENANCE = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
@@ -20,7 +21,7 @@ interface MaintenanceContextValue {
 const MaintenanceContext = createContext<MaintenanceContextValue | null>(null);
 
 const DEFAULT_MESSAGE =
-  'The EMCI platform is temporarily unavailable while we perform scheduled maintenance. Please check back soon.';
+  `The ${EMCI_PLATFORM} is temporarily unavailable while we perform scheduled maintenance. Please check back soon.`;
 
 export function useMaintenance(): MaintenanceContextValue {
   const ctx = useContext(MaintenanceContext);

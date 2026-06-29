@@ -1,17 +1,215 @@
 # EMCI — Changelog
 
-All notable changes to the EMCI student intelligence interface are documented here.  
+All notable changes to the EMCI — Enhanced My Career Insights (Pilot Program) portal are documented here.  
 Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-26 (latest)
+## — 2026-06-29 (latest)
+
+### Fixed: Semgrep static analysis findings
+
+- Hardened a diagnostic log in the Dataverse paged fetch: the dynamic `errorLabel` is now passed as a `console.warn` argument instead of being interpolated into the format string, removing a format-string injection smell ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Documented and suppressed three `detect-non-literal-regexp` false positives where the dynamic input is already sanitised via `escapeRegExp()` and case-insensitive global matching requires a `RegExp` ([`src/lib/studentRedaction.ts`](src/lib/studentRedaction.ts), [`src/redaction/smartRedaction.ts`](src/redaction/smartRedaction.ts)).
+
+### Removed: DE Analytics sidebar nav (P9-T1)
+
+- **DE Analytics** removed from the main sidebar; reporting scope views are out of scope for this release ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx), [`src/routes/MainShell.tsx`](src/routes/MainShell.tsx)).
+
+### Changed: Counsellor View layout and student roster
+
+- Counsellor profile stats (totals, completion, stages, Morrisby counts) are consolidated into a full-width minimalist header strip ([`src/components/CounsellorView.tsx`](src/components/CounsellorView.tsx)).
+- Counsellor View now uses the same sortable, filterable student roster table as the Network **Students** view, with the counsellor column hidden ([`src/components/NetworkStudentRoster.tsx`](src/components/NetworkStudentRoster.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+
+### Fixed: Counsellor View header stacking on switch
+
+- Switching counsellors in the sidebar no longer stacks multiple profile headers; the detail panel remounts via `AnimatePresence mode="wait"` ([`src/components/CounsellorView.tsx`](src/components/CounsellorView.tsx)).
+
+### Changed: Counsellor assignment uses student record owner only
+
+- Student counsellor identity now comes solely from the WLPC student record `_ownerid_value` (Dataverse owner); the previous override from the most recent session owner was removed ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Counsellor View groups and counts students by owner GUID (via roster key), not display name ([`src/components/CounsellorView.tsx`](src/components/CounsellorView.tsx), [`src/lib/programStatsFilters.ts`](src/lib/programStatsFilters.ts)).
+- Counsellor matching no longer falls back to email or display name; students and scoped portal users must have a Dataverse owner GUID ([`src/types/roles.ts`](src/types/roles.ts), [`src/lib/programStatsFilters.ts`](src/lib/programStatsFilters.ts), [`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts)).
+
+### Added: Portal inactive counsellor overrides
+
+- New `emci_inactive_counsellors` table stores Dataverse owner GUIDs that should be treated as inactive in Counsellor View and **Active Counsellors** KPIs ([`supabase/migrations/20260629140000_emci_inactive_counsellors.sql`](supabase/migrations/20260629140000_emci_inactive_counsellors.sql)).
+- Patricia Crilly marked inactive via portal override and duplicate-Dataverse-user name matching (students owned by `7cbb0112-034e-ef11-a316-6045bde53c6c`, disabled duplicate `13684b43-6127-ee11-9965-0022489334a7`).
+- SecureLogic Admin sees Dataverse owner UUIDs on Counsellor View sidebar and profile header ([`src/components/CounsellorView.tsx`](src/components/CounsellorView.tsx)).
+
+### Changed: Counsellor active/inactive from Dataverse
+
+- Counsellor View now splits the sidebar into **active** and **Inactive** counsellors. Disabled Dataverse users (`systemuser.isdisabled = true`) and platform-deactivated team members no longer appear in the active list ([`src/components/CounsellorView.tsx`](src/components/CounsellorView.tsx), [`src/lib/programStatsFilters.ts`](src/lib/programStatsFilters.ts)).
+- **Active Counsellors** KPI also excludes Dataverse-disabled counsellors, in addition to platform-deactivated and test accounts ([`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Documented `systemusers.isdisabled` in [`DATAVERSE_CONNECTION_REFERENCE.md`](DATAVERSE_CONNECTION_REFERENCE.md).
+
+### Changed: Dashboard student KPI strip
+
+- Removed **In Progress** from the Dashboard and Schools KPI strip; **Total Students** is now labelled **Total Students (Pilot Lifetime)** to match the school KPI naming ([`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+
+### Changed: Schools renamed to Schools / Campuses
+
+- Sidebar nav, schools directory page title, KPI labels (**Total / Active / Inactive Schools / Campuses**), dashboard register links, counsellor school filters, and related search placeholders now use **Schools / Campuses** terminology ([`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/dashboard/DashboardQuickAccess.tsx`](src/components/dashboard/DashboardQuickAccess.tsx), [`src/components/dashboard/DashboardSchoolsSnapshot.tsx`](src/components/dashboard/DashboardSchoolsSnapshot.tsx)).
+
+### Removed: EMCI Assistant chat
+
+- Removed the floating **Ask EMCI Assistant** button and chat drawer from the student journey page, along with the `chat-student` edge function, chat hook/context, and `react-markdown` / `remark-gfm` dependencies ([`src/routes/StudentJourneyRoute.tsx`](src/routes/StudentJourneyRoute.tsx)).
+
+### Removed: Support Levels (P7-T1)
+
+- Removed Standard / Elevated / High support levels from the tracking rating model and watch-out logic; priority cohort and year level no longer derive a support-need tier ([`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`src/lib/studentWatchouts.ts`](src/lib/studentWatchouts.ts)). Legacy stored ratings drop the field on read.
+
+### Added: Priority alerts surfacing (P6-T3)
+
+- **No Career Plan**, **Disengaged**, and **Stalled** now generate as priority watch-outs (action severity) on student journeys, including AI flag handlers for `no_career_plan`, `disengaged`, and `stalled` ([`src/lib/studentWatchouts.ts`](src/lib/studentWatchouts.ts)).
+- Dashboard and school **Advisories** show a priority-attention count when any scoped student has one of these alerts ([`src/components/dashboard/DashboardAdvisories.tsx`](src/components/dashboard/DashboardAdvisories.tsx), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/SchoolDashboard.tsx`](src/components/SchoolDashboard.tsx)).
+- Network and school rosters show a **Needs Attention** pill for priority-alert students ([`src/components/StudentRosterNameMeta.tsx`](src/components/StudentRosterNameMeta.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx)).
+- Bulk rating fetch now includes AI `flags` for roster-level detection ([`src/hooks/useStudentRatingScores.ts`](src/hooks/useStudentRatingScores.ts), [`supabase/migrations/20260629120000_list_student_rating_flags.sql`](supabase/migrations/20260629120000_list_student_rating_flags.sql)).
+
+### Changed: Alert label renames (P6-T2)
+
+- Student watch-outs now show **Attendance Issues** (was “High absences” / Attendance Risk) and **Engaged** (was Thriving); internal AI flag keys `attendance_risk` and `thriving` are unchanged ([`src/lib/studentWatchouts.ts`](src/lib/studentWatchouts.ts), [`src/components/StudentWatchouts.tsx`](src/components/StudentWatchouts.tsx)).
+
+### Changed: Wellbeing Concern alert naming (P6-T1)
+
+- The AI watch-out formerly labelled **Wellbeing Concern** (`wellbeing_concern`) now uses **Sentiment concern** / `sentiment_concern` in watch-outs, rating flags, and `rate-student` output; legacy stored flags migrate on read ([`src/lib/studentWatchouts.ts`](src/lib/studentWatchouts.ts), [`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`src/lib/studentRatingStorage.ts`](src/lib/studentRatingStorage.ts), [`supabase/functions/rate-student/index.ts`](supabase/functions/rate-student/index.ts)). Alert behaviour is unchanged.
+
+### Added: Advanced roster filter by session count
+
+- The student roster **Filters** panel now includes a **Sessions** control to narrow the list by EMCI session count (none, 1, 2–3, or 4+) ([`src/components/StudentRosterAdvancedFilters.tsx`](src/components/StudentRosterAdvancedFilters.tsx)).
+
+### Added: Network Students referral date column filter
+
+- The **Students** roster on the Schools/Students view now includes a **Referral Date** column (CRM `createdon`), sortable and filterable by month via the column header dropdown ([`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+
+### Changed: Score eligibility (P5-T2)
+
+- Tracking scores require **at least 2 real EMCI sessions** instead of the previous three-gate rule (session + Initial Student Survey + Satisfaction Survey) ([`src/lib/studentRating.ts`](src/lib/studentRating.ts)).
+- The rating hook skips auto-generation, manual generation, and cached score display when eligibility is not met ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts), [`src/components/StudentRatingBadge.tsx`](src/components/StudentRatingBadge.tsx)).
+- Student roster score column hides scores for ineligible students ([`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/App.tsx`](src/App.tsx)).
+
+### Added: 30-day CRM creation grace period (P5-T3)
+
+- Tracking scores are withheld for the first **30 days** after a student CRM record is created (`createdon`), even when the student has 2+ EMCI sessions ([`src/lib/studentRating.ts`](src/lib/studentRating.ts)).
+- Rating hook, roster score column, and badge respect the combined P5-T2 + P5-T3 eligibility check ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts), [`src/App.tsx`](src/App.tsx)).
+
+### Fixed: SearchableDropdown panel placement crash
+
+- Restored missing `VIEWPORT_MARGIN_PX` constant so dropdown panels compute position without a runtime `ReferenceError` ([`src/components/ui/SearchableDropdown.tsx`](src/components/ui/SearchableDropdown.tsx)).
+
+### Changed: EMCI program naming consistency (P5-T1)
+
+- Added canonical program naming constants in [`src/lib/programNaming.ts`](src/lib/programNaming.ts) (`EMCI_PROGRAM_NAME`, `EMCI_BRAND`, `EMCI_PLATFORM`, `EMCI_PLATFORM_ADMINISTRATOR`).
+- Auth, maintenance, loading, dashboard/school footers, sidebar subtitle, PDF export subtitle, and invite email now use the full name **Enhanced My Career Insights (Pilot Program)** where users first encounter the product.
+- PDF export header now shows the full program name beside the logo instead of the legacy Education, Monitoring & Curriculum Improvement Department lines ([`src/components/PdfPreview.tsx`](src/components/PdfPreview.tsx)).
+- CRM timeline labels, role titles, feature eyebrows, and P4-approved inactive-student copy remain abbreviated as **EMCI** where context is already established.
+
+### Changed: Dataverse survey fetch logging
+
+- Removed per-entity console logging on survey activity fetches (record counts and `_regardingobjectid_value` coverage) from the browser console ([`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Fetch-failure and zero-student-link warnings are unchanged.
+
+### Fixed: Voice sentiment analyser firing without source data
+
+- Student Voice & Sentiment no longer invokes the AI edge function when there are no survey responses, session feedback, or relevant notes to analyse ([`src/lib/studentInsights.ts`](src/lib/studentInsights.ts), [`src/hooks/useStudentSentiment.ts`](src/hooks/useStudentSentiment.ts)).
+- The card now shows the empty state immediately instead of a loading spinner when no voice data exists.
+
+### Fixed: Sentiment card stuck on "Analysing…" for early-stage students
+
+- Students before the career-guidance stage (e.g. at Referral) no longer show a permanent "Analysing student voice and sentiment…" spinner. The card now reads the hook's `too_early` display state and shows the empty state, since analysis does not auto-generate until the student reaches career guidance ([`src/components/StudentSentimentCard.tsx`](src/components/StudentSentimentCard.tsx)).
+
+### Changed: Stronger sensitive-information redaction
+
+- Tier-1 (deterministic) redaction now also catches living/care arrangements (e.g. "lives primarily with her Nan and cousins", grandparents, aunts/uncles, cousins, siblings, kinship), descriptions of a "complex family situation/circumstances", and wellbeing disclosures such as trauma / trauma-informed needs, emotional-regulation difficulties, absconding, behavioural concerns, and attachment ([`src/redaction/sensitivePatterns.ts`](src/redaction/sensitivePatterns.ts)).
+- Tier-2 (AI deep scan) prompt expanded to explicitly flag family/living situation, trauma and behavioural/emotional profiling of a minor, and to redact whole sentences (not minimal fragments) when a note is largely a personal profile ([`supabase/functions/redact-sensitive/index.ts`](supabase/functions/redact-sensitive/index.ts)).
+- Routine programme content and neutral practitioner guidance (career interests, praise, clear expectations, consent status) remain unredacted.
+- `[Redacted — sensitive]` tokens now render as a small orange pill badge in timeline, context panel, and survey views ([`src/components/ui/RedactedText.tsx`](src/components/ui/RedactedText.tsx)).
+
+### Changed: Inactive student journey layout
+
+- Inactive student profiles now default to a minimal view: student record, inactive status copy, and Quick Insights only ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx)).
+- **Show historical data** reveals programme progress, archived sentiment, watchouts, and the activity timeline without tracking indicators or AI regeneration.
+- Tracking scores no longer load or auto-generate for inactive students ([`src/hooks/useStudentRating.ts`](src/hooks/useStudentRating.ts)).
+
+### Changed: Inactive student summary wording (P4-T2)
+
+- Inactive students now show approved alternate copy instead of AI-generated active-engagement summaries on the journey page, context panel, PDF export, and redacted overview ([`src/lib/inactiveStudentCopy.ts`](src/lib/inactiveStudentCopy.ts), [`src/components/StudentSentimentCard.tsx`](src/components/StudentSentimentCard.tsx), [`src/components/ContextPanel.tsx`](src/components/ContextPanel.tsx), [`src/hooks/useStudentSentiment.ts`](src/hooks/useStudentSentiment.ts), [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts)).
+- Copy: *"This student is no longer active in the EMCI program."* and *"Participation ceased before program completion."*
+
+### Changed: Student journey layout — sentiment replaces analysis summary
+
+- Removed the **Analysis Summary** card from the student journey page; it no longer auto-runs on page load ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/hooks/useStudentAnalysis.ts`](src/hooks/useStudentAnalysis.ts)).
+- **Student Voice & Sentiment** now occupies the primary left column beside Quick Insights (replacing the former Analysis Summary slot) ([`src/components/StudentJourneySummary.tsx`](src/components/StudentJourneySummary.tsx), [`src/components/StudentSentimentCard.tsx`](src/components/StudentSentimentCard.tsx)).
+- Cached analysis data is still loaded for PDF export when available; generation is no longer triggered automatically on the journey page.
+
+### Changed: Tracking score rubric weightings
+
+- Updated category weights to Engagement 20%, Career Planning & Exploration 25%, Work Readiness 25%, Attendance & Momentum 15%, and Student Sentiment 15% ([`src/lib/studentRating.ts`](src/lib/studentRating.ts)).
+- Stored ratings now reapply current weights and recompute the composite score on read ([`src/lib/studentRatingStorage.ts`](src/lib/studentRatingStorage.ts)).
+- Rating breakdown labels updated to match the rubric area names ([`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx)).
+
+### Fixed: Student roster Filters dropdown layout and clipping
+
+- The **Filters** popover now renders in a viewport-aware fixed portal so it is not clipped by parent `overflow-hidden` containers ([`src/components/StudentRosterAdvancedFilters.tsx`](src/components/StudentRosterAdvancedFilters.tsx)).
+- Header, scrollable filter fields, and **Done** footer use a three-row grid so the last filters are no longer hidden behind the footer; panel height adapts to available viewport space and flips above the trigger when needed.
+- Nested filter dropdowns (`SearchableDropdown`) now render option panels in a fixed viewport portal so they are not clipped by the scrollable filter body ([`src/components/ui/SearchableDropdown.tsx`](src/components/ui/SearchableDropdown.tsx)).
+
+### Added: Student roster column header filters and sorting
+
+- Network **Students** table headers now use the same hover checkbox filter panel and click-to-sort behaviour as the Schools directory ([`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/components/SchoolColumnFilterDropdown.tsx`](src/components/SchoolColumnFilterDropdown.tsx)).
+- Filterable columns: Year, School, Counsellor (staff view), Current Stage, and Status; active filters show a dot on the header; toolbar **Clear** resets search, toolbar filters, column filters, and sort.
+
+### Fixed: Student roster table responsiveness on smaller screens
+
+- Trimmed the student roster table cell padding and lowered its minimum width so all columns fit on standard laptop screens without horizontal (shift) scrolling; it only scrolls horizontally on genuinely small viewports, with responsive content padding and a wrapping pagination row ([`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+
+### Fixed: Follow Up flag only after 90+ days without contact
+
+- The student roster **Follow Up** flag (and related dashboard advisories) now appears only when a student has had no EMCI activity for more than **90 days** — not from absence count alone ([`src/lib/deAnalyticsMetrics.ts`](src/lib/deAnalyticsMetrics.ts), [`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- Completed and inactive students are excluded from follow-up flagging; severity tiers (Low / Medium / High) reflect how long since last activity.
+- Roster, network overview, and school dashboard views use the shared `isFlaggedForFollowUp` helper ([`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/SchoolDashboard.tsx`](src/components/SchoolDashboard.tsx)).
+
+### Changed: Student roster name subtitle — sessions count and Follow Up pill
+
+- Under each student name, the Morrisby/registration ID is replaced with **session count** (e.g. `2 sessions`) next to absences ([`src/components/StudentRosterNameMeta.tsx`](src/components/StudentRosterNameMeta.tsx), [`src/services/dataverse.ts`](src/services/dataverse.ts)).
+- **Follow Up** now renders as a red pill badge instead of inline text; the warning triangle beside the name was removed ([`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx), [`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx)).
+
+### Changed: Growth & Wellbeing rating area renamed to Student Sentiment
+
+- The tracking-score category formerly labelled **Growth & Wellbeing** (and interim **Growth & sentiment** / **Sentiment**) now displays as **Student Sentiment** in the rating breakdown and stored rating payloads ([`src/lib/studentRating.ts`](src/lib/studentRating.ts), [`src/components/StudentRatingBreakdown.tsx`](src/components/StudentRatingBreakdown.tsx), [`src/lib/studentRatingStorage.ts`](src/lib/studentRatingStorage.ts)).
+- Legacy stored ratings with `growth_wellbeing` keys or old labels are migrated on read to `growth_sentiment` with the **Student Sentiment** label.
+
+---
+
+## — 2026-06-26
 
 ### Changed: "At Risk" user-facing copy renamed to "Follow Up"
 
+- Student sentiment verbatim record tone tags now show **Follow Up** instead of **Concern** for negative quotes ([`src/components/StudentSentimentCard.tsx`](src/components/StudentSentimentCard.tsx)).
 - Student roster filters, type badges, profile fields, PDF export, and DE cohort charts now display **Follow Up** instead of **At Risk**; legacy `studentType` and cohort keys are unchanged internally ([`src/data/studentsData.ts`](src/data/studentsData.ts), [`src/lib/deAnalyticsMetrics.ts`](src/lib/deAnalyticsMetrics.ts)).
 - Dashboard and school advisories, plus roster risk subtitles, now use **Follow Up** wording ([`src/components/dashboard/DashboardAdvisories.tsx`](src/components/dashboard/DashboardAdvisories.tsx), [`src/components/SchoolStudentRegister.tsx`](src/components/SchoolStudentRegister.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
 - Student roster advanced filters and search now label the severity filter **Follow Up** (replacing "Risk level") with **Any level** / None / Low / Medium / High options ([`src/components/StudentRosterAdvancedFilters.tsx`](src/components/StudentRosterAdvancedFilters.tsx), [`src/components/StudentSearch.tsx`](src/components/StudentSearch.tsx)).
+
+### Changed: Schools column filter dropdown extracted into own component
+
+- Moved the column filter dropdown (hover panel on school table headers) into [`src/components/SchoolColumnFilterDropdown.tsx`](src/components/SchoolColumnFilterDropdown.tsx), including its types (`SchoolSortKey`, `SortDir`, `ColumnFilterValues`) and constants (`SCHOOL_TABLE_COLUMNS`).
+- Fixed the **Clear** button inside the dropdown — was `text-[10px]` (barely legible); now `text-xs` with padding and a hover background, making it easy to click.
+
+### Added: Schools directory column sorting
+
+- Schools table headers are now clickable: sort by name, Morrisby ID, status (Active → Onboarding → Inactive), programme completion %, or total students; click again to reverse direction ([`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+
+### Changed: Test/demo school visibility
+
+- Test/demo/vendor schools (names or Morrisby IDs matching Secure Logic, "test", or "demo") are hidden from the Schools directory, student rosters, and direct school routes for every role; school-role users assigned to a test school still see only their own school ([`src/lib/programStatsFilters.ts`](src/lib/programStatsFilters.ts), [`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+
+### Changed: Product branding
+
+- Replaced **Student Management Platform** / **Student Intelligence Interface** with **EMCI — Enhanced My Career Insights (Pilot Program)** across browser title, Open Graph tags, sidebar tagline, login footer, dashboard footer, loading screen, and documentation ([`index.html`](index.html), [`src/components/layout/MainSidebar.tsx`](src/components/layout/MainSidebar.tsx), [`src/components/auth/AuthShell.tsx`](src/components/auth/AuthShell.tsx), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/SchoolDashboard.tsx`](src/components/SchoolDashboard.tsx), [`src/App.tsx`](src/App.tsx), [`src/components/EmciLoadingScreen.tsx`](src/components/EmciLoadingScreen.tsx), [`README.md`](README.md), [`package.json`](package.json), [`metadata.json`](metadata.json)).
+
+### Changed: Phase map verification playbook
+
+- Expanded [`docs/emci-portal-phase-map.md`](docs/emci-portal-phase-map.md) with a **Verification playbook**: app navigation table, original checklist → task ID mapping, Phase 1 one-session walkthrough, KPI counting rules, and step-by-step human verification for P1 (Dashboard), P2–P3 (priority items), and P10 (regression checks).
 
 ### Fixed: Supabase client startup when env is missing
 
@@ -24,7 +222,9 @@ Entries are ordered newest-first within each release.
 
 ### Changed: Dashboard programme KPI metrics (Phase 1)
 
-- Dashboard and Schools directory KPI strip now shows **Total Schools (Pilot Lifetime)**, **Active Schools**, **Inactive Schools**, **Active Counsellors**, and **Total Counsellors** alongside existing student metrics ([`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+- Dashboard letterhead subtitle for network-wide roles now shows **Network-wide scope** only (removed the separate participating-school count that could disagree with **Total Schools (Pilot Lifetime)** KPIs) ([`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx)).
+- Removed **Total Counsellors** from the Dashboard and Schools KPI strip; **Active Counsellors** remains the single counsellor metric ([`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
+- Dashboard and Schools directory KPI strip now shows **Total Schools (Pilot Lifetime)**, **Active Schools**, **Inactive Schools**, and **Active Counsellors** alongside existing student metrics ([`src/lib/networkProgramMetrics.ts`](src/lib/networkProgramMetrics.ts), [`src/components/DashboardHome.tsx`](src/components/DashboardHome.tsx), [`src/components/NetworkOverview.tsx`](src/components/NetworkOverview.tsx)).
 - Test/demo schools (e.g. Secure Logic, names containing "test" or "demo") are excluded from programme statistics; the dashboard schools snapshot uses the same filtered scope ([`src/lib/programStatsFilters.ts`](src/lib/programStatsFilters.ts)).
 - Counsellor counts are derived from Dataverse owner identity (not display-name strings alone); active counsellors require at least one active student assignment and exclude platform-deactivated team members and test accounts.
 

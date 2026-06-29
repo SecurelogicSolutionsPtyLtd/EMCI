@@ -17,6 +17,14 @@ import { computeQuickInsights } from './studentInsights';
 
 export type WatchoutSeverity = 'action' | 'watch' | 'positive';
 
+/** Watch-outs that require priority staff attention (P6-T3). */
+export const PRIORITY_WATCHOUT_IDS = ['no-career-plan', 'disengaged', 'stalled'] as const;
+export type PriorityWatchoutId = typeof PRIORITY_WATCHOUT_IDS[number];
+
+export function isPriorityWatchout(w: Watchout): boolean {
+  return (PRIORITY_WATCHOUT_IDS as readonly string[]).includes(w.id);
+}
+
 export interface Watchout {
   id:       string;
   severity: WatchoutSeverity;
@@ -100,8 +108,9 @@ export function computeWatchouts(
     } else if (inProgress && idle > STALL_DAYS) {
       out.push({
         id: 'stalled',
-        severity: 'watch',
-        label: `Stalled — no activity in ${idle} days`,
+        severity: 'action',
+        label: 'Stalled',
+        detail: `No activity in ${idle} days`,
       });
     }
   }
@@ -171,12 +180,13 @@ export function computeWatchouts(
     });
   }
 
-  // 7. High absences.
+  // 7. Attendance issues (high absences).
   if (student.absenceCount > HIGH_ABSENCE_COUNT) {
     out.push({
-      id: 'high-absences',
+      id: 'attendance-issues',
       severity: 'watch',
-      label: `High absences (${student.absenceCount} recorded)`,
+      label: 'Attendance Issues',
+      detail: `${student.absenceCount} absences recorded`,
     });
   }
 
@@ -188,8 +198,8 @@ export function computeWatchouts(
   ) {
     out.push({
       id: 'no-career-plan',
-      severity: 'watch',
-      label: 'No Career Action Plan yet',
+      severity: 'action',
+      label: 'No Career Plan',
     });
   }
 
@@ -206,30 +216,46 @@ export function computeWatchouts(
         detail: verifyHint,
       });
     }
-    if (rating.flags.includes('disengaged')) {
+    if (rating.flags.includes('disengaged') && !out.some(w => w.id === 'disengaged')) {
       out.push({
         id: 'disengaged',
-        severity: 'watch',
-        label: 'Signs of disengagement',
+        severity: 'action',
+        label: 'Disengaged',
         detail: verifyHint,
       });
     }
-    if (rating.supportNeed === 'high' && rating.band === 'needs_attention') {
+    if (rating.flags.includes('stalled') && !out.some(w => w.id === 'stalled')) {
       out.push({
-        id: 'equity-escalation',
+        id: 'stalled',
         severity: 'action',
-        label: 'Priority-cohort student tracking behind',
+        label: 'Stalled',
+        detail: verifyHint,
       });
     }
-    const thriving = rating.flags.includes('thriving')
-      || (rating.band === 'on_track' && rating.supportNeed === 'high');
-    if (thriving) {
+    if (rating.flags.includes('no_career_plan') && !out.some(w => w.id === 'no-career-plan')) {
       out.push({
-        id: 'thriving',
+        id: 'no-career-plan',
+        severity: 'action',
+        label: 'No Career Plan',
+        detail: verifyHint,
+      });
+    }
+    if (
+      rating.flags.includes('attendance_risk')
+      && !out.some(w => w.id === 'attendance-issues')
+    ) {
+      out.push({
+        id: 'attendance-issues',
+        severity: 'watch',
+        label: 'Attendance Issues',
+        detail: verifyHint,
+      });
+    }
+    if (rating.flags.includes('thriving')) {
+      out.push({
+        id: 'engaged',
         severity: 'positive',
-        label: rating.supportNeed === 'high'
-          ? 'Priority-cohort student doing well'
-          : 'Thriving',
+        label: 'Engaged',
       });
     }
   }

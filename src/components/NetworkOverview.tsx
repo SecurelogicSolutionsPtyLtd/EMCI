@@ -1,34 +1,36 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import {
   Building2,
-  Search, ChevronLeft, ChevronRight,
-  AlertTriangle, BookOpen, EyeOff,
+  Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X,
 } from 'lucide-react';
 import type { School } from '../data/networkData';
-import { type Student, YEAR_LEVEL_PLUS_BUCKET, formatStudentTypeLabel, formatYearLevelLine } from '../data/studentsData';
+import { type Student } from '../data/studentsData';
 import type { AppRole } from '../types/roles';
 import { canAccessPage, canSeeStudentNames, canViewStudentRoster } from '../types/roles';
-import { studentPseudonym } from '../lib/studentRedaction';
 import { useAuth } from '../context/AuthContext';
 import type { NetworkMainTab } from './layout/MainSidebar';
 import { buildProgramKpiCards, getProgramVisibleScope, resolveProgramStatsOptions } from '../lib/networkProgramMetrics';
-import type { TeamMember } from '../services/supabase';
-import { programmeProgressPct, ratingOverallColorClass } from '../lib/stageProgress';
-import { useStudentRatingScores } from '../hooks/useStudentRatingScores';
+import { filterViewableSchools } from '../lib/programStatsFilters';
+import { getRoleGroup } from '../types/roles';
+import type { TeamMember, InactiveCounsellorOverride } from '../services/supabase';
+import type { OwnerLookup } from '../services/dataverse';
 import {
-  DEFAULT_ROSTER_FILTERS,
-  StudentRosterAdvancedFilters,
-  studentMatchesRosterFilters,
-  type RosterFilterState,
-} from './StudentRosterAdvancedFilters';
-import { SearchableDropdown } from './ui/SearchableDropdown';
+  SchoolColumnFilterDropdown,
+  SCHOOL_TABLE_COLUMNS,
+  type SchoolSortKey,
+  type SortDir,
+  type ColumnFilterValues,
+} from './SchoolColumnFilterDropdown';
+import { NetworkStudentRoster } from './NetworkStudentRoster';
 
 interface NetworkOverviewProps {
   students: Student[];
   schools: School[];
   userRole: AppRole;
   teamMembers?: TeamMember[];
+  ownerMap?: OwnerLookup;
+  inactiveCounsellorOverrides?: InactiveCounsellorOverride[];
   networkTab: NetworkMainTab;
   onNetworkTabChange: (tab: NetworkMainTab) => void;
   onSelectSchool: (school: School) => void;
@@ -43,20 +45,6 @@ const STATUS_DOT: Record<string, { dot: string; text: string }> = {
   Inactive:   { dot: 'bg-slate-400',   text: 'text-slate-500'   },
 };
 
-const STAGE_LABELS: Record<string, string> = {
-  referral:        'Initial Intake',
-  consent:         'Consent',
-  career_guidance: 'Career Guidance',
-  complete:        'Job Ready',
-};
-
-const STAGE_PILL: Record<string, string> = {
-  referral:        'bg-slate-100 text-slate-600',
-  consent:         'bg-slate-100 text-slate-600',
-  career_guidance: 'bg-primary/10 text-primary',
-  complete:        'bg-emerald-100 text-emerald-700',
-};
-
 function schoolStats(schoolId: string, students: Student[]) {
   const ss        = students.filter(s => (s as any).schoolId === schoolId);
   const total     = ss.length;
@@ -65,19 +53,68 @@ function schoolStats(schoolId: string, students: Student[]) {
   return { total, completed, pct };
 }
 
-function getInitials(student: Student) {
-  return `${student.firstName[0] ?? ''}${student.lastName[0] ?? ''}`.toUpperCase();
+const SCHOOL_STATUS_ORDER: Record<School['status'], number> = {
+  Active: 0,
+  Onboarding: 1,
+  Inactive: 2,
+};
+
+const COMPLETION_BUCKET_ORDER = ['0%', '1–24%', '25–49%', '50–74%', '75–99%', '100%'];
+const STUDENTS_BUCKET_ORDER   = ['0', '1–25', '26–50', '51–100', '101+'];
+
+function getCompletionBucket(pct: number): string {
+  if (pct === 0)    return '0%';
+  if (pct < 25)     return '1–24%';
+  if (pct < 50)     return '25–49%';
+  if (pct < 75)     return '50–74%';
+  if (pct < 100)    return '75–99%';
+  return '100%';
 }
 
-function rosterStageFilterLabel(key: string) {
-  if (key === '__none__') return 'Not started';
-  return STAGE_LABELS[key] ?? key;
+function getStudentsBucket(total: number): string {
+  if (total === 0)  return '0';
+  if (total <= 25)  return '1–25';
+  if (total <= 50)  return '26–50';
+  if (total <= 100) return '51–100';
+  return '101+';
+}
+
+function compareSchools(
+  a: School,
+  b: School,
+  key: SchoolSortKey,
+  dir: SortDir,
+  students: Student[],
+): number {
+  let cmp = 0;
+  switch (key) {
+    case 'name':
+      cmp = a.name.localeCompare(b.name, 'en-AU', { sensitivity: 'base' });
+      break;
+    case 'morrisbyId':
+      cmp = a.morrisbyId.localeCompare(b.morrisbyId, 'en-AU', { sensitivity: 'base' });
+      break;
+    case 'status':
+      cmp = SCHOOL_STATUS_ORDER[a.status] - SCHOOL_STATUS_ORDER[b.status];
+      break;
+    case 'completion':
+      cmp = schoolStats(a.id, students).pct - schoolStats(b.id, students).pct;
+      break;
+    case 'students':
+      cmp = schoolStats(a.id, students).total - schoolStats(b.id, students).total;
+      break;
+    default: {
+      const _exhaustive: never = key;
+      return _exhaustive;
+    }
+  }
+  return dir === 'asc' ? cmp : -cmp;
 }
 
 type View = 'schools' | 'students';
 
 export function NetworkOverview({
-  students, schools, userRole, teamMembers = [], networkTab, onNetworkTabChange,
+  students, schools, userRole, teamMembers = [], ownerMap, inactiveCounsellorOverrides = [], networkTab, onNetworkTabChange,
   onSelectSchool, onSelectStudent,
 }: NetworkOverviewProps) {
   const { schoolId, counsellorScope } = useAuth();
@@ -94,162 +131,138 @@ export function NetworkOverview({
     counsellorScope,
   );
 
-  const visibleStudentIds = useMemo(
-    () => visibleStudents.map(s => s.id),
-    [visibleStudents],
-  );
-  const { scores: ratingScores } = useStudentRatingScores(visibleStudentIds);
+  const directorySchools = useMemo(() => {
+    const retainSchoolId = getRoleGroup(userRole) === 'school' && schoolId ? schoolId : null;
+    return filterViewableSchools(visibleSchools, { retainSchoolId });
+  }, [visibleSchools, userRole, schoolId]);
 
   // ── schools view state ────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [page,   setPage]   = useState(1);
+  const [schoolSortKey, setSchoolSortKey] = useState<SchoolSortKey>('name');
+  const [schoolSortDir, setSchoolSortDir] = useState<SortDir>('asc');
+  const [openFilterKey,    setOpenFilterKey]    = useState<SchoolSortKey | null>(null);
+  const [filterDropdownPos, setFilterDropdownPos] = useState({ top: 0, left: 0 });
+  const [columnFilters,    setColumnFilters]    = useState<ColumnFilterValues>({});
+  const closeTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── student roster state ──────────────────────────────────────
-  const [rosterSearch, setRosterSearch] = useState('');
-  const [rosterFilters, setRosterFilters] = useState<RosterFilterState>(DEFAULT_ROSTER_FILTERS);
-  const [rosterPage, setRosterPage] = useState(1);
-
-  const rosterCounsellorOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(visibleStudents.map(s => s.counsellor).filter((c): c is string => Boolean(c && c.trim()))),
-      ).sort((a, b) => a.localeCompare(b)),
-    [visibleStudents],
-  );
-  const rosterYearOptions = useMemo(
-    () =>
-      Array.from(new Set(visibleStudents.map(s => s.yearLevel)))
-        .filter((y): y is number => y != null && !Number.isNaN(y) && y > 0)
-        .sort((a, b) => a - b),
-    [visibleStudents],
-  );
-  const rosterStageFilterKeys = useMemo(() => {
-    const keys = new Set<string>();
-    for (const s of visibleStudents) {
-      keys.add(s.currentStage == null ? '__none__' : s.currentStage);
-    }
-    return Array.from(keys).sort((a, b) => {
-      const order = (k: string) =>
-        k === '__none__' ? -1 : ['referral', 'consent', 'career_guidance', 'complete'].indexOf(k);
-      return order(a) - order(b);
-    });
-  }, [visibleStudents]);
-
-  const rosterStatusOptions = useMemo(() => {
-    const present = new Set(visibleStudents.map(s => s.status));
-    return (['Active', 'Pending', 'Inactive'] as const).filter(st => present.has(st));
-  }, [visibleStudents]);
-
-  const counsellorFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All Counsellors' },
-      ...rosterCounsellorOptions.map(c => ({ value: c, label: c })),
-    ],
-    [rosterCounsellorOptions],
-  );
-
-  const stageFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All Stages' },
-      ...rosterStageFilterKeys.map(k => ({ value: k, label: rosterStageFilterLabel(k) })),
-    ],
-    [rosterStageFilterKeys],
-  );
-
-  const yearFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'Year Level' },
-      ...rosterYearOptions.map(y => ({
-        value: String(y),
-        label: y === YEAR_LEVEL_PLUS_BUCKET ? '15+' : `Year ${y}`,
-      })),
-    ],
-    [rosterYearOptions],
-  );
-
-  const statusFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All Statuses' },
-      ...rosterStatusOptions.map(st => ({ value: st, label: st })),
-    ],
-    [rosterStatusOptions],
-  );
-
-  const schoolFilterOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All Schools' },
-      ...visibleSchools.map(s => ({ value: s.id, label: s.name })),
-    ],
-    [visibleSchools],
-  );
-
-  const rosterStudentTypeOptions = useMemo(() => {
-    const types = Array.from(
-      new Set(visibleStudents.map(s => s.studentType).filter(Boolean)),
-    ).sort((a, b) => a.localeCompare(b));
-    return [
-      { value: 'all', label: 'All Types' },
-      ...types.map(t => ({ value: t, label: formatStudentTypeLabel(t) })),
-    ];
-  }, [visibleStudents]);
+  // ── schools filter options (per-column dropdown data) ───────
+  const schoolColumnFilterOptions = useMemo<Record<SchoolSortKey, string[]>>(() => {
+    const statsBySchoolId = new Map<string, ReturnType<typeof schoolStats>>(
+      directorySchools.map(s => [s.id, schoolStats(s.id, students)]),
+    );
+    const completionBuckets = Array.from(
+      new Set<string>(directorySchools.map(s => getCompletionBucket(statsBySchoolId.get(s.id)!.pct))),
+    ).sort((a, b) => COMPLETION_BUCKET_ORDER.indexOf(a) - COMPLETION_BUCKET_ORDER.indexOf(b));
+    const studentsBuckets = Array.from(
+      new Set<string>(directorySchools.map(s => getStudentsBucket(statsBySchoolId.get(s.id)!.total))),
+    ).sort((a, b) => STUDENTS_BUCKET_ORDER.indexOf(a) - STUDENTS_BUCKET_ORDER.indexOf(b));
+    return {
+      name:       directorySchools.map(s => s.name).sort((a, b) => a.localeCompare(b, 'en-AU', { sensitivity: 'base' })),
+      morrisbyId: directorySchools.map(s => s.morrisbyId).sort(),
+      status:     (['Active', 'Onboarding', 'Inactive'] as School['status'][]).filter(
+                    st => directorySchools.some(s => s.status === st),
+                  ),
+      completion: completionBuckets,
+      students:   studentsBuckets,
+    };
+  }, [directorySchools, students]);
 
   // ── schools filter ────────────────────────────────────────────
-  const filteredSchools = visibleSchools.filter(s => {
-    const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-                        s.morrisbyId.toLowerCase().includes(search.toLowerCase());
-    return matchSearch;
-  });
+  const filteredSchools = useMemo(
+    () =>
+      directorySchools.filter(s => {
+        const q = search.toLowerCase();
+        if (!(s.name.toLowerCase().includes(q) || s.morrisbyId.toLowerCase().includes(q))) return false;
 
-  const totalSchoolPages = Math.max(1, Math.ceil(filteredSchools.length / PAGE_SIZE));
+        const nameF = columnFilters.name;
+        if (nameF && nameF.length > 0 && !nameF.includes(s.name)) return false;
+
+        const midF = columnFilters.morrisbyId;
+        if (midF && midF.length > 0 && !midF.includes(s.morrisbyId)) return false;
+
+        const stF = columnFilters.status;
+        if (stF && stF.length > 0 && !stF.includes(s.status)) return false;
+
+        const compF = columnFilters.completion;
+        if (compF && compF.length > 0) {
+          const pct = schoolStats(s.id, students).pct;
+          if (!compF.includes(getCompletionBucket(pct))) return false;
+        }
+
+        const stuF = columnFilters.students;
+        if (stuF && stuF.length > 0) {
+          const total = schoolStats(s.id, students).total;
+          if (!stuF.includes(getStudentsBucket(total))) return false;
+        }
+
+        return true;
+      }),
+    [directorySchools, search, columnFilters, students],
+  );
+
+  const sortedSchools = useMemo(
+    () =>
+      [...filteredSchools].sort((a, b) =>
+        compareSchools(a, b, schoolSortKey, schoolSortDir, students),
+      ),
+    [filteredSchools, schoolSortKey, schoolSortDir, students],
+  );
+
+  const totalSchoolPages = Math.max(1, Math.ceil(sortedSchools.length / PAGE_SIZE));
   const safePage         = Math.min(page, totalSchoolPages);
-  const pageSlice        = filteredSchools.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageSlice        = sortedSchools.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
 
-  // ── student roster filter ─────────────────────────────────────
-  const filteredRoster = visibleStudents.filter(s => {
-    const q = rosterSearch.toLowerCase();
-    const matchSearch = showStudentNames
-      ? `${s.firstName} ${s.lastName} ${s.preferredName ?? ''}`.toLowerCase().includes(q) ||
-        s.morrisbyId.toLowerCase().includes(q) ||
-        (s.counsellor ?? '').toLowerCase().includes(q)
-      : studentPseudonym(s.id).toLowerCase().includes(q) ||
-        (visibleSchools.find(sc => sc.id === (s as { schoolId?: string }).schoolId)?.name ?? '')
-          .toLowerCase()
-          .includes(q);
-    const schoolId = (s as { schoolId?: string }).schoolId;
-    return (
-      matchSearch &&
-      studentMatchesRosterFilters(s, rosterFilters, { schoolId })
-    );
-  });
-
-  const totalRosterPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
-  const safeRosterPage   = Math.min(rosterPage, totalRosterPages);
-  const rosterSlice      = filteredRoster.slice((safeRosterPage - 1) * PAGE_SIZE, safeRosterPage * PAGE_SIZE);
-
-  const handleRosterSearch = (v: string) => { setRosterSearch(v); setRosterPage(1); };
-  const handleRosterFilters = (patch: Partial<RosterFilterState>) => {
-    setRosterFilters(f => ({ ...f, ...patch }));
-    setRosterPage(1);
-  };
-  const resetRosterFilters = () => {
-    setRosterFilters(DEFAULT_ROSTER_FILTERS);
-    setRosterPage(1);
+  const handleSchoolSort = (key: SchoolSortKey) => {
+    setOpenFilterKey(null);
+    if (schoolSortKey === key) {
+      setSchoolSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSchoolSortKey(key);
+      setSchoolSortDir('asc');
+    }
+    setPage(1);
   };
 
-  const rosterShowingFrom = filteredRoster.length === 0 ? 0 : (safeRosterPage - 1) * PAGE_SIZE + 1;
-  const rosterShowingTo   = Math.min(safeRosterPage * PAGE_SIZE, filteredRoster.length);
+  const scheduleFilterClose = () => {
+    closeTimerRef.current = setTimeout(() => setOpenFilterKey(null), 160);
+  };
 
-  const rosterPageNumbers: number[] = [];
-  for (let i = Math.max(1, safeRosterPage - 2); i <= Math.min(totalRosterPages, safeRosterPage + 2); i++) {
-    rosterPageNumbers.push(i);
-  }
+  const cancelFilterClose = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+  };
+
+  const handleThMouseEnter = (key: SchoolSortKey, thEl: HTMLTableCellElement) => {
+    cancelFilterClose();
+    const rect = thEl.getBoundingClientRect();
+    setFilterDropdownPos({ top: rect.bottom + 2, left: rect.left });
+    setOpenFilterKey(key);
+  };
+
+  const toggleFilterValue = (key: SchoolSortKey, value: string) => {    setColumnFilters(prev => {
+      const current = prev[key] ?? [];
+      const updated = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
+      return { ...prev, [key]: updated };
+    });
+    setPage(1);
+  };
+
+  const clearColumnFilter = (key: SchoolSortKey) => {
+    setColumnFilters(prev => ({ ...prev, [key]: [] }));
+    setPage(1);
+  };
+
+  const hasColumnFilter  = (key: SchoolSortKey) => (columnFilters[key]?.length ?? 0) > 0;
+  const hasAnyColumnFilter = Object.values(columnFilters).some(
+    (f): f is string[] => Array.isArray(f) && f.length > 0,
+  );
 
   const KPIS = buildProgramKpiCards(
-    visibleSchools,
+    directorySchools,
     visibleStudents,
-    resolveProgramStatsOptions(teamMembers),
+    resolveProgramStatsOptions(teamMembers, ownerMap, inactiveCounsellorOverrides),
   );
 
   // Clamp the active view if the role can't see the roster.
@@ -266,7 +279,7 @@ export function NetworkOverview({
           <>
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shrink-0">
-              <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Schools</h2>
+              <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Schools / Campuses</h2>
             </header>
 
             {/* Scrollable content */}
@@ -274,7 +287,7 @@ export function NetworkOverview({
 
               {/* KPI strip */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 divide-x divide-y xl:divide-y-0 divide-slate-100">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 divide-x divide-y xl:divide-y-0 divide-slate-100">
                   {KPIS.map((k, i) => (
                     <motion.div
                       key={k.label}
@@ -294,36 +307,83 @@ export function NetworkOverview({
 
               {/* Schools table */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-200">
+                <div className="p-4 border-b border-slate-200 flex items-center gap-3">
                   <div className="relative w-full max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search schools by name or Morrisby ID…"
+                      placeholder="Search schools / campuses by name or Morrisby ID…"
                       value={search}
                       onChange={e => handleSearch(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
                     />
                   </div>
-
+                  {(search || schoolSortKey !== 'name' || schoolSortDir !== 'asc' || hasAnyColumnFilter) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch('');
+                        setSchoolSortKey('name');
+                        setSchoolSortDir('asc');
+                        setColumnFilters({});
+                        setOpenFilterKey(null);
+                        setPage(1);
+                      }}
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-200 transition-all duration-150 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        {['School Name', 'Morrisby ID', 'Status', 'Programme Completion', 'Total Students'].map(h => (
-                          <th key={h} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                            {h}
-                          </th>
-                        ))}
+                        {SCHOOL_TABLE_COLUMNS.map(({ key, label }) => {
+                          const active = schoolSortKey === key;
+                          const SortIcon = active && schoolSortDir === 'desc' ? ChevronDown : ChevronUp;
+                          const filterActive = hasColumnFilter(key);
+                          return (
+                            <th
+                              key={key}
+                              className="px-6 py-3 whitespace-nowrap"
+                              onMouseEnter={e => handleThMouseEnter(key, e.currentTarget)}
+                              onMouseLeave={scheduleFilterClose}
+                            >
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSchoolSort(key)}
+                                  aria-sort={active ? (schoolSortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                  className={`group/sort inline-flex items-center gap-1.5 rounded px-1.5 py-1 text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-150 ${
+                                    active
+                                      ? 'text-primary bg-primary/8'
+                                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
+                                  }`}
+                                >
+                                  {label}
+                                  <SortIcon
+                                    className={`w-3.5 h-3.5 shrink-0 transition-opacity duration-150 ${
+                                      active ? 'opacity-100 text-primary' : 'opacity-25 group-hover/sort:opacity-60'
+                                    }`}
+                                  />
+                                </button>
+                                {filterActive && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" title="Filter active" />
+                                )}
+                              </div>
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {pageSlice.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="px-6 py-16 text-center text-sm text-slate-400">
-                            No schools match your search.
+                            No schools / campuses match your search.
                           </td>
                         </tr>
                       ) : (
@@ -333,9 +393,9 @@ export function NetworkOverview({
                           return (
                             <motion.tr
                               key={school.id}
-                              initial={{ opacity: 0, x: -6 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.12, delay: idx * 0.03 }}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.15 }}
                               onClick={canOpenSchoolDashboard ? () => onSelectSchool(school) : undefined}
                               className={`transition-colors group ${canOpenSchoolDashboard ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
                             >
@@ -378,7 +438,7 @@ export function NetworkOverview({
                 {/* Schools pagination */}
                 <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
                   <p className="text-xs text-slate-500 font-medium">
-                    Showing {pageSlice.length} of {filteredSchools.length} school{filteredSchools.length !== 1 ? 's' : ''}
+                    Showing {pageSlice.length} of {sortedSchools.length} schools / campuses
                   </p>
                   <div className="flex items-center gap-2">
                     <button
@@ -401,307 +461,38 @@ export function NetworkOverview({
               </div>
 
             </div>
+
+            {/* Column filter dropdown — fixed-positioned so it escapes the overflow-x-auto table */}
+            {openFilterKey && (
+              <SchoolColumnFilterDropdown
+                openFilterKey={openFilterKey}
+                filterDropdownPos={filterDropdownPos}
+                columnFilters={columnFilters}
+                schoolColumnFilterOptions={schoolColumnFilterOptions}
+                onMouseEnter={cancelFilterClose}
+                onMouseLeave={scheduleFilterClose}
+                onClear={clearColumnFilter}
+                onToggleValue={toggleFilterValue}
+                hasColumnFilter={hasColumnFilter}
+              />
+            )}
           </>
         )}
 
-        {/* ════════════════════════════════════════════════════════
-            STUDENT ROSTER VIEW
-            ════════════════════════════════════════════════════ */}
         {effectiveView === 'students' && (
           <>
-            {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shrink-0">
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 sm:px-8 shrink-0">
               <h2 className="text-xl font-bold text-slate-900 whitespace-nowrap">Students</h2>
             </header>
 
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto p-8">
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-
-                {/* Toolbar */}
-                <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-4 items-center">
-                  <div className="relative w-full lg:w-96 shrink-0">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={
-                        showStudentNames
-                          ? 'Search students by name, ID or counsellor...'
-                          : 'Search by pseudonym or school...'
-                      }
-                      value={rosterSearch}
-                      onChange={e => handleRosterSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-700 placeholder:text-slate-400 transition-all"
-                    />
-                  </div>
-
-                  <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:flex-1 lg:min-w-0 ${showStudentNames ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
-                    {showStudentNames && (
-                      <SearchableDropdown
-                        value={rosterFilters.counsellor}
-                        onChange={v => handleRosterFilters({ counsellor: v })}
-                        options={counsellorFilterOptions}
-                        placeholder="All Counsellors"
-                        searchPlaceholder="Search counsellors…"
-                        panelWidthClass="w-56"
-                      />
-                    )}
-                    <SearchableDropdown
-                      value={rosterFilters.stage}
-                      onChange={v => handleRosterFilters({ stage: v })}
-                      options={stageFilterOptions}
-                      placeholder="All Stages"
-                      searchPlaceholder="Search stages…"
-                      panelWidthClass="w-56"
-                    />
-                    {showStudentNames && (
-                      <SearchableDropdown
-                        value={rosterFilters.year}
-                        onChange={v => handleRosterFilters({ year: v })}
-                        options={yearFilterOptions}
-                        placeholder="Year Level"
-                        searchPlaceholder="Search year levels…"
-                        panelWidthClass="w-48"
-                      />
-                    )}
-                    <SearchableDropdown
-                      value={rosterFilters.status}
-                      onChange={v => handleRosterFilters({ status: v })}
-                      options={statusFilterOptions}
-                      placeholder="All Statuses"
-                      searchPlaceholder="Search statuses…"
-                      panelWidthClass="w-48"
-                    />
-                    <SearchableDropdown
-                      value={rosterFilters.school}
-                      onChange={v => handleRosterFilters({ school: v })}
-                      options={schoolFilterOptions}
-                      placeholder="All Schools"
-                      searchPlaceholder="Search schools…"
-                      panelWidthClass="w-64"
-                      className="col-span-2 sm:col-span-1"
-                    />
-                  </div>
-
-                  <StudentRosterAdvancedFilters
-                    filters={rosterFilters}
-                    onChange={handleRosterFilters}
-                    onReset={resetRosterFilters}
-                    showCounsellor={showStudentNames}
-                    showYear={showStudentNames}
-                    showSchool
-                    counsellorOptions={counsellorFilterOptions}
-                    stageOptions={stageFilterOptions}
-                    yearOptions={yearFilterOptions}
-                    statusOptions={statusFilterOptions}
-                    schoolOptions={schoolFilterOptions}
-                    studentTypeOptions={rosterStudentTypeOptions}
-                    className="shrink-0"
-                  />
-                </div>
-
-                {/* Selected school info strip */}
-                {rosterFilters.school !== 'all' && (() => {
-                  const s = visibleSchools.find(sc => sc.id === rosterFilters.school);
-                  return s ? (
-                    <div className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-3">
-                      <Building2 className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-sm font-semibold text-primary">{s.name}</span>
-                      <span className="text-xs text-slate-400">{s.morrisbyId}</span>
-                      <span className="ml-auto text-xs text-slate-500">{filteredRoster.length} student{filteredRoster.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  ) : null;
-                })()}
-
-                {/* Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          {showStudentNames ? 'Name' : 'Student'}
-                        </th>
-                        {showStudentNames && (
-                          <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Year</th>
-                        )}
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">School</th>
-                        {showStudentNames && (
-                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Counsellor</th>
-                        )}
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Stage</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Score</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Progress</th>
-                        <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {rosterSlice.length === 0 ? (
-                        <tr>
-                          <td colSpan={6 + (showStudentNames ? 2 : 0)} className="py-16 text-center">
-                            <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                            <p className="text-sm text-slate-400">No students match your search or filters.</p>
-                          </td>
-                        </tr>
-                      ) : (
-                        rosterSlice.map((student, idx) => {
-                          const atRisk     = student.riskLevel !== 'none';
-                          const initials   = getInitials(student);
-                          const pct        = programmeProgressPct(student.stageProgress);
-                          const score      = ratingScores.get(student.id);
-                          const barColor   = student.currentStage === 'complete' ? 'bg-emerald-500' : atRisk ? 'bg-red-400' : 'bg-primary';
-                          const stagePill  = student.currentStage ? (STAGE_PILL[student.currentStage] ?? 'bg-slate-100 text-slate-500') : 'bg-slate-100 text-slate-500';
-                          const stageLabel = student.currentStage ? (STAGE_LABELS[student.currentStage] ?? student.currentStage) : 'Not started';
-                          const schoolName = visibleSchools.find(sc => sc.id === (student as any).schoolId)?.name ?? '—';
-
-                          return (
-                            <motion.tr
-                              key={student.id}
-                              initial={{ opacity: 0, x: -4 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.12, delay: idx * 0.02 }}
-                              className={`transition-colors group ${showStudentJourney ? 'hover:bg-slate-50/70 cursor-pointer' : ''}`}
-                              onClick={showStudentJourney ? () => onSelectStudent(student) : undefined}
-                            >
-                              {/* Name */}
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                                    {showStudentNames ? initials : <EyeOff className="w-4 h-4" />}
-                                  </div>
-                                  <div className="flex flex-col min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className={`font-bold text-slate-900 ${showStudentJourney ? 'group-hover:text-primary transition-colors' : ''}`}>
-                                        {showStudentNames
-                                          ? `${student.firstName} ${student.lastName}`
-                                          : studentPseudonym(student.id)}
-                                      </span>
-                                      {atRisk && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                                    </div>
-                                    <p className="text-xs text-slate-500 tabular-nums">
-                                      <span>{student.absenceCount} absence{student.absenceCount !== 1 ? 's' : ''}</span>
-                                      {showStudentNames && (
-                                        <>
-                                          <span className="text-slate-300 mx-1">·</span>
-                                          <span className="text-slate-400 font-mono">{student.morrisbyId}</span>
-                                        </>
-                                      )}
-                                      {atRisk && (
-                                        <>
-                                          <span className="text-slate-300 mx-1">·</span>
-                                          <span className="text-red-500/80 font-medium">Follow Up</span>
-                                        </>
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-
-                              {/* Year — student-level identifier; hidden for DE */}
-                              {showStudentNames && (
-                                <td className="px-4 py-4 text-sm text-slate-700 max-w-[10rem] truncate" title={formatYearLevelLine(student)}>
-                                  {formatYearLevelLine(student)}
-                                </td>
-                              )}
-
-                              {/* School */}
-                              <td className="px-6 py-4">
-                                <span className="text-sm text-slate-600 truncate max-w-[140px] block">{schoolName}</span>
-                              </td>
-
-                              {/* Counsellor — staff identifier; hidden for DE */}
-                              {showStudentNames && (
-                                <td className="px-6 py-4 text-sm text-slate-600">{student.counsellor ?? '—'}</td>
-                              )}
-
-                              {/* Stage */}
-                              <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${stagePill}`}>
-                                  {stageLabel}
-                                </span>
-                              </td>
-
-                              {/* Score */}
-                              <td className="px-6 py-4 text-center">
-                                {score != null ? (
-                                  <span className={`text-sm font-bold tabular-nums ${ratingOverallColorClass(score)}`}>
-                                    {score}
-                                  </span>
-                                ) : (
-                                  <span className="text-sm text-slate-300">—</span>
-                                )}
-                              </td>
-
-                              {/* Progress */}
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 h-1.5 w-24 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
-                                  </div>
-                                  <span className="text-xs font-medium text-slate-500 tabular-nums">{pct}%</span>
-                                </div>
-                              </td>
-
-                              {/* Status */}
-                              <td className="px-4 py-4 text-center">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase ${
-                                  student.status === 'Active'   ? 'bg-emerald-100 text-emerald-700'
-                                : student.status === 'Pending'  ? 'bg-blue-100 text-blue-700'
-                                : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                  {student.status}
-                                </span>
-                              </td>
-
-                            </motion.tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Roster pagination */}
-                <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-                  <p className="text-sm text-slate-500">
-                    Showing{' '}
-                    <span className="font-bold text-slate-900">{rosterShowingFrom}</span>
-                    {' '}to{' '}
-                    <span className="font-bold text-slate-900">{rosterShowingTo}</span>
-                    {' '}of{' '}
-                    <span className="font-bold text-slate-900">{filteredRoster.length}</span>
-                    {' '}students
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setRosterPage(p => Math.max(1, p - 1))}
-                      disabled={safeRosterPage === 1}
-                      className="px-3 py-1 text-sm border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Previous
-                    </button>
-                    {rosterPageNumbers.map(n => (
-                      <button
-                        key={n}
-                        onClick={() => setRosterPage(n)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                          n === safeRosterPage
-                            ? 'bg-primary text-white'
-                            : 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
-                      disabled={safeRosterPage === totalRosterPages}
-                      className="px-3 py-1 text-sm border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+              <NetworkStudentRoster
+                students={visibleStudents}
+                schools={directorySchools}
+                showStudentNames={showStudentNames}
+                showStudentJourney={showStudentJourney}
+                onSelectStudent={onSelectStudent}
+              />
             </div>
           </>
         )}

@@ -4,7 +4,6 @@ import { AnimatePresence } from 'motion/react';
 import { ChevronRight, Eye, FileDown } from 'lucide-react';
 import { StudentJourneySummary } from '../components/StudentJourneySummary';
 import { StudentJourneyModal } from '../components/StudentJourneyModal';
-import { StudentAssistantChat } from '../components/StudentAssistantChat';
 import { useAuth } from '../context/AuthContext';
 import { canAccessPage, canSeeStudentNames, canUseAiFeatures, getRoleGroup, isCounsellorScoped, studentMatchesCounsellorScope } from '../types/roles';
 import type { AppShellOutletContext } from './shellContext';
@@ -159,15 +158,6 @@ export function StudentJourneyRoute() {
           />
         )}
       </div>
-
-      {/* ── AI assistant chat — ACCE Admin only ── */}
-      {displayStudent && canUseAiFeatures(userRole) && (
-        <StudentAssistantChat
-          student={displayStudent}
-          events={studentEvents}
-          schoolName={studentSchoolName}
-        />
-      )}
 
       {/* ── Details modal ── */}
       <AnimatePresence>

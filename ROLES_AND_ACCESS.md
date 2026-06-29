@@ -1,6 +1,6 @@
 # EMCI — Roles & Access Levels
 
-This document defines every user role in the EMCI Student Intelligence Interface, the authentication method, the access level assigned to each role, what they can see and do within the platform, and the data they interact with.
+This document defines every user role in the EMCI — Enhanced My Career Insights (Pilot Program) portal, the authentication method, the access level assigned to each role, what they can see and do within the platform, and the data they interact with.
 
 ---
 

@@ -63,7 +63,7 @@ const QUICK_ENTITIES = [
   { label: 'WLPC Students',  entity: 'cr89a_wlpcstudents',   icon: '👤' },
   { label: 'Accounts',       entity: 'accounts',              icon: '🏢' },
   { label: 'Contacts',       entity: 'contacts',              icon: '🙋' },
-  { label: 'Schools',        entity: 'cr89a_wlpcschools',     icon: '🏫' },
+  { label: 'Schools / Campuses', entity: 'cr89a_wlpcschools', icon: '🏫' },
   { label: 'System Users',   entity: 'systemusers',           icon: '👥' },
   { label: 'Entity Definitions', entity: 'EntityDefinitions', icon: '📋' },
 ];

@@ -1,5 +1,6 @@
 import type { Student, StageKey } from '../data/studentsData';
 import { YEAR_LEVEL_PLUS_BUCKET } from '../data/studentsData';
+import { deriveFollowUpRiskLevel } from '../lib/deAnalyticsMetrics';
 import type { School } from '../data/networkData';
 export type {
   RawInitialSurvey,
@@ -266,6 +267,8 @@ function studentIdFromActivity(raw: RawActivity): string | null {
 export interface OwnerIdentity {
   email: string;
   name:  string;
+  /** Dataverse `systemuser.isdisabled` — counsellor is inactive when true. */
+  isDisabled?: boolean;
 }
 
 export type OwnerLookup = Map<string, OwnerIdentity>;
@@ -275,6 +278,7 @@ interface RawSystemUser {
   fullname: string | null;
   internalemailaddress: string | null;
   domainname: string | null;
+  isdisabled: boolean | null;
 }
 
 function resolveOwnerFromMap(
@@ -293,7 +297,7 @@ function resolveOwnerFromMap(
 }
 
 export async function fetchSystemUsers(token: string): Promise<OwnerLookup> {
-  const select = 'systemuserid,fullname,internalemailaddress,domainname';
+  const select = 'systemuserid,fullname,internalemailaddress,domainname,isdisabled';
   const map: OwnerLookup = new Map();
   let url: string | undefined = `${BASE_URL}/systemusers?$select=${select}`;
 
@@ -306,11 +310,12 @@ export async function fetchSystemUsers(token: string): Promise<OwnerLookup> {
     }
     const data = await res.json() as { value: RawSystemUser[]; '@odata.nextLink'?: string };
     for (const user of data.value ?? []) {
+      const ownerId = user.systemuserid.toLowerCase();
       const email = (user.internalemailaddress ?? user.domainname ?? '').trim().toLowerCase();
-      if (!email) continue;
-      map.set(user.systemuserid.toLowerCase(), {
+      map.set(ownerId, {
         email,
         name: user.fullname?.trim() ?? '',
+        isDisabled: user.isdisabled === true,
       });
     }
     url = data['@odata.nextLink'];
@@ -346,6 +351,7 @@ function mapStudent(raw: RawStudent, ownerMap: OwnerLookup): Student & { schoolI
     stageProgress: deriveProgress(raw),
     riskLevel:     'none',
     absenceCount:  0,
+    sessionCount:  0,
     counsellor:         owner.name,
     counsellorOwnerId:  owner.ownerId,
     counsellorEmail:    owner.email,
@@ -430,18 +436,15 @@ async function fetchActivity<T extends RawActivity>(
     return all.filter(row => row._regardingobjectid_value != null);
   }
 
-  // Diagnostic: warn when ALL records lack a student link so the dev can spot it
-  const linked = all.filter(r => r._regardingobjectid_value != null);
-  console.log(
-    `[EMCI] ${errorLabel}: ${all.length} records fetched, ${linked.length} have _regardingobjectid_value`,
-  );
-  if (all.length > 0 && linked.length === 0) {
+  // Warn when ALL records lack a student link so the dev can spot it
+  if (all.length > 0 && !all.some(r => r._regardingobjectid_value != null)) {
     const sample = all[0];
     const candidateKeys = Object.keys(sample).filter(
       k => k.toLowerCase().includes('student') || k.toLowerCase().includes('regarding') || k.toLowerCase().includes('id'),
     );
     console.warn(
-      `[EMCI] ${errorLabel}: no records have _regardingobjectid_value — possible custom student link field. Candidate keys:`,
+      '[EMCI] %s: no records have _regardingobjectid_value — possible custom student link field. Candidate keys:',
+      errorLabel,
       candidateKeys,
     );
   }
@@ -599,7 +602,7 @@ export function enrichStudents(
   journeys: RawJourney[],
   sessions: RawSession[],
   absences: RawAbsence[],
-  ownerMap: OwnerLookup = new Map(),
+  _ownerMap: OwnerLookup = new Map(),
 ): (Student & { schoolId: string })[] {
   // Build per-student maps for fast lookup
   const journeyByStudent = new Map<string, RawJourney>();
@@ -634,32 +637,7 @@ export function enrichStudents(
     const studentSessions = sessionsByStudent.get(sid) ?? [];
     const studentAbsences = absencesByStudent.get(sid) ?? [];
 
-    // ── counsellor: student record owner is the primary source; most recent
-    // session owner overrides if present (reflects any reassignment).
-    const sortedSessions = [...studentSessions].sort(
-      (a, b) => (b.createdon ?? '').localeCompare(a.createdon ?? ''),
-    );
-    const latestSession = sortedSessions[0];
-    const sessionOwnerId = latestSession?._ownerid_value ?? null;
-    const effectiveOwnerId = sessionOwnerId ?? student.counsellorOwnerId ?? null;
-    const owner = resolveOwnerFromMap(
-      effectiveOwnerId,
-      ownerMap,
-      (latestSession?.['_ownerid_value@OData.Community.Display.V1.FormattedValue'] as string | undefined)
-        ?? student.counsellor,
-    );
-    const counsellor = owner.name || student.counsellor;
-    const counsellorOwnerId = owner.ownerId;
-    const counsellorEmail = owner.email ?? student.counsellorEmail;
-
-    // ── riskLevel: derived from absence count (unexplained/frequent) ─
-    // No explicit risk field in journeys — derive from absence frequency.
-    // > 5 absences in the data → high, > 2 → medium, else low (or none if zero).
     const absenceCount = studentAbsences.length;
-    let riskLevel: Student['riskLevel'] = 'none';
-    if (absenceCount > 5)      riskLevel = 'high';
-    else if (absenceCount > 2) riskLevel = 'medium';
-    else if (absenceCount > 0) riskLevel = 'low';
 
     // ── lastActivity: most recent date across sessions, absences, and student record ─
     const dates: string[] = [student.lastActivity].filter(Boolean) as string[];
@@ -668,15 +646,16 @@ export function enrichStudents(
     dates.sort((a, b) => b.localeCompare(a));
     const lastActivity = dates[0] ?? student.lastActivity;
 
-    return {
+    const enriched = {
       ...student,
-      counsellor,
-      counsellorOwnerId,
-      counsellorEmail,
-      riskLevel,
       absenceCount,
+      sessionCount: studentSessions.length,
       lastActivity,
+      riskLevel: 'none' as const,
     };
+    enriched.riskLevel = deriveFollowUpRiskLevel(enriched);
+
+    return enriched;
   });
 }
 

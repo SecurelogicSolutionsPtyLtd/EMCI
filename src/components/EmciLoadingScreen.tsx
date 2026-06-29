@@ -6,6 +6,8 @@
  * indeterminate progress bar on the brand navy background.
  */
 
+import { EMCI_BRAND } from '../lib/programNaming';
+
 interface EmciLoadingScreenProps {
   /** Small caption under the progress bar. Defaults to "Please wait…". */
   message?: string;
@@ -118,7 +120,7 @@ const STYLES = `
 
 export function EmciLoadingScreen({ message = 'Please wait…' }: EmciLoadingScreenProps) {
   return (
-    <div className="emci-load-wrap" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
+    <div className="emci-load-wrap" role="status" aria-live="polite" aria-busy="true" aria-label={`Loading ${EMCI_BRAND}`}>
       <style>{STYLES}</style>
       <div className="emci-load-logo">
         <div className="emci-load-icon">
@@ -131,7 +133,7 @@ export function EmciLoadingScreen({ message = 'Please wait…' }: EmciLoadingScr
         </div>
         <div className="emci-load-word">EMCI</div>
       </div>
-      <div className="emci-load-tag">Loading&nbsp;&nbsp;Platform</div>
+      <div className="emci-load-tag">Pilot&nbsp;&nbsp;Program</div>
       <div className="emci-load-progress">
         <div className="emci-load-track">
           <div className="emci-load-bar-fill" />

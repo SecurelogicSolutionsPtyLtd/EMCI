@@ -1,4 +1,4 @@
-import type { StudentRating } from './studentRating';
+import { reapplyRubricWeights, type StudentRating } from './studentRating';
 
 /**
  * Serialises a finalised tracking rating into the encrypted blob stored in
@@ -9,13 +9,16 @@ export function serializeRating(rating: StudentRating): string {
   return JSON.stringify({ v: 1, ...rating });
 }
 
-/** Maps legacy wellbeing keys/flags from pre-sentiment rename blobs. */
+const STUDENT_SENTIMENT_LABEL = 'Student Sentiment';
+
+/** Maps legacy wellbeing keys/flags/labels from pre-sentiment rename blobs. */
 function migrateStoredRating(rating: StudentRating): StudentRating {
   return {
     ...rating,
     categories: rating.categories.map(c => {
-      if ((c.key as string) === 'growth_wellbeing') {
-        return { ...c, key: 'growth_sentiment', label: 'Growth & sentiment' };
+      const key = c.key as string;
+      if (key === 'growth_wellbeing' || key === 'growth_sentiment') {
+        return { ...c, key: 'growth_sentiment', label: STUDENT_SENTIMENT_LABEL };
       }
       return c;
     }),
@@ -36,7 +39,7 @@ export function parseStoredRating(raw: string): StudentRating | null {
     if (typeof parsed.overall !== 'number') return null;
     if (typeof parsed.band !== 'string') return null;
     if (!Array.isArray(parsed.categories)) return null;
-    return migrateStoredRating(parsed as unknown as StudentRating);
+    return reapplyRubricWeights(migrateStoredRating(parsed as unknown as StudentRating));
   } catch {
     return null;
   }
@@ -64,7 +67,7 @@ export function readLegacyRatingCache(
     const parsed = JSON.parse(raw) as LegacyCachedRating;
     if (parsed.fingerprint !== fingerprint) return null;
     if (typeof parsed.rating?.overall !== 'number') return null;
-    return migrateStoredRating(parsed.rating);
+    return reapplyRubricWeights(migrateStoredRating(parsed.rating));
   } catch {
     return null;
   }

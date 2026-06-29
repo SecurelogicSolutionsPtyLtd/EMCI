@@ -28,11 +28,11 @@ export function DashboardQuickAccess({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              Schools Directory
+              Schools / Campuses Directory
               <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              All participating schools, completion KPIs, and school cohort dashboards.
+              All participating schools / campuses, completion KPIs, and cohort dashboards.
             </p>
           </div>
         </button>

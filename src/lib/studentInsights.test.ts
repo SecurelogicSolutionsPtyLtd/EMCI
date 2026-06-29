@@ -5,6 +5,7 @@ import {
   detectWorkExperienceCompleted,
   buildTimelineNotes,
   buildQuickInsightDetails,
+  hasStudentVoiceData,
 } from './studentInsights.js';
 import type { Student } from '../data/studentsData.js';
 import type { TimelineEvent } from '../services/dataverse.js';
@@ -265,5 +266,60 @@ describe('buildTimelineNotes', () => {
     assert.equal(notes[0].note.includes('James'), false);
     assert.equal(notes[0].note.includes('[Redacted]'), true);
     assert.equal(notes[1].note, 'Next Step: Ask [Redacted] to bring resume notes.');
+  });
+});
+
+describe('hasStudentVoiceData', () => {
+  it('returns false when there are no surveys, feedback, or voice notes', () => {
+    assert.equal(
+      hasStudentVoiceData(baseStudent, [{
+        ...session('CAP'),
+        title: 'Counselling session',
+        notes: 'Practitioner observation only.',
+      }]),
+      false,
+    );
+  });
+
+  it('returns true for survey field values', () => {
+    assert.equal(
+      hasStudentVoiceData(baseStudent, [
+        {
+          type: 'survey',
+          id: 'init-survey-1',
+          date: '2026-01-01T00:00:00Z',
+          modifiedDate: '2026-01-01T00:00:00Z',
+          title: 'Start survey',
+          status: 'Completed',
+          by: 'Alex Counsellor',
+          description: 'Start survey',
+          notes: null,
+          track: 'above',
+          surveyFields: [{ label: 'What do you enjoy at school?', value: 'Sport and science.' }],
+        },
+      ]),
+      true,
+    );
+  });
+
+  it('returns true for session satisfaction feedback', () => {
+    assert.equal(
+      hasStudentVoiceData(baseStudent, [
+        session('CAP', [{ label: 'Session Satisfaction', value: 'Very satisfied' }]),
+      ]),
+      true,
+    );
+  });
+
+  it('returns true for timeline notes containing student voice keywords', () => {
+    assert.equal(
+      hasStudentVoiceData(baseStudent, [
+        {
+          ...session('CAP'),
+          notes: 'Student feels more confident about career options.',
+        },
+      ]),
+      true,
+    );
   });
 });

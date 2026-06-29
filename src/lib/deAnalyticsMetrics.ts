@@ -89,6 +89,25 @@ export function daysSinceLastActivity(s: Student): number | null {
 /** A journey that has started but gone quiet for too long. */
 export const STALL_DAYS = 60;
 
+/** No EMCI contact/activity for this long → staff follow-up flag. */
+export const FOLLOW_UP_INACTIVITY_DAYS = 90;
+
+export function isFlaggedForFollowUp(s: Student): boolean {
+  if (s.status === 'Inactive' || s.currentStage === 'complete') return false;
+  const days = daysSinceLastActivity(s);
+  return days !== null && days > FOLLOW_UP_INACTIVITY_DAYS;
+}
+
+/** Follow-up severity from days since last activity (only when {@link isFlaggedForFollowUp}). */
+export function deriveFollowUpRiskLevel(s: Student): Student['riskLevel'] {
+  if (!isFlaggedForFollowUp(s)) return 'none';
+  const days = daysSinceLastActivity(s);
+  if (days === null) return 'none';
+  if (days > 180) return 'high';
+  if (days > 120) return 'medium';
+  return 'low';
+}
+
 export function isStalled(s: Student): boolean {
   if (!isInProgress(s)) return false;
   const days = daysSinceLastActivity(s);

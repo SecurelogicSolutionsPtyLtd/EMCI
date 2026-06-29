@@ -12,6 +12,7 @@ import {
 } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { AuthShell, SectionHeader, ErrorBanner, INPUT_CLASS, BTN_PRIMARY } from './auth/AuthShell';
+import { EMCI_BRAND, EMCI_PLATFORM, EMCI_PLATFORM_ADMINISTRATOR } from '../lib/programNaming';
 import { MaintenanceNotice } from './MaintenanceNotice';
 
 // ── LoginPage ─────────────────────────────────────────────────────────────────
@@ -157,7 +158,7 @@ export function LoginPage() {
         <SectionHeader
           icon={<Smartphone className="w-5 h-5 text-primary" />}
           title="Set up two-factor authentication"
-          subtitle="MFA is required before you can access the EMCI platform. Scan the QR code with your authenticator app."
+          subtitle={`MFA is required before you can access the ${EMCI_PLATFORM}. Scan the QR code with your authenticator app.`}
         />
         {error && <ErrorBanner message={error} />}
         {loading && !mfaQrCode ? (
@@ -260,10 +261,10 @@ export function LoginPage() {
         <SectionHeader
           icon={<Shield className="w-5 h-5 text-amber-500" />}
           title="Access pending"
-          subtitle="Your account has been authenticated but has not yet been granted access to the EMCI platform."
+          subtitle={`Your account has been authenticated but has not yet been granted access to the ${EMCI_PLATFORM}.`}
         />
         <div className="bg-amber-50/90 border border-amber-200/80 rounded-xl px-4 py-4 text-sm text-amber-800 leading-relaxed shadow-sm shadow-amber-900/[0.04]">
-          Please contact your EMCI platform administrator to have your access configured. Once your role is assigned, refresh this page.
+          Please contact your {EMCI_PLATFORM_ADMINISTRATOR} to have your access configured. Once your role is assigned, refresh this page.
         </div>
         <motion.button
           type="button"
@@ -321,7 +322,7 @@ export function LoginPage() {
         {tab === 'microsoft' ? (
           <motion.div key="microsoft" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-              Sign in with your SecureLogic Microsoft account to access the EMCI programme dashboard.
+              Sign in with your SecureLogic Microsoft account to access the {EMCI_BRAND} programme dashboard.
             </p>
             <motion.button
               type="button"

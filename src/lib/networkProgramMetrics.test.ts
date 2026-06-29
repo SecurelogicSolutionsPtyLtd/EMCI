@@ -10,10 +10,16 @@ import {
 } from './networkProgramMetrics.js';
 import {
   buildDeactivatedCounsellorKeys,
+  buildDataverseDisabledCounsellorKeys,
+  buildInactiveCounsellorOverrideKeys,
+  deriveCounsellorRoster,
+  filterStudentsForCounsellorRoster,
   filterStatsSchools,
+  filterViewableSchools,
   isExcludedFromProgramStats,
   isExcludedTestCounsellor,
 } from './programStatsFilters.js';
+import { getProgramVisibleScope } from './networkProgramMetrics.js';
 
 const baseSchool = (overrides: Partial<School>): School => ({
   id: 'school-1',
@@ -53,7 +59,22 @@ describe('programStatsFilters', () => {
   it('excludes Secure Logic and test schools from stats', () => {
     assert.equal(isExcludedFromProgramStats({ name: 'Secure Logic Demo School' }), true);
     assert.equal(isExcludedFromProgramStats({ name: 'EMCI Test School' }), true);
+    assert.equal(isExcludedFromProgramStats({ name: 'Demo Schools' }), true);
+    assert.equal(isExcludedFromProgramStats({ name: 'test acce' }), true);
     assert.equal(isExcludedFromProgramStats({ name: 'Ashwood School' }), false);
+  });
+
+  it('filterViewableSchools hides test schools but can retain one school id', () => {
+    const schools = [
+      baseSchool({ id: 'real-1', name: 'Ashwood School' }),
+      baseSchool({ id: 'demo-1', name: 'Demo Schools' }),
+      baseSchool({ id: 'test-1', name: 'Secure Logic' }),
+    ];
+    assert.equal(filterViewableSchools(schools).length, 1);
+    assert.equal(
+      filterViewableSchools(schools, { retainSchoolId: 'demo-1' }).map(s => s.id).sort().join(','),
+      'demo-1,real-1',
+    );
   });
 
   it('excludes test counsellor identities', () => {
@@ -80,6 +101,136 @@ describe('programStatsFilters', () => {
     const keys = buildDeactivatedCounsellorKeys(members);
     assert.equal(keys.ownerIds.has('owner-inactive'), true);
     assert.equal(keys.emails.has('inactive@emci.edu.au'), true);
+  });
+
+  it('builds deactivated counsellor keys from Dataverse-disabled system users', () => {
+    const ownerMap = new Map([
+      ['owner-active', { email: 'active@emci.edu.au', name: 'Active Counsellor', isDisabled: false }],
+      ['owner-disabled', { email: 'disabled@emci.edu.au', name: 'Disabled Counsellor', isDisabled: true }],
+    ]);
+    const keys = buildDataverseDisabledCounsellorKeys(ownerMap);
+    assert.equal(keys.ownerIds.has('owner-disabled'), true);
+    assert.equal(keys.emails.has('disabled@emci.edu.au'), true);
+    assert.equal(keys.ownerIds.has('owner-active'), false);
+  });
+
+  it('builds inactive counsellor keys from portal overrides', () => {
+    const keys = buildInactiveCounsellorOverrideKeys([
+      {
+        id: '1',
+        dataverse_owner_id: '13684b43-6127-ee11-9965-0022489334a7',
+        display_name: 'Patricia Crilly',
+        notes: null,
+        created_at: '2025-01-01',
+      },
+    ]);
+    assert.equal(keys.ownerIds.has('13684b43-6127-ee11-9965-0022489334a7'), true);
+    assert.equal(keys.names.has('patricia crilly'), true);
+  });
+
+  it('marks counsellor inactive when a duplicate Dataverse name is disabled', () => {
+    const students = [
+      baseStudent({
+        counsellor: 'Patricia Crilly',
+        counsellorOwnerId: '7cbb0112-034e-ef11-a316-6045bde53c6c',
+      }),
+    ];
+    const ownerMap = new Map([
+      ['13684b43-6127-ee11-9965-0022489334a7', { email: '', name: 'Patricia Crilly', isDisabled: true }],
+      ['7cbb0112-034e-ef11-a316-6045bde53c6c', { email: '', name: 'Patricia Crilly', isDisabled: false }],
+    ]);
+    const inactiveKeys = buildDataverseDisabledCounsellorKeys(ownerMap);
+    const roster = deriveCounsellorRoster(students, ownerMap, inactiveKeys);
+    assert.equal(roster.length, 1);
+    assert.equal(roster[0]?.isInactive, true);
+  });
+
+  it('deriveCounsellorRoster splits active and inactive counsellors', () => {
+    const students = [
+      baseStudent({ counsellor: 'Active One', counsellorOwnerId: 'owner-1' }),
+      baseStudent({
+        id: 'stu-2',
+        counsellor: 'Inactive One',
+        counsellorOwnerId: 'owner-2',
+        counsellorEmail: 'inactive@emci.edu.au',
+      }),
+    ];
+    const ownerMap = new Map([
+      ['owner-1', { email: 'active@emci.edu.au', name: 'Active One', isDisabled: false }],
+      ['owner-2', { email: 'inactive@emci.edu.au', name: 'Inactive One', isDisabled: true }],
+    ]);
+    const roster = deriveCounsellorRoster(students, ownerMap);
+    assert.equal(roster.length, 2);
+    assert.equal(roster[0]?.name, 'Active One');
+    assert.equal(roster[0]?.isInactive, false);
+    assert.equal(roster[1]?.name, 'Inactive One');
+    assert.equal(roster[1]?.isInactive, true);
+  });
+
+  it('filterStudentsForCounsellorRoster matches by owner GUID not display name', () => {
+    const sharedName = 'Patricia Crilly';
+    const students = [
+      baseStudent({ id: 'stu-a', counsellor: sharedName, counsellorOwnerId: 'owner-a' }),
+      baseStudent({ id: 'stu-b', counsellor: sharedName, counsellorOwnerId: 'owner-b' }),
+    ];
+    const roster = deriveCounsellorRoster(students);
+    const ownerA = roster.find(c => c.ownerId === 'owner-a');
+    assert.ok(ownerA);
+    const matched = filterStudentsForCounsellorRoster(students, ownerA!.id);
+    assert.equal(matched.length, 1);
+    assert.equal(matched[0]?.id, 'stu-a');
+  });
+});
+
+describe('getProgramVisibleScope', () => {
+  const schools: School[] = [
+    baseSchool({ id: 'school-1', name: 'Ashwood School' }),
+    baseSchool({ id: 'school-demo', name: 'Demo Schools' }),
+    baseSchool({ id: 'school-test', name: 'Secure Logic' }),
+    baseSchool({ id: 'school-test2', name: 'test acce' }),
+  ];
+
+  const students: (Student & { schoolId: string })[] = [
+    baseStudent({ id: 's1', schoolId: 'school-1' }),
+    baseStudent({ id: 's2', schoolId: 'school-demo' }),
+    baseStudent({ id: 's3', schoolId: 'school-test' }),
+  ];
+
+  it('hides test/demo schools from network-wide ACCE views', () => {
+    const { visibleSchools, visibleStudents } = getProgramVisibleScope(
+      students,
+      schools,
+      'acce_admin',
+      null,
+    );
+    assert.equal(visibleSchools.length, 1);
+    assert.equal(visibleSchools[0].name, 'Ashwood School');
+    assert.equal(visibleStudents.length, 1);
+    assert.equal(visibleStudents[0].id, 's1');
+  });
+
+  it('retains a school-role user own test school', () => {
+    const { visibleSchools, visibleStudents } = getProgramVisibleScope(
+      students,
+      schools,
+      'school_admin',
+      'school-demo',
+    );
+    assert.equal(visibleSchools.length, 1);
+    assert.equal(visibleSchools[0].id, 'school-demo');
+    assert.equal(visibleStudents.length, 1);
+    assert.equal(visibleStudents[0].id, 's2');
+  });
+
+  it('hides test/demo schools for securelogic_admin too', () => {
+    const { visibleSchools } = getProgramVisibleScope(
+      students,
+      schools,
+      'securelogic_admin',
+      null,
+    );
+    assert.equal(visibleSchools.length, 1);
+    assert.equal(visibleSchools[0].name, 'Ashwood School');
   });
 });
 
@@ -121,9 +272,11 @@ describe('buildProgramKpiCards', () => {
   it('reports school counts excluding test schools', () => {
     const kpis = buildProgramKpiCards(schools, students);
     const byLabel = Object.fromEntries(kpis.map(k => [k.label, k.value]));
-    assert.equal(byLabel['Total Schools (Pilot Lifetime)'], 3);
-    assert.equal(byLabel['Active Schools'], 1);
-    assert.equal(byLabel['Inactive Schools'], 1);
+    assert.equal(byLabel['Total Schools / Campuses (Pilot Lifetime)'], 3);
+    assert.equal(byLabel['Active Schools / Campuses'], 1);
+    assert.equal(byLabel['Inactive Schools / Campuses'], 1);
+    assert.equal(byLabel['Total Students (Pilot Lifetime)'], '3');
+    assert.equal(byLabel['In Progress'], undefined);
   });
 
   it('excludes students at test schools from student totals', () => {
@@ -145,13 +298,44 @@ describe('buildProgramKpiCards', () => {
       is_active: false,
       created_at: '2025-01-01',
     };
+    const ownerMap = new Map([
+      ['owner-3', { email: 'c.park@emci.edu.au', name: 'Ms. Cleo Park', isDisabled: false }],
+    ]);
     const kpis = buildProgramKpiCards(
       schools,
       students,
-      resolveProgramStatsOptions([inactiveMember]),
+      resolveProgramStatsOptions([inactiveMember], ownerMap),
     );
     const byLabel = Object.fromEntries(kpis.map(k => [k.label, k.value]));
     assert.equal(byLabel['Active Counsellors'], 1);
-    assert.equal(byLabel['Total Counsellors'], 3);
+    assert.equal(byLabel['Total Counsellors'], undefined);
+  });
+
+  it('excludes Dataverse-disabled counsellors from Active Counsellors KPI', () => {
+    const ownerMap = new Map([
+      ['owner-1', { email: 'a.thorne@emci.edu.au', name: 'Dr. Aris Thorne', isDisabled: false }],
+      ['owner-3', { email: 'c.park@emci.edu.au', name: 'Ms. Cleo Park', isDisabled: true }],
+    ]);
+    const kpis = buildProgramKpiCards(schools, students, resolveProgramStatsOptions([], ownerMap));
+    const byLabel = Object.fromEntries(kpis.map(k => [k.label, k.value]));
+    assert.equal(byLabel['Active Counsellors'], 1);
+  });
+
+  it('excludes portal inactive overrides from Active Counsellors KPI', () => {
+    const kpis = buildProgramKpiCards(
+      schools,
+      students,
+      resolveProgramStatsOptions([], undefined, [
+        {
+          id: '1',
+          dataverse_owner_id: 'owner-3',
+          display_name: 'Ms. Cleo Park',
+          notes: null,
+          created_at: '2025-01-01',
+        },
+      ]),
+    );
+    const byLabel = Object.fromEntries(kpis.map(k => [k.label, k.value]));
+    assert.equal(byLabel['Active Counsellors'], 1);
   });
 });

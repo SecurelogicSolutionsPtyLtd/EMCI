@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { AlertCircle } from 'lucide-react';
+import { EMCI_BRAND } from '../../lib/programNaming';
 
 // ── Shared auth UI ──────────────────────────────────────────────────────────────
 // Used by both the sign-in screen (LoginPage) and the invite-acceptance screen
@@ -64,7 +65,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
               >
                 <img
                   src="/emci-logo-lockup.png"
-                  alt="EMCI"
+                  alt={EMCI_BRAND}
                   className="h-11 w-auto object-contain drop-shadow-sm"
                   draggable={false}
                 />
@@ -87,7 +88,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         transition={{ duration: 0.6, delay: 0.35 }}
         className="relative shrink-0 text-center py-5 text-[10px] text-slate-400 uppercase tracking-widest font-semibold"
       >
-        EMCI Student Management Platform · SecureLogic Solutions · {new Date().getFullYear()}
+        {EMCI_BRAND} · SecureLogic Solutions · {new Date().getFullYear()}
       </motion.div>
     </div>
   );

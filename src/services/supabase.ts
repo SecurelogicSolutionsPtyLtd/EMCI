@@ -189,6 +189,24 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
   return (data ?? []) as TeamMember[];
 }
 
+export interface InactiveCounsellorOverride {
+  id:                 string;
+  dataverse_owner_id: string;
+  display_name:       string | null;
+  notes:              string | null;
+  created_at:         string;
+}
+
+/** Portal-managed inactive counsellor overrides (Dataverse owner GUID). */
+export async function listInactiveCounsellorOverrides(): Promise<InactiveCounsellorOverride[]> {
+  const { data, error } = await supabase
+    .from('emci_inactive_counsellors')
+    .select('id, dataverse_owner_id, display_name, notes, created_at')
+    .order('display_name', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as InactiveCounsellorOverride[];
+}
+
 export async function addTeamMember(
   email: string,
   role: AppRole,

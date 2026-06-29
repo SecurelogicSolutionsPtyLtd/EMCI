@@ -1,5 +1,5 @@
 /**
- * EMCI Student Intelligence Interface — application entry.
+ * EMCI — Enhanced My Career Insights (Pilot Program) — application entry.
  *
  * @author Zac Swalling
  */

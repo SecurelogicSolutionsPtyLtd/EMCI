@@ -19,7 +19,7 @@ Raster exports:
 Variants included:
 - Primary official-name colour lockup
 - Primary official-name black/single-colour lockup
-- App-header colour lockup with “Student Management Platform”
+- App-header colour lockup with “Enhanced My Career Insights (Pilot Program)”
 - Acronym-only colour lockup
 - Standalone emblem colour and black variants
 - Reverse-white lockup for dark backgrounds

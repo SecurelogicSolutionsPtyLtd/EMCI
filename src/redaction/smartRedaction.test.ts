@@ -37,6 +37,34 @@ describe('redactSensitiveText', () => {
     assert.equal(out, 'Parental consent obtained for the programme.');
   });
 
+  it('redacts living/care arrangements and complex family situations', () => {
+    const out = redactSensitiveText(
+      'Has a complex family situation and lives primarily with her Nan and cousins. Career interests discussed.',
+    );
+    assert.ok(!out.includes('complex family'));
+    assert.ok(!out.includes('Nan'));
+    assert.ok(!out.includes('cousins'));
+    assert.ok(out.includes(SENSITIVE_TOKEN));
+    assert.ok(out.includes('Career interests discussed.'));
+  });
+
+  it('redacts trauma, emotional regulation and absconding disclosures', () => {
+    assert.ok(
+      !redactSensitiveText('Benefits from a trauma-informed approach.').includes('trauma'),
+    );
+    assert.ok(
+      !redactSensitiveText('This can impact her attendance and emotional regulation.').includes('emotional regulation'),
+    );
+    assert.ok(
+      !redactSensitiveText('When situations feel unfair she may disengage or abscond.').includes('abscond'),
+    );
+  });
+
+  it('keeps neutral practitioner guidance without personal detail', () => {
+    const text = 'Responds positively to praise, validation and clear expectations.';
+    assert.equal(redactSensitiveText(text), text);
+  });
+
   it('redacts emails and phone numbers in place', () => {
     const out = redactSensitiveText(
       'Contact via jane.doe@example.com or 0412 345 678 to confirm.',

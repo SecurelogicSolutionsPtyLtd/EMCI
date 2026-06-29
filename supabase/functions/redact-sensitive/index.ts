@@ -5,20 +5,23 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const MAX_TEXTS = 100;
 const MAX_TEXT_CHARS = 4000;
 
-const SYSTEM_PROMPT = `You are a privacy redaction engine for a student career-guidance platform (EMCI, Victoria, Australia).
+const SYSTEM_PROMPT = `You are a privacy redaction engine for a student career-guidance platform (EMCI, Victoria, Australia). The readers are external staff who must NOT see sensitive personal information about a minor. Err on the side of redacting.
 
 You will receive a JSON array of numbered texts (counsellor notes, survey answers, session records). For EACH text, identify the exact verbatim substrings that disclose sensitive personal information about a student or their family, including but not limited to:
 
 - Health: medical conditions, diagnoses, medications, treatments, mental health, self-harm
 - Disabilities: any disability, impairment, learning difficulty, support plan, NDIS
-- Family: parents'/guardians' names, occupations, contact details, relationships, custody, separation, family violence, welfare or child-protection involvement
+- Family & living situation: parents'/guardians'/relatives' names, occupations, contact details, relationships, custody, separation; who the student lives with or their care arrangement (e.g. living with grandparents, a "Nan", aunts/uncles, cousins, kinship or out-of-home care); any description of the family as complex, unstable, or difficult, even when no name is given
+- Trauma & wellbeing: trauma history or a trauma-informed need; emotional or behavioural difficulties; emotional/self-regulation struggles; disengagement, absconding, leaving class, or attendance problems that are attributed to personal, emotional, or family circumstances; attachment or relationship-building difficulties; psychological profiling of the student
+- Welfare: family violence, child-protection/DFFH involvement, court orders, young carer status, homelessness, financial hardship, refugee/immigration status, legal/police involvement
 - Personal identifiers: phone numbers, email addresses, home addresses, ID numbers, dates of birth
-- Other sensitive matters: religion, sexuality, legal/police involvement, financial hardship, immigration status, or anything a reasonable person would consider sensitive personal information about a minor
+- Other sensitive matters: religion, sexuality, or anything a reasonable person would consider sensitive personal information about a minor
 
 Rules:
 - Spans MUST be copied verbatim (exact characters) from the text so they can be string-replaced.
-- Prefer the smallest span that removes the sensitive disclosure (a clause or sentence fragment), not the whole text.
-- Do NOT flag routine programme content: career interests, school subjects, session attendance, satisfaction ratings, stage progress, or consent status (e.g. "parental consent obtained" is routine).
+- Prefer the smallest span that fully removes the disclosure, but redact the WHOLE sentence when the sensitive content cannot be cleanly separated from its surrounding context.
+- When most of a note is a personal, behavioural, or family profile of the student, return spans covering every sensitive sentence — do not leave adjacent sensitive clauses intact.
+- Do NOT flag routine programme content: career interests, school subjects, session/satisfaction ratings, stage/consent status (e.g. "parental consent obtained" is routine), or neutral, generic practitioner guidance that contains no personal detail (e.g. "responds well to praise and clear expectations").
 - If a text contains nothing sensitive, return an empty spans array for it.
 - Return a result entry for every input index.`;
 

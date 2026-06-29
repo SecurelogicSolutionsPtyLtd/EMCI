@@ -36,7 +36,7 @@ const CATEGORY_META: Record<RatingCategoryKey, CategoryMeta> = {
     ],
   },
   career_outcomes: {
-    label: 'Career',
+    label: 'Career Planning & Exploration',
     description: 'Action plan, Morrisby & exploration',
     rubric: [
       { signal: 'Career Action Plan',     pts: '40' },
@@ -46,7 +46,7 @@ const CATEGORY_META: Record<RatingCategoryKey, CategoryMeta> = {
     ],
   },
   work_readiness: {
-    label: 'Work readiness',
+    label: 'Work Readiness',
     description: 'Work experience & employability',
     rubric: [
       { signal: 'Work experience done',  pts: '40' },
@@ -56,7 +56,7 @@ const CATEGORY_META: Record<RatingCategoryKey, CategoryMeta> = {
     ],
   },
   attendance_momentum: {
-    label: 'Attendance',
+    label: 'Attendance & Momentum',
     description: 'Recorded absences',
     rubric: [
       { signal: '0 absences',  pts: '100' },
@@ -66,7 +66,7 @@ const CATEGORY_META: Record<RatingCategoryKey, CategoryMeta> = {
     ],
   },
   growth_sentiment: {
-    label: 'Sentiment',
+    label: 'Student Sentiment',
     description: 'Survey shifts & student voice',
     rubric: [
       { signal: 'Preparedness & strengths shift', pts: '0–40' },

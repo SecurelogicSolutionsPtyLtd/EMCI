@@ -47,7 +47,7 @@
 
 ## Student Progress Rating Updates
 
-- [ ] Update rating area name: **Growth & Wellbeing** → **Student Sentiment**
+- [x] Update rating area name: **Growth & Wellbeing** → **Student Sentiment**
 - [ ] Update rating weightings to:
 
 | Rating Area | Weight |
@@ -79,7 +79,7 @@
 
 ## Scoring & Eligibility Rules
 
-- [ ] Rename program references: **EMCI** = Enhanced My Career Insights (Pilot Program)
+- [x] Rename program references: **EMCI** = Enhanced My Career Insights (Pilot Program)
 - [ ] Only calculate scores when:
   - At least 1 EMCI session exists
   - Initial Student Survey completed
@@ -93,12 +93,13 @@
 
 ### Remove
 
-- [ ] Wellbeing Concern
+- [x] Wellbeing Concern *(retired name only — alert kept as **Sentiment concern**)*
 
 ### Rename
 
 | Current | New |
 |---------|-----|
+| Wellbeing Concern | Sentiment concern |
 | Attendance Risk | Attendance Issues |
 | Thriving | Engaged |
 

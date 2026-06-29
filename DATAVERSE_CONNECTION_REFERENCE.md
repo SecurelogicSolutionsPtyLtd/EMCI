@@ -1,6 +1,6 @@
 # EMCI — Dataverse Connection Reference
 
-Complete map of every Dataverse entity, field, and data connection used by the EMCI Student Intelligence Interface. Use this as a guide to re-implement or port the integration to another application.
+Complete map of every Dataverse entity, field, and data connection used by the EMCI — Enhanced My Career Insights (Pilot Program) portal. Use this as a guide to re-implement or port the integration to another application.
 
 ---
 
@@ -45,6 +45,7 @@ Prefer:           odata.include-annotations="*"
 | EMCI End of Pilot Survey (Legacy) | `cr89a_emciendofpilotstudentsurvey` | `cr89a_emciendofpilotstudentsurveies` | `activityid` | Pre-2026 end-of-pilot survey |
 | EMCI End of Pilot Survey 2026 | `cr89a_emcistudentendofpilotsurvey2026` | `cr89a_emcistudentendofpilotsurvey2026s` | `activityid` | 2026 end-of-pilot survey |
 | WLPC Student Journey | `cr89a_wlpcstudentjourney` | `cr89a_wlpcstudentjourneies` | `businessprocessflowinstanceid` | BPF stage tracking |
+| System User | `systemuser` | `systemusers` | `systemuserid` | Counsellor owner identity and enabled/disabled status |
 
 ---
 
@@ -384,6 +385,31 @@ records.filter(r => r._regardingobjectid_value === student.id)
 
 ---
 
+## Entity 12 — System User (`systemusers`)
+
+**Fetch URL:** `GET /systemusers?$select=systemuserid,fullname,internalemailaddress,domainname,isdisabled`
+
+Used to resolve counsellor owner email/name from student `_ownerid_value` GUIDs and to determine whether a counsellor is **enabled** or **disabled** in Dataverse.
+
+### Fields Used
+
+| Dataverse Field | Display Name | Type | App Property | Notes |
+|---|---|---|---|---|
+| `systemuserid` | User ID | Uniqueidentifier (PK) | `ownerMap` key | Matches student/session `_ownerid_value` |
+| `fullname` | Full Name | String | `OwnerIdentity.name` | Preferred counsellor display name when annotation missing |
+| `internalemailaddress` | Primary Email | String | `OwnerIdentity.email` | Preferred email source |
+| `domainname` | User Name | String | `OwnerIdentity.email` fallback | Used when `internalemailaddress` is empty |
+| `isdisabled` | Status | Boolean | `OwnerIdentity.isDisabled` | `false` = **Enabled** (active counsellor), `true` = **Disabled** (inactive counsellor) |
+
+### Counsellor enabled / disabled
+
+- **Enabled** (`isdisabled = false`): counsellor appears in the active counsellor list and counts toward **Active Counsellors** KPI (when they have active student assignments).
+- **Disabled** (`isdisabled = true`): counsellor is excluded from active counsellor metrics and shown under **Inactive** in Counsellor View. Student assignments remain visible for historical context.
+- Platform-deactivated team members (`emci_user_roles.is_active = false`) are treated the same as Dataverse-disabled counsellors for KPI and Counsellor View inactive grouping.
+- Portal-managed overrides in `emci_inactive_counsellors` (Dataverse `systemuserid` GUID) apply the same inactive treatment without requiring Dataverse or team-account changes.
+
+---
+
 ## Relationship Map
 
 ```
@@ -445,9 +471,10 @@ Quick reference for the `Student` interface properties and their Dataverse sourc
 | `status` | `statecode` + `statuscode` combined | `'Inactive'` |
 | `currentStage` | Highest true boolean among stage flags | `null` |
 | `stageProgress` | Count of true stage flags (0–4) | `0` |
-| `counsellor` | `_ownerid_value@FormattedValue` (student record) | overridden by most recent session owner |
-| `counsellorOwnerId` | `_ownerid_value` (student) or session `_ownerid_value` | — |
+| `counsellor` | `_ownerid_value@FormattedValue` (student record) | — |
+| `counsellorOwnerId` | `_ownerid_value` (student record) | — |
 | `counsellorEmail` | `systemusers.internalemailaddress` / `domainname` via owner GUID | — |
+| Counsellor active status | `systemusers.isdisabled` (`false` = enabled) | Platform `emci_user_roles.is_active` for portal team members |
 | `riskLevel` | Derived from absence count | `'none'` |
 | `interviewed` | `cr89a_studentinterviewed` | — |
 | `hasProfile` | `cr89a_studenthasaprofile` | — |

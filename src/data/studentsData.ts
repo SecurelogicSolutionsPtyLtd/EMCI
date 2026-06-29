@@ -20,10 +20,14 @@ export interface Student {
   currentStage: StageKey;
   stageProgress: number; // 0-4
   riskLevel: 'low' | 'medium' | 'high' | 'none';
-  /** Count of linked absence records (Dataverse); demo seeds align with risk tiers. */
+  /** Count of linked absence records (Dataverse). */
   absenceCount: number;
+  /** Count of linked EMCI session records (Dataverse); set in enrichStudents. */
+  sessionCount?: number;
+  /** True when the student has ≥2 EMCI sessions and P5-T3 CRM creation grace period has elapsed; set in App. */
+  scoreEligible?: boolean;
   counsellor: string;
-  /** Dataverse `systemuser` GUID for the effective counsellor (student owner or latest session owner). */
+  /** Dataverse `systemuser` GUID for the student record owner (`_ownerid_value`). */
   counsellorOwnerId?: string;
   /** Dataverse owner email when available (`internalemailaddress` / `domainname`). */
   counsellorEmail?: string;

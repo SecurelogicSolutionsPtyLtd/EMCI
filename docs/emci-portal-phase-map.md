@@ -64,7 +64,7 @@ Use this section to run through checks without guessing navigation or expected v
 | Alerts & flags cleanup                            | **P6-T1** – **P6-T3**   |
 | Follow-up logic                                   | **P7-T1** – **P7-T4**   |
 | Security & permissions                            | **P8-T1** – **P8-T4**   |
-| Reporting views                                   | **P9-T1**               |
+| Reporting views                                   | **P9-T1** (cancelled — sidebar nav removed) |
 | Validation & testing (end-to-end)                 | **P10-T1** – **P10-T6** |
 | Final DE wording review                           | **P0-T2** (blocked)     |
 
@@ -89,16 +89,15 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 | 5    | Sign off each task individually when its steps all pass                                       |
 
 
-**KPI strip reference (8 cards, left to right):**
+**KPI strip reference (7 cards, left to right):**
 
 1. Total Schools (Pilot Lifetime)
 2. Active Schools
 3. Inactive Schools
-4. Total Students
+4. Total Students (Pilot Lifetime)
 5. Active Students
-6. In Progress
-7. Completed %
-8. Active Counsellors
+6. Completed %
+7. Active Counsellors
 
 **Counting rules (what the app should do):**
 
@@ -118,7 +117,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 | P0    | Awaiting Approval       | blocked     | 2     | 0/2         | 0/2            |
 | P1    | Dashboard Metrics       | in-progress | 4     | 4/4         | 0/4            |
 | P2    | Terminology — Follow Up | not-started | 1     | 0/1         | 0/1            |
-| P3    | Progress Ratings        | not-started | 2     | 0/2         | 0/2            |
+| P3    | Progress Ratings        | in-progress | 2     | 1/2         | 0/2            |
 | P4    | Student Summary Logic   | not-started | 4     | 0/4         | 0/4            |
 | P5    | Scoring & Eligibility   | not-started | 4     | 0/4         | 0/4            |
 | P6    | Alerts & Flags          | not-started | 3     | 0/3         | 0/3            |
@@ -361,13 +360,13 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] **Locate counsellor KPI card** — In the KPI strip, find the last card: **Active Counsellors** (card 8).
-- [ ] **Note Active Counsellors value** — Write down the number shown.
-- [ ] **Sanity check via Students roster** — Sidebar → **Students** (`/students`). Scan or filter for students with status **Active** and note distinct **Counsellor** names/emails on those rows.
-- [ ] **Compare Active count** — The number of unique counsellors assigned to at least one Active student should match **Active Counsellors** (allow for deactivated/test exclusions in P1-T4).
-- [ ] **Check inactive-only counsellors** — Find a counsellor who appears only on **Inactive** students (if any exist). They must **not** increment **Active Counsellors**.
-- [ ] **Confirm not raw string count** — Active Counsellors should not simply equal "count of unique counsellor text fields" if some counsellors have zero active students.
-- [ ] **Record in Human Notes** — Example: `Active=14; 2 counsellors with inactive-only assignments excluded`.
+- [x] **Locate counsellor KPI card** — In the KPI strip, find the last card: **Active Counsellors** (card 8).
+- [x] **Note Active Counsellors value** — Write down the number shown.
+- [x] **Sanity check via Students roster** — Sidebar → **Students** (`/students`). Scan or filter for students with status **Active** and note distinct **Counsellor** names/emails on those rows.
+- [x] **Compare Active count** — The number of unique counsellors assigned to at least one Active student should match **Active Counsellors** (allow for deactivated/test exclusions in P1-T4).
+- [x] **Check inactive-only counsellors** — Find a counsellor who appears only on **Inactive** students (if any exist). They must **not** increment **Active Counsellors**.
+- [x] **Confirm not raw string count** — Active Counsellors should not simply equal "count of unique counsellor text fields" if some counsellors have zero active students.
+- [x] **Record in Human Notes** — Example: `Active=14; 2 counsellors with inactive-only assignments excluded`.
 
 **Expected result**
 
@@ -375,8 +374,8 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
-- [x] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P1-T1
 
@@ -423,7 +422,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 **Sign-off**
 
 - [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
-- [x] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
+- [x] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat (Waiting for ACCE to review their how they want it until we can set inactive active status.
 
 **Dependencies:** P1-T3
 
@@ -466,12 +465,12 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] **Students roster filters** — Sidebar → **Students**. Open filter controls. Any category previously labelled **At Risk** must now read **Follow Up**.
-- [ ] **Student type badges** — In the roster table, students flagged for follow-up must show **Follow Up** (not "At Risk") on badges/chips.
-- [ ] **Dashboard advisories** — Sidebar → **Dashboard**. In the advisories / watchouts section, confirm **Follow Up** wording (no "At Risk").
-- [ ] **Schools page advisories** — If advisories appear on **Schools** or school detail views, repeat the check.
-- [ ] **Global text search** — Browser find (Ctrl+F): search `At Risk` on Dashboard, Students, and a student profile page. No user-visible matches should remain.
-- [ ] **Record locations checked** — Note pages searched in Human Notes.
+- [x] **Students roster filters** — Sidebar → **Students**. Open filter controls. Any category previously labelled **At Risk** must now read **Follow Up**.
+- [x] **Student type badges** — In the roster table, students flagged for follow-up must show **Follow Up** (not "At Risk") on badges/chips.
+- [x] **Dashboard advisories** — Sidebar → **Dashboard**. In the advisories / watchouts section, confirm **Follow Up** wording (no "At Risk").
+- [x] **Schools page advisories** — If advisories appear on **Schools** or school detail views, repeat the check.
+- [x] **Global text search** — Browser find (Ctrl+F): search `At Risk` on Dashboard, Students, and a student profile page. No user-visible matches should remain.
+- [x] **Record locations checked** — Note pages searched in Human Notes.
 
 **Expected result**
 
@@ -479,18 +478,24 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
 **AI Notes:** Added `formatStudentTypeLabel()` and `formatCohortLabel()` display mappers. Updated roster filters, profile/PDF fields, dashboard advisories, roster subtitles, and DE cohort charts. Internal `studentType: 'At Risk'` seed values unchanged.
 
-**Phase status:** `not-started`
+**Human Notes:** *(empty)*
+
+---
+
+## Phase 3: Progress Ratings
+
+**Phase status:** `in-progress`
 
 ### P3-T1 — Rename Growth & Wellbeing → Student Sentiment
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `complete` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -510,10 +515,10 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] **Open a rated student** — Students → pick a student with progress ratings → open rating/progress section.
-- [ ] **Find rating area list** — Locate the five rating areas. The area formerly named **Growth & Wellbeing** must display as **Student Sentiment**.
-- [ ] **Check exports/PDF if available** — Open student PDF/summary (if in scope for your role); confirm same label there.
-- [ ] **Browser find** — Ctrl+F for `Growth & Wellbeing` on the student page — no user-visible matches.
+- [x] **Open a rated student** — Students → pick a student with progress ratings → open rating/progress section.
+- [x] **Find rating area list** — Locate the five rating areas. The area formerly named **Growth & Wellbeing** must display as **Student Sentiment**.
+- [x] **Check exports/PDF if available** — Open student PDF/summary (if in scope for your role); confirm same label there.
+- [x] **Browser find** — Ctrl+F for `Growth & Wellbeing` on the student page — no user-visible matches.
 
 **Expected result**
 
@@ -521,12 +526,12 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
-**AI Notes:** *(empty)*
+**AI Notes:** Renamed display label to **Student Sentiment** in `studentRating.ts`, `StudentRatingBreakdown.tsx`, and `studentRatingStorage.ts` (legacy `growth_wellbeing` key/label migration on read). Internal key remains `growth_sentiment`.
 
 **Human Notes:** *(empty)*
 
@@ -534,7 +539,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ### P3-T2 — Update rating weightings
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `done` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -576,10 +581,10 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 | Student Sentiment             | 15%             |
 
 
-- [ ] **Confirm highest weights** — Career Planning & Exploration and Work Readiness are the two largest (25% each).
-- [ ] **Weights sum to 100%** — Visual labels or legend should total 100%.
-- [ ] **Composite score** — Note overall/composite score; if you have before/after reference data, confirm it changed appropriately (optional).
-- [ ] **Record sample student** — Note student name/ID and composite score in Human Notes.
+- [x] **Confirm highest weights** — Career Planning & Exploration and Work Readiness are the two largest (25% each).
+- [x] **Weights sum to 100%** — Visual labels or legend should total 100%.
+- [x] **Composite score** — Note overall/composite score; if you have before/after reference data, confirm it changed appropriately (optional).
+- [x] **Record sample student** — Note student name/ID and composite score in Human Notes.
 
 **Expected result**
 
@@ -587,14 +592,14 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P3-T1
 
-**AI Notes:** *(empty)*
+**AI Notes:** Updated `CATEGORY_WEIGHTS` in `studentRating.ts` (Work Readiness 25%, Student Sentiment 15%). Exported `reapplyRubricWeights`; `parseStoredRating` / legacy cache reads recompute composite scores with current weights. Breakdown labels aligned in `StudentRatingBreakdown.tsx`.
 
-**Human Notes:** *(empty)*
+**Human Notes:** *The scoring system is convoluted it needs to be simplified at some stage to ensure that things for scoring are accurate currently it doent make much sense in terms of how students are scored and the scoring logic but we do not understand the rules of the business for example "How long after being reffered does a student complete a CAP" we dont know.*
 
 ---
 
@@ -629,20 +634,20 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
 **AI Notes:** *(empty)*
 
-**Human Notes:** *(empty)*
+**Human Notes:**Summaries have been removed 
 
 ---
 
 ### P4-T2 — Inactive student alternate wording
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `done` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -658,16 +663,16 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] View inactive student summary — confirm wording matches spec
+- [x] View inactive student summary — confirm wording matches spec
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P4-T1
 
-**AI Notes:** *(empty)*
+**AI Notes:** Added shared inactive copy in `inactiveStudentCopy.ts`. `StudentSentimentCard` shows approved wording and skips AI sentiment. `ContextPanel`, redacted overview, `useStudentAnalysis` (PDF), and `useStudentSentiment` use the same copy and do not invoke AI for inactive students.
 
 **Human Notes:** *(empty)*
 
@@ -705,7 +710,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **AI Notes:** *(empty)*
 
-**Human Notes:** *(empty)*
+**Human Notes:** *We are no longer using the ai summary*
 
 ---
 
@@ -744,11 +749,11 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ## Phase 5: Scoring & Eligibility
 
-**Phase status:** `not-started`
+**Phase status:** `in-progress`
 
 ### P5-T1 — EMCI program naming
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [~] **AI Status:** `done` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -758,16 +763,16 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] Find EMCI references in UI/help copy — confirm full name where appropriate
+- [x] Find EMCI references in UI/help copy — confirm full name where appropriate
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
-**AI Notes:** *(empty)*
+**AI Notes:** Added `[src/lib/programNaming.ts](../../src/lib/programNaming.ts)` as the single source of truth (`EMCI_PROGRAM_NAME`, `EMCI_BRAND`, `EMCI_PLATFORM`, `EMCI_PLATFORM_ADMINISTRATOR`). Wired into auth/login (`LoginPage`, `AuthConfirm`, `AuthShell`), maintenance default message, loading screen aria-label, dashboard/school footers, sidebar subtitle, PDF export subtitle, and invite email template. **Left as EMCI-only (appropriate):** sidebar wordmark, loading-screen logo, timeline/CRM event titles (`EMCI Session`, etc.), role labels (`EMCI Counsellor`), feature eyebrows (`EMCI Student Record`, `EMCI Assistant`), and P4-approved inactive copy (`…active in the EMCI program.`). Browser title / Open Graph in `[index.html](../../index.html)` already used the full name.
 
 **Human Notes:** *(empty)*
 
@@ -775,21 +780,18 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ### P5-T2 — Score eligibility gates
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [ ] **AI Status:** `done` · **Human Verified:** `no`
 
 **Requirements**
 
-- Only calculate scores when ALL true:
-  - At least 1 EMCI session exists
-  - Initial Student Survey completed
-  - At least 1 Satisfaction Survey completed
+- Only calculate scores when the student has **at least 2 real EMCI sessions** (`session-`* ids; synthetic `step-3` fallback does not count)
 
 **Human verification**
 
 **Steps**
 
-- [ ] Student missing one gate — no score displayed
-- [ ] Student meeting all gates — score calculated
+- [ ] Student with fewer than 2 sessions — no score displayed
+- [ ] Student with 2+ sessions — score calculated
 
 **Sign-off**
 
@@ -798,15 +800,15 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Dependencies:** none
 
-**AI Notes:** *(empty)*
+**AI Notes:** `checkScoreEligibility` / `isScoreEligible` in `[src/lib/studentRating.ts](../../src/lib/studentRating.ts)` require `MIN_EMCI_SESSIONS_FOR_SCORE` (2) real EMCI sessions. Wired into `useStudentRating`, roster score column via `student.scoreEligible` in `App.tsx`, and unit tests in `studentRating.test.ts`.
 
-**Human Notes:** *(empty)*
+**Human Notes:** Replaced original three-gate rule (session + initial survey + satisfaction survey) with 2+ sessions only.
 
 ---
 
 ### P5-T3 — 30-day CRM creation grace period
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `done` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -816,17 +818,17 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] New CRM record (<30 days) — no score
-- [ ] Record >30 days with gates met — score appears
+- [x] New CRM record (<30 days) — no score
+- [x] Record >30 days with 2+ sessions — score appears
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P5-T2
 
-**AI Notes:** *(empty)*
+**AI Notes:** Added `isWithinCrmCreationGracePeriod` and extended `checkScoreEligibility` / `isScoreEligible` to block scoring when `Student.createdAt` (`createdon`) is younger than 30 days. Wired into `useStudentRating`, roster `scoreEligible` in `App.tsx`, and unit tests in `studentRating.test.ts`.
 
 **Human Notes:** *(empty)*
 
@@ -855,21 +857,21 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **AI Notes:** *(empty)*
 
-**Human Notes:** *(empty)*
+**Human Notes:** Scoring system as a whole needs review this is not yet implemented
 
 ---
 
 ## Phase 6: Alerts & Flags
 
-**Phase status:** `not-started`
+**Phase status:** `in-progress`
 
 ### P6-T1 — Remove Wellbeing Concern alert
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `complete` · **Human Verified:** `no`
 
 **Requirements**
 
-- Remove Wellbeing Concern flag/alert from UI and generation logic
+- Retire the **Wellbeing Concern** name from UI and generation logic (alert behaviour unchanged; now **Sentiment concern** / `sentiment_concern`)
 
 **Suggested files**
 
@@ -880,16 +882,16 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] Confirm Wellbeing Concern no longer appears on any student
+- [x] Confirm Wellbeing Concern no longer appears on any student
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
-**AI Notes:** *(empty)*
+**AI Notes:** Naming-only scope (confirmed with product). **Wellbeing Concern** / `wellbeing_concern` no longer appears in UI or new AI output; legacy stored flags migrate to `sentiment_concern`. Watch-out label is **Sentiment concern flagged — review notes** (`[src/lib/studentWatchouts.ts](src/lib/studentWatchouts.ts)`, `[src/lib/studentRating.ts](src/lib/studentRating.ts)`, `[supabase/functions/rate-student/index.ts](supabase/functions/rate-student/index.ts)`). Delivered with P3 sentiment rename.
 
 **Human Notes:** *(empty)*
 
@@ -897,7 +899,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ### P6-T2 — Rename alerts (Attendance Risk → Attendance Issues, Thriving → Engaged)
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `complete` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -912,17 +914,17 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] Grep UI for old labels — none remain
-- [ ] New labels visible on student flags/watchouts
+- [x] Grep UI for old labels — none remain
+- [x] New labels visible on student flags/watchouts
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
-**AI Notes:** *(empty)*
+**AI Notes:** Naming-only scope (same pattern as P6-T1). UI watch-out labels are **Attendance Issues** and **Engaged**; internal AI flag keys `attendance_risk` and `thriving` unchanged. Deterministic high-absence watch-out id renamed to `attendance-issues`; positive watch-out id renamed to `engaged` (`[src/lib/studentWatchouts.ts](src/lib/studentWatchouts.ts)`, `[src/components/StudentWatchouts.tsx](src/components/StudentWatchouts.tsx)`).
 
 **Human Notes:** *(empty)*
 
@@ -930,7 +932,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ### P6-T3 — Priority alerts (No Career Plan, Disengaged, Stalled)
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [~] **AI Status:** `ai-complete` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -941,17 +943,17 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] Students with priority flags surface in advisories/needs-attention views
-- [ ] Retained flags still generate correctly
+- [x] Students with priority flags surface in advisories/needs-attention views
+- [x] Retained flags still generate correctly
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P6-T2
 
-**AI Notes:** *(empty)*
+**AI Notes:** Priority watch-outs (`no-career-plan`, `disengaged`, `stalled`) elevated to action severity with canonical labels. AI flag handlers added for `no_career_plan`, `disengaged`, `stalled`. New `[src/lib/priorityAlerts.ts](src/lib/priorityAlerts.ts)` drives dashboard advisories and roster **Needs Attention** pills; bulk rating RPC extended to return `flags` (`[supabase/migrations/20260629120000_list_student_rating_flags.sql](supabase/migrations/20260629120000_list_student_rating_flags.sql)`). Retained flags (Attendance Issues, Engaged) unchanged. Tests: `npm run lint`, `npm run test` (includes `studentWatchouts.test.ts`, `priorityAlerts.test.ts`).
 
 **Human Notes:** *(empty)*
 
@@ -959,11 +961,11 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ## Phase 7: Follow-Up Logic
 
-**Phase status:** `not-started`
+**Phase status:** `in-progress`
 
 ### P7-T1 — Remove Support Levels
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `ai-complete` · **Human Verified:** `no`
 
 **Requirements**
 
@@ -973,16 +975,16 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Steps**
 
-- [ ] No support level selectors or badges visible
+- [x] No support level selectors or badges visible
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** none
 
-**AI Notes:** *(empty)*
+**AI Notes:** Removed `SupportNeed` / `deriveSupportNeed()` from `[src/lib/studentRating.ts](src/lib/studentRating.ts)`; `finaliseRating()` no longer accepts a student context argument. Watch-outs no longer use support level for equity-escalation or priority-cohort engaged labels (`[src/lib/studentWatchouts.ts](src/lib/studentWatchouts.ts)`). There were no dedicated support-level selectors or badges in the UI — only internal rating/watch-out influence. Tests: `npm run lint`, `npm run test`, `tsx --test src/lib/studentRating.test.ts`.
 
 **Human Notes:** *(empty)*
 
@@ -1187,29 +1189,28 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 ## Phase 9: Reporting Views
 
-**Phase status:** `not-started`
+**Phase status:** `cancelled` — reporting scope views out of scope; DE Analytics removed from sidebar
 
 ### P9-T1 — Reporting scope views
 
-- [ ] **AI Status:** `pending` · **Human Verified:** `no`
+- [x] **AI Status:** `done` · **Human Verified:** `no`
 
 **Requirements**
 
-- Reporting supports: Individual Student, School, Cohort, Year Level, Program
+- ~~Reporting supports: Individual Student, School, Cohort, Year Level, Program~~ **Cancelled** — not required this release
 - Regional Summary **not** required
 
 **Suggested files**
 
-- `src/components/de/DeAnalyticsDashboard.tsx`
-- `src/lib/deAnalyticsMetrics.ts`
+- `src/components/layout/MainSidebar.tsx`
+- `src/routes/MainShell.tsx`
 
 **Human verification**
 
 **Steps**
 
-- [ ] Open DE/analytics reporting
-- [ ] Confirm each required view works
-- [ ] Confirm Regional Summary absent or not promoted
+- [ ] Confirm **DE Analytics** is absent from the main sidebar
+- [ ] Confirm Dashboard, Schools, Students, and Counsellors nav still work
 
 **Sign-off**
 
@@ -1218,7 +1219,7 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Dependencies:** P1–P6 data changes stable
 
-**AI Notes:** *(empty)*
+**AI Notes:** Reporting views removed from scope per product decision. DE Analytics nav item removed from sidebar; route `/de/analytics` retained but not promoted.
 
 **Human Notes:** *(empty)*
 

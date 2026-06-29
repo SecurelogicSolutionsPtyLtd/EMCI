@@ -9,7 +9,7 @@ interface ProgrammeOverviewSectionProps {
 export function ProgrammeOverviewSection({ overview }: ProgrammeOverviewSectionProps) {
   const tiles = [
     { label: 'Enrolled Students',   value: overview.totalEnrolled.toLocaleString('en-AU'), icon: GraduationCap, highlight: false },
-    { label: 'Active Schools',      value: overview.activeSchools,                          icon: Building2,     highlight: false },
+    { label: 'Active Schools / Campuses', value: overview.activeSchools, icon: Building2, highlight: false },
     { label: 'Completion Rate',     value: `${overview.completionRate}%`,                   icon: CheckCircle2,  highlight: true },
     { label: 'In Career Guidance',  value: overview.inCareerGuidance.toLocaleString('en-AU'), icon: Compass,     highlight: false },
     { label: 'Needing Follow-up',   value: overview.needingFollowUp.toLocaleString('en-AU'), icon: AlertTriangle, highlight: false, alert: overview.needingFollowUp > 0 },
