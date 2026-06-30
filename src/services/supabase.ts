@@ -32,8 +32,16 @@ export async function signInWithMicrosoft(): Promise<void> {
 }
 
 /** External users (School, DE) — email + password */
-export async function signInWithEmail(email: string, password: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+export async function signInWithEmail(
+  email: string,
+  password: string,
+  captchaToken: string,
+): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    options: { captchaToken },
+  });
   if (error) throw error;
 }
 

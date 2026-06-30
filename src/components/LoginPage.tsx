@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Shield, Mail, Lock, Eye, EyeOff, Smartphone, Copy, Check, RefreshCw } from 'lucide-react';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import {
   signInWithMicrosoft,
   signInWithEmail,
@@ -23,6 +24,8 @@ import { MaintenanceNotice } from './MaintenanceNotice';
 
 type LoginTab = 'microsoft' | 'email';
 
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
+
 export function LoginPage() {
   const { stage, refresh } = useAuth();
 
@@ -35,6 +38,8 @@ export function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   // MFA state
   const [mfaFactorId,    setMfaFactorId]    = useState<string | null>(null);
@@ -70,13 +75,23 @@ export function LoginPage() {
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
+    if (!TURNSTILE_SITE_KEY) {
+      setError('Login security check is not configured. Contact your administrator.');
+      return;
+    }
+    if (!captchaToken) {
+      setError('Please complete the security check below.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      await signInWithEmail(email, password);
+      await signInWithEmail(email, password, captchaToken);
       await refresh();
     } catch (e: any) {
       setError(e.message ?? 'Sign-in failed. Check your email and password.');
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
       setLoading(false);
     }
   }
@@ -307,7 +322,7 @@ export function LoginPage() {
         </button>
         <button
           type="button"
-          onClick={() => { setTab('email'); setError(null); }}
+          onClick={() => { setTab('email'); setError(null); setCaptchaToken(null); turnstileRef.current?.reset(); }}
           className={`relative z-10 flex-1 py-2.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${
             tab === 'email' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
           }`}
@@ -388,10 +403,29 @@ export function LoginPage() {
                   </button>
                 </div>
               </div>
+              {TURNSTILE_SITE_KEY ? (
+                <div className="flex justify-center pt-1">
+                  <Turnstile
+                    ref={turnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => {
+                      setCaptchaToken(null);
+                      setError('Security check failed. Please try again.');
+                    }}
+                    options={{ theme: 'light', size: 'normal' }}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2">
+                  Bot protection is not configured for this environment.
+                </p>
+              )}
               <motion.button
                 type="submit"
-                disabled={loading || !email || !password}
-                whileHover={{ y: loading || !email || !password ? 0 : -2 }}
+                disabled={loading || !email || !password || !captchaToken || !TURNSTILE_SITE_KEY}
+                whileHover={{ y: loading || !email || !password || !captchaToken ? 0 : -2 }}
                 whileTap={{ scale: 0.99, y: 0 }}
                 className={`${BTN_PRIMARY} mt-1`}
               >

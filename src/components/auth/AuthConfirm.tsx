@@ -44,8 +44,14 @@ export function AuthConfirm() {
   const [confirm,   setConfirm]   = useState('');
   const [showPass,  setShowPass]  = useState(false);
 
-  // Guard against React 18 StrictMode double-invoke consuming the one-time token twice.
-  const verifiedRef = useRef(false);
+  // The one-time token is held until password submit (not consumed on open),
+  // so the link stays reusable from any browser/device until the hour expires.
+  const tokenRef    = useRef<string | null>(null);
+  const typeRef     = useRef<EmailOtpType>('invite');
+  const deadlineRef = useRef<number>(0);
+
+  // Guard against React 18 StrictMode double-invoke of the init effect.
+  const initRef = useRef(false);
 
   const expireInviteSetup = useCallback(async () => {
     clearPendingInviteSetup();
@@ -59,8 +65,8 @@ export function AuthConfirm() {
   }, []);
 
   useEffect(() => {
-    if (verifiedRef.current) return;
-    verifiedRef.current = true;
+    if (initRef.current) return;
+    initRef.current = true;
 
     const params    = new URLSearchParams(window.location.search);
     const tokenHash = params.get('token_hash');
@@ -68,58 +74,51 @@ export function AuthConfirm() {
     const issuedAtMs = parseInviteIssuedAt(params.get('issued_at'));
 
     void (async () => {
-      if (!tokenHash) {
-        const pending = readPendingInviteSetup();
-        if (!pending || isInviteExpired(pending.deadlineMs)) {
-          if (pending) clearPendingInviteSetup();
-          setError(`This invitation link is missing its security token. Please request a new invite from your ${EMCI_PLATFORM_ADMINISTRATOR}.`);
-          setPhase('error');
-          return;
-        }
+      // Derive the 1-hour deadline from the link's issued_at; fall back to any
+      // stored deadline (resume in the same browser) or one hour from now.
+      const stored = readPendingInviteSetup();
+      const deadlineMs = issuedAtMs
+        ? inviteDeadlineFromIssuedAt(issuedAtMs)
+        : stored?.deadlineMs ?? Date.now() + INVITE_LINK_TTL_MS;
 
-        const session = await getSession();
-        if (!session) {
-          clearPendingInviteSetup();
-          setError(inviteExpiredMessage());
-          setPhase('error');
-          return;
-        }
-
-        setPhase('set_password');
-        return;
-      }
-
-      if (issuedAtMs && isInviteExpired(inviteDeadlineFromIssuedAt(issuedAtMs))) {
+      if (isInviteExpired(deadlineMs)) {
+        clearPendingInviteSetup();
         setError(inviteExpiredMessage());
         setPhase('error');
         return;
       }
 
-      try {
-        await verifyEmailToken(tokenHash, type);
-        const deadlineMs = issuedAtMs
-          ? inviteDeadlineFromIssuedAt(issuedAtMs)
-          : Date.now() + INVITE_LINK_TTL_MS;
+      if (tokenHash) {
+        // Defer verification until submit so the token isn't consumed on open.
+        // The link stays valid (any browser/device) until used or the hour ends.
+        // verifyOtp is a POST, so GET link-prefetch scanners won't consume it.
+        tokenRef.current    = tokenHash;
+        typeRef.current     = type;
+        deadlineRef.current = deadlineMs;
         writePendingInviteSetup(deadlineMs);
-        // The one-time token is now consumed. Strip it from the URL so a page
-        // refresh resumes via the session + stored deadline instead of
-        // re-verifying the dead token (which 403s as "invalid or expired").
-        window.history.replaceState(null, '', window.location.pathname);
         setPhase('set_password');
-      } catch {
-        setError(`This invitation link is invalid or has expired. Please ask your ${EMCI_PLATFORM_ADMINISTRATOR} to send a new invite.`);
-        setPhase('error');
+        return;
       }
+
+      // No token in the URL — only resumable if this browser already holds a
+      // session from a prior step in this flow.
+      const session = await getSession();
+      if (session && stored && !isInviteExpired(stored.deadlineMs)) {
+        deadlineRef.current = stored.deadlineMs;
+        setPhase('set_password');
+        return;
+      }
+      clearPendingInviteSetup();
+      setError(`This invitation link is missing its security token. Please request a new invite from your ${EMCI_PLATFORM_ADMINISTRATOR}.`);
+      setPhase('error');
     })();
   }, []);
 
   useEffect(() => {
     if (phase !== 'set_password' && phase !== 'submitting') return;
+    if (!deadlineRef.current) return;
 
-    const pending = readPendingInviteSetup();
-    if (!pending) return;
-
-    const msLeft = pending.deadlineMs - Date.now();
+    const msLeft = deadlineRef.current - Date.now();
     if (msLeft <= 0) {
       void expireInviteSetup();
       return;
@@ -135,8 +134,7 @@ export function AuthConfirm() {
   async function handleSetPassword(e: React.FormEvent) {
     e.preventDefault();
 
-    const pending = readPendingInviteSetup();
-    if (pending && isInviteExpired(pending.deadlineMs)) {
+    if (deadlineRef.current && isInviteExpired(deadlineRef.current)) {
       await expireInviteSetup();
       return;
     }
@@ -152,10 +150,26 @@ export function AuthConfirm() {
     setPhase('submitting');
     setError(null);
     try {
+      // Consume the one-time token now to establish a session. If it was
+      // already used (e.g. submitted in another tab) fall back to an existing
+      // session in this browser; otherwise the link is spent.
+      const token = tokenRef.current;
+      if (token) {
+        try {
+          await verifyEmailToken(token, typeRef.current);
+        } catch {
+          const session = await getSession();
+          if (!session) {
+            setError(inviteExpiredMessage());
+            setPhase('error');
+            return;
+          }
+        }
+      }
       await setUserPassword(password);
       clearPendingInviteSetup();
-      // Session is already active from verifyOtp; refreshing resolves the auth
-      // stage (school/DE users → MFA enrolment) before we leave this route.
+      // Session is active now; refreshing resolves the auth stage (school/DE
+      // users → MFA enrolment) before we leave this route.
       await refresh();
       navigate('/', { replace: true });
     } catch (err: any) {

@@ -7,11 +7,18 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-30 (latest)
 
-### Fixed: Invite link broke on page refresh instead of lasting the full hour
+### Added: Cloudflare Turnstile on School / DE email login
 
-- Refreshing the `/auth/confirm` page re-ran token verification against the **same one-time token** still present in the URL. Because `verifyOtp` consumes the token on first use, the second attempt returned `403` (`otp_expired` / "One-time token not found"), so the link appeared to "break" well within the 1-hour window ([`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx)).
-- After a successful verification, the `token_hash` (and other auth params) are now stripped from the URL via `history.replaceState`. A refresh then resumes through the existing session + stored 1-hour deadline path rather than re-verifying a consumed token.
-- Confirmed against auth logs: each successful `user_signedup`/`verify 200` was immediately followed by repeated `verify 403 "One-time token not found"` from re-verification.
+- School and Department of Education sign-in now shows a Cloudflare Turnstile challenge and passes the token to Supabase Auth (`signInWithPassword` with `captchaToken`), matching **Authentication → Attack Protection → Turnstile** in the Supabase dashboard ([`src/components/LoginPage.tsx`](src/components/LoginPage.tsx), [`src/services/supabase.ts`](src/services/supabase.ts)).
+- Set `VITE_TURNSTILE_SITE_KEY` in Vercel (and local `.env`) from your Turnstile widget; the secret stays in Supabase only. Add `localhost` to the widget hostnames for local testing.
+
+### Fixed: Invite link "invalid" on refresh/reopen instead of staying usable for the hour
+
+- Root cause: the `/auth/confirm` page called `verifyOtp` **on open**, which consumes the single-use token immediately. Any refresh or reopen (even in the same browser) re-verified the now-dead token and returned `403` (`otp_expired` / "One-time token not found"), so the link appeared to break well within the 1-hour window. Confirmed against auth logs (every `verify 200` was followed by repeated `verify 403`).
+- Token verification is now **deferred until the user submits their password**. On open, the page validates only the time window (`issued_at` + 1 hour) and shows the password form, holding the token in memory. The token is consumed once, at submit, via `verifyOtp` (a POST — GET link-prefetch scanners still don't consume it). This makes the link reusable from any browser/device until it is actually used or the hour expires ([`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx)).
+- If the token was already consumed (e.g. submitted in another tab), submit falls back to an existing session in that browser; otherwise the link is treated as spent.
+
+**Supabase Dashboard (required):** **Authentication → Providers → Email → Email OTP Expiration** must be **≥ 3600** seconds, since the token now needs to remain valid server-side for the full hour (previously it was consumed on first click).
 
 ### Ops: Supabase auth email rate limit blocks invite resends during testing
 
