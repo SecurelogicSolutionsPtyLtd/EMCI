@@ -7,6 +7,12 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-30 (latest)
 
+### Fixed: Semgrep security findings (3 blocking)
+
+- `concept/code.html` (missing SRI on CDN script): file is a design reference only — not deployed. Added `.semgrepignore` to exclude `concept/` from future scans ([`.semgrepignore`](.semgrepignore)).
+- `vite.config.ts` (unsafe format strings): replaced template-literal `console.error` calls with explicit `%d` placeholders so Semgrep's `util.format` rule is satisfied. Dev-server only — no production exposure ([`vite.config.ts`](vite.config.ts)).
+- `api/devtoken.ts` (CORS wildcard): tightened `Access-Control-Allow-Origin` from `*` to `VITE_SITE_URL` (defaults to `https://emci.acce.org.au`). Added `Vary: Origin` header ([`api/devtoken.ts`](api/devtoken.ts)).
+
 ### Added: Invite link detects an already-activated account
 
 - When an invite link is opened after the account has already been activated, submitting the password form now shows a **"You've already signed up"** screen with a **Go to sign in** button, instead of silently re-setting the password ([`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx)).

@@ -70,13 +70,13 @@ export default defineConfig(({ mode }) => {
               try {
                 data = JSON.parse(raw) as Record<string, unknown>;
               } catch {
-                console.error(`[devtoken] Azure AD returned non-JSON (status ${tokenRes.status}):`, raw.slice(0, 200));
+                console.error('[devtoken] Azure AD returned non-JSON (status %d):', tokenRes.status, raw.slice(0, 200));
                 res.statusCode = 502;
                 res.end(JSON.stringify({ error: 'Azure AD returned an unexpected response. Check TENANT_ID/CLIENT_ID in .env.' }));
                 return;
               }
               if (!tokenRes.ok) {
-                console.error(`[devtoken] Azure AD error (${tokenRes.status}):`, data);
+                console.error('[devtoken] Azure AD error (status %d):', tokenRes.status, data);
               }
               res.statusCode = tokenRes.status;
               res.end(JSON.stringify(data));
