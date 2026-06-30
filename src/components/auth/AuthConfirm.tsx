@@ -101,6 +101,10 @@ export function AuthConfirm() {
           ? inviteDeadlineFromIssuedAt(issuedAtMs)
           : Date.now() + INVITE_LINK_TTL_MS;
         writePendingInviteSetup(deadlineMs);
+        // The one-time token is now consumed. Strip it from the URL so a page
+        // refresh resumes via the session + stored deadline instead of
+        // re-verifying the dead token (which 403s as "invalid or expired").
+        window.history.replaceState(null, '', window.location.pathname);
         setPhase('set_password');
       } catch {
         setError(`This invitation link is invalid or has expired. Please ask your ${EMCI_PLATFORM_ADMINISTRATOR} to send a new invite.`);

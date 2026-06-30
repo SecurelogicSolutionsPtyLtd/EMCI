@@ -7,6 +7,19 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-30 (latest)
 
+### Fixed: Invite link broke on page refresh instead of lasting the full hour
+
+- Refreshing the `/auth/confirm` page re-ran token verification against the **same one-time token** still present in the URL. Because `verifyOtp` consumes the token on first use, the second attempt returned `403` (`otp_expired` / "One-time token not found"), so the link appeared to "break" well within the 1-hour window ([`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx)).
+- After a successful verification, the `token_hash` (and other auth params) are now stripped from the URL via `history.replaceState`. A refresh then resumes through the existing session + stored 1-hour deadline path rather than re-verifying a consumed token.
+- Confirmed against auth logs: each successful `user_signedup`/`verify 200` was immediately followed by repeated `verify 403 "One-time token not found"` from re-verification.
+
+### Ops: Supabase auth email rate limit blocks invite resends during testing
+
+- Invite emails are sent by **Supabase Auth** (`inviteUserByEmail`), not EMCI app code. Auth logs show `over_email_send_rate_limit` (429) after two successful invites in the same hour.
+- With the **built-in** Supabase mailer (`noreply@mail.app.supabase.io`), the project-wide limit is **2 auth emails per hour** and **cannot be raised** until custom SMTP is configured.
+- **To increase:** [Authentication → SMTP Settings](https://supabase.com/dashboard/project/vklwppadgogepkeaizow/auth/smtp) (custom SMTP, e.g. SendGrid/Resend for `acce.org.au`), then [Authentication → Rate Limits](https://supabase.com/dashboard/project/vklwppadgogepkeaizow/auth/rate-limits) → raise **Rate limit for sending emails** (`rate_limit_email_sent`; e.g. **100–200/hour** for admin onboarding). Built-in SMTP must be replaced first — the email limit slider is only available with custom SMTP.
+- **Immediate workaround:** wait up to one hour from the last successful invite before re-sending, or use the invite link already delivered instead of delete + re-add (each attempt counts toward the hourly cap even when the user row already exists).
+
 ### Changed: Invite links expire after 1 hour (time-based, not page session)
 
 - Invite emails now embed `issued_at` in the confirmation link and the app enforces a **1-hour** window from when the invite was sent — closing the browser tab no longer determines whether the link still works ([`supabase/functions/invite-user/index.ts`](supabase/functions/invite-user/index.ts), [`src/lib/inviteLink.ts`](src/lib/inviteLink.ts), [`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx), [`src/App.tsx`](src/App.tsx), [`supabase/email-templates/invite-user.html`](supabase/email-templates/invite-user.html)).
