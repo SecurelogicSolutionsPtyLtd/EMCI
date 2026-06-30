@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { EmailOtpType } from '@supabase/supabase-js';
-import { Loader2, Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Lock, Eye, EyeOff, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { verifyEmailToken, setUserPassword, getSession, signOut } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { AuthShell, SectionHeader, ErrorBanner, INPUT_CLASS, BTN_PRIMARY } from './AuthShell';
@@ -25,7 +25,7 @@ import {
 // Keeping this link on the EMCI domain (instead of the raw Supabase verify URL)
 // prevents mail security from quarantining the email.
 
-type Phase = 'verifying' | 'set_password' | 'submitting' | 'error';
+type Phase = 'verifying' | 'set_password' | 'submitting' | 'already_signed_up' | 'error';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -150,20 +150,19 @@ export function AuthConfirm() {
     setPhase('submitting');
     setError(null);
     try {
-      // Consume the one-time token now to establish a session. If it was
-      // already used (e.g. submitted in another tab) fall back to an existing
-      // session in this browser; otherwise the link is spent.
+      // Consume the one-time token now to establish a session. Within the valid
+      // window, a failed verification means the single-use invite token has
+      // already been used — i.e. the account is already activated (the user has
+      // already signed up, possibly on another device). Don't offer password
+      // setup again; send them to sign in instead.
       const token = tokenRef.current;
       if (token) {
         try {
           await verifyEmailToken(token, typeRef.current);
         } catch {
-          const session = await getSession();
-          if (!session) {
-            setError(inviteExpiredMessage());
-            setPhase('error');
-            return;
-          }
+          clearPendingInviteSetup();
+          setPhase('already_signed_up');
+          return;
         }
       }
       await setUserPassword(password);
@@ -189,6 +188,21 @@ export function AuthConfirm() {
         <div className="flex justify-center py-8">
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
+      </AuthShell>
+    );
+  }
+
+  if (phase === 'already_signed_up') {
+    return (
+      <AuthShell>
+        <SectionHeader
+          icon={<CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+          title="You've already signed up"
+          subtitle={`This ${EMCI_BRAND} account is already active. Please sign in with your email and password.`}
+        />
+        <button type="button" onClick={() => navigate('/', { replace: true })} className={BTN_PRIMARY}>
+          Go to sign in
+        </button>
       </AuthShell>
     );
   }

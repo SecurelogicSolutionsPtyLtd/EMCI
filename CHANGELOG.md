@@ -7,6 +7,11 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-30 (latest)
 
+### Added: Invite link detects an already-activated account
+
+- When an invite link is opened after the account has already been activated, submitting the password form now shows a **"You've already signed up"** screen with a **Go to sign in** button, instead of silently re-setting the password ([`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx)).
+- Detection happens at submit, not on open: the one-time token is still verified lazily so the link stays reusable for the full hour. Within the valid window, a failed `verifyOtp` means the single-use invite token was already consumed (the user signed up — possibly on another device), so we route them to sign in rather than offering password setup again.
+
 ### Added: Cloudflare Turnstile on School / DE email login
 
 - School and Department of Education sign-in now shows a Cloudflare Turnstile challenge and passes the token to Supabase Auth (`signInWithPassword` with `captchaToken`), matching **Authentication → Attack Protection → Turnstile** in the Supabase dashboard ([`src/components/LoginPage.tsx`](src/components/LoginPage.tsx), [`src/services/supabase.ts`](src/services/supabase.ts)).
