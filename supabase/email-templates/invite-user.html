@@ -94,7 +94,7 @@
                 <tr>
                   <td style="border-radius:8px;background-color:#2563EB;">
                     <a
-                      href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&redirect_to={{ .RedirectTo }}"
+                      href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&amp;redirect_to={{ .RedirectTo }}&amp;issued_at={{ .Data.invite_issued_at }}"
                       style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.2px;border-radius:8px;"
                     >
                       Accept invitation &amp; set up account
@@ -105,7 +105,7 @@
 
               <!-- Expiry + security note -->
               <p style="margin:0 0 12px;font-size:13px;color:#64748B;line-height:1.6;">
-                This invitation link expires in <strong style="color:#475569;">24 hours</strong> and can only be used once.
+                This invitation link expires in <strong style="color:#475569;">1 hour</strong> and can only be used once. You can close this page and return within that hour to finish setting up your account.
               </p>
               <p style="margin:0 0 20px;font-size:13px;color:#64748B;line-height:1.6;">
                 If you were not expecting this invitation, you can safely ignore this email — no account will be created unless you click the button above. Never share this link with anyone else.
@@ -121,7 +121,7 @@
               <!-- Fallback -->
               <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
                 Button not working? Copy and paste this link into your browser:<br />
-                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&redirect_to={{ .RedirectTo }}" style="color:#2563EB;word-break:break-all;">{{ .SiteURL }}/auth/confirm</a>
+                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&amp;redirect_to={{ .RedirectTo }}&amp;issued_at={{ .Data.invite_issued_at }}" style="color:#2563EB;word-break:break-all;">{{ .SiteURL }}/auth/confirm</a>
               </p>
 
             </td>

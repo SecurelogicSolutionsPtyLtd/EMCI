@@ -7,6 +7,14 @@ Entries are ordered newest-first within each release.
 
 ## — 2026-06-30 (latest)
 
+### Changed: Invite links expire after 1 hour (time-based, not page session)
+
+- Invite emails now embed `issued_at` in the confirmation link and the app enforces a **1-hour** window from when the invite was sent — closing the browser tab no longer determines whether the link still works ([`supabase/functions/invite-user/index.ts`](supabase/functions/invite-user/index.ts), [`src/lib/inviteLink.ts`](src/lib/inviteLink.ts), [`src/components/auth/AuthConfirm.tsx`](src/components/auth/AuthConfirm.tsx), [`src/App.tsx`](src/App.tsx), [`supabase/email-templates/invite-user.html`](supabase/email-templates/invite-user.html)).
+- After the token is verified, pending password setup is stored in `localStorage` with the same deadline so invited users can return to `/auth/confirm` within the hour to finish creating their password.
+- Invite email copy updated from 24 hours to **1 hour**.
+
+**Supabase Dashboard:** confirm **Authentication → Providers → Email → Email OTP Expiration** is **3600** seconds (1 hour), re-paste the updated **Invite user** template from [`supabase/email-templates/invite-user.html`](supabase/email-templates/invite-user.html), and redeploy the `invite-user` edge function.
+
 ### Fixed: Removing a user left an orphaned Supabase Auth account
 
 - Permanent user removal now deletes the Supabase Auth account by **email** when the role row has no linked `user_id`, in addition to the existing `user_id` path ([`supabase/functions/delete-user/index.ts`](supabase/functions/delete-user/index.ts), [`src/services/supabase.ts`](src/services/supabase.ts), [`src/components/TeamManagement.tsx`](src/components/TeamManagement.tsx)). Redeployed the edge function (version 3).

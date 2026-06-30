@@ -1,11 +1,20 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { Loader2, Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
-import { verifyEmailToken, setUserPassword } from '../../services/supabase';
+import { verifyEmailToken, setUserPassword, getSession, signOut } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { AuthShell, SectionHeader, ErrorBanner, INPUT_CLASS, BTN_PRIMARY } from './AuthShell';
 import { EMCI_BRAND, EMCI_PLATFORM_ADMINISTRATOR } from '../../lib/programNaming';
+import {
+  INVITE_LINK_TTL_MS,
+  parseInviteIssuedAt,
+  inviteDeadlineFromIssuedAt,
+  isInviteExpired,
+  readPendingInviteSetup,
+  writePendingInviteSetup,
+  clearPendingInviteSetup,
+} from '../../lib/inviteLink';
 
 // ── AuthConfirm ───────────────────────────────────────────────────────────────
 // Handles the EMCI-domain invite link: /auth/confirm?token_hash=…&type=invite
@@ -19,6 +28,10 @@ import { EMCI_BRAND, EMCI_PLATFORM_ADMINISTRATOR } from '../../lib/programNaming
 type Phase = 'verifying' | 'set_password' | 'submitting' | 'error';
 
 const MIN_PASSWORD_LENGTH = 8;
+
+function inviteExpiredMessage(): string {
+  return `This invitation link expired after 1 hour. Please ask your ${EMCI_PLATFORM_ADMINISTRATOR} to send a new invite.`;
+}
 
 export function AuthConfirm() {
   const { refresh } = useAuth();
@@ -34,6 +47,17 @@ export function AuthConfirm() {
   // Guard against React 18 StrictMode double-invoke consuming the one-time token twice.
   const verifiedRef = useRef(false);
 
+  const expireInviteSetup = useCallback(async () => {
+    clearPendingInviteSetup();
+    try {
+      await signOut();
+    } catch {
+      /* session may already be gone */
+    }
+    setError(inviteExpiredMessage());
+    setPhase('error');
+  }, []);
+
   useEffect(() => {
     if (verifiedRef.current) return;
     verifiedRef.current = true;
@@ -41,16 +65,42 @@ export function AuthConfirm() {
     const params    = new URLSearchParams(window.location.search);
     const tokenHash = params.get('token_hash');
     const type      = (params.get('type') ?? 'invite') as EmailOtpType;
-
-    if (!tokenHash) {
-      setError(`This invitation link is missing its security token. Please request a new invite from your ${EMCI_PLATFORM_ADMINISTRATOR}.`);
-      setPhase('error');
-      return;
-    }
+    const issuedAtMs = parseInviteIssuedAt(params.get('issued_at'));
 
     void (async () => {
+      if (!tokenHash) {
+        const pending = readPendingInviteSetup();
+        if (!pending || isInviteExpired(pending.deadlineMs)) {
+          if (pending) clearPendingInviteSetup();
+          setError(`This invitation link is missing its security token. Please request a new invite from your ${EMCI_PLATFORM_ADMINISTRATOR}.`);
+          setPhase('error');
+          return;
+        }
+
+        const session = await getSession();
+        if (!session) {
+          clearPendingInviteSetup();
+          setError(inviteExpiredMessage());
+          setPhase('error');
+          return;
+        }
+
+        setPhase('set_password');
+        return;
+      }
+
+      if (issuedAtMs && isInviteExpired(inviteDeadlineFromIssuedAt(issuedAtMs))) {
+        setError(inviteExpiredMessage());
+        setPhase('error');
+        return;
+      }
+
       try {
         await verifyEmailToken(tokenHash, type);
+        const deadlineMs = issuedAtMs
+          ? inviteDeadlineFromIssuedAt(issuedAtMs)
+          : Date.now() + INVITE_LINK_TTL_MS;
+        writePendingInviteSetup(deadlineMs);
         setPhase('set_password');
       } catch {
         setError(`This invitation link is invalid or has expired. Please ask your ${EMCI_PLATFORM_ADMINISTRATOR} to send a new invite.`);
@@ -59,8 +109,34 @@ export function AuthConfirm() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (phase !== 'set_password' && phase !== 'submitting') return;
+
+    const pending = readPendingInviteSetup();
+    if (!pending) return;
+
+    const msLeft = pending.deadlineMs - Date.now();
+    if (msLeft <= 0) {
+      void expireInviteSetup();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void expireInviteSetup();
+    }, msLeft);
+
+    return () => window.clearTimeout(timer);
+  }, [phase, expireInviteSetup]);
+
   async function handleSetPassword(e: React.FormEvent) {
     e.preventDefault();
+
+    const pending = readPendingInviteSetup();
+    if (pending && isInviteExpired(pending.deadlineMs)) {
+      await expireInviteSetup();
+      return;
+    }
+
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
@@ -73,6 +149,7 @@ export function AuthConfirm() {
     setError(null);
     try {
       await setUserPassword(password);
+      clearPendingInviteSetup();
       // Session is already active from verifyOtp; refreshing resolves the auth
       // stage (school/DE users → MFA enrolment) before we leave this route.
       await refresh();

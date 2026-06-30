@@ -111,8 +111,11 @@ Deno.serve(async (req) => {
 
   // 2. Send a Supabase invite email — creates the auth user (if new) and emails a sign-in link.
   //    Safe to call for existing users; Supabase will resend the invite.
+  //    invite_issued_at is embedded in the email link so the app can enforce a 1-hour expiry window.
+  const inviteIssuedAt = Math.floor(Date.now() / 1000);
   const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(cleanEmail, {
     redirectTo: APP_SITE_URL,
+    data: { invite_issued_at: inviteIssuedAt },
   });
 
   if (inviteError && !inviteError.message.toLowerCase().includes("already")) {

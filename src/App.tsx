@@ -49,6 +49,7 @@ import {
 import { canBypassMaintenance, getRoleGroup, ROLE_LABELS } from './types/roles';
 import { getProgramVisibleScope } from './lib/networkProgramMetrics';
 import { listTeamMembers, listInactiveCounsellorOverrides, type TeamMember, type InactiveCounsellorOverride } from './services/supabase';
+import { clearPendingInviteSetup, isInviteExpired, readPendingInviteSetup } from './lib/inviteLink';
 import { redactSensitiveEventsMap } from './redaction';
 import { Eye, RotateCcw } from 'lucide-react';
 import { EmciLoadingScreen } from './components/EmciLoadingScreen';
@@ -325,6 +326,15 @@ function AppInner() {
   // before the standard MFA-enrolment flow takes over.
   if (location.pathname === '/auth/confirm') {
     return <AuthConfirm />;
+  }
+
+  const pendingInviteSetup = readPendingInviteSetup();
+  if (pendingInviteSetup) {
+    if (isInviteExpired(pendingInviteSetup.deadlineMs)) {
+      clearPendingInviteSetup();
+    } else if (stage === 'mfa_enroll' || stage === 'mfa_required') {
+      return <Navigate to="/auth/confirm" replace />;
+    }
   }
 
   if (stage === 'loading') {
