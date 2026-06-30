@@ -4,7 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL     = Deno.env.get("SUPABASE_URL")              ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 /** Post-invite redirect — must match Supabase Auth → URL Configuration (Site URL + Redirect URLs). */
-const APP_SITE_URL     = (Deno.env.get("APP_SITE_URL") ?? "https://acce.org.au").replace(/\/$/, "");
+const APP_SITE_URL     = (Deno.env.get("APP_SITE_URL") ?? "https://emci.acce.org.au").replace(/\/$/, "");
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin":  "*",

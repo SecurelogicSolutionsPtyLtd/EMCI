@@ -300,7 +300,7 @@ export function TeamManagement({ onBack, schools = [] }: TeamManagementProps) {
   async function handleRemove(member: TeamMember) {
     setRemoveLoading(true);
     try {
-      await deleteTeamMember(member.id, member.user_id);
+      await deleteTeamMember(member.id, member.user_id, member.email);
       setConfirmRemove(null);
       await load();
     } catch (e: any) {

@@ -48,25 +48,25 @@ Use this section to run through checks without guessing navigation or expected v
 ### Original checklist → phase map
 
 
-| Original checklist item                           | Phase map task(s)       |
-| ------------------------------------------------- | ----------------------- |
-| Dashboard school summary cards                    | **P1-T1**               |
-| Exclude test schools from statistics              | **P1-T2**               |
-| Active / Total counsellor counts                  | **P1-T3**               |
-| Exclude inactive/test counsellors from active     | **P1-T4**               |
-| At Risk → Follow Up                               | **P2-T1**               |
-| Job Ready wording (stakeholder approval)          | **P0-T1** (blocked)     |
-| Growth & Wellbeing → Student Sentiment            | **P3-T1**               |
-| Rating weightings 20/25/25/15/15                  | **P3-T2**               |
-| Inactive student summaries                        | **P4-T1**, **P4-T2**    |
-| Incorrect completion summaries (Charlie McDonald) | **P4-T3**, **P4-T4**    |
-| Scoring & eligibility rules                       | **P5-T1** – **P5-T4**   |
-| Alerts & flags cleanup                            | **P6-T1** – **P6-T3**   |
-| Follow-up logic                                   | **P7-T1** – **P7-T4**   |
-| Security & permissions                            | **P8-T1** – **P8-T4**   |
+| Original checklist item                           | Phase map task(s)                           |
+| ------------------------------------------------- | ------------------------------------------- |
+| Dashboard school summary cards                    | **P1-T1**                                   |
+| Exclude test schools from statistics              | **P1-T2**                                   |
+| Active / Total counsellor counts                  | **P1-T3**                                   |
+| Exclude inactive/test counsellors from active     | **P1-T4**                                   |
+| At Risk → Follow Up                               | **P2-T1**                                   |
+| Job Ready wording (stakeholder approval)          | **P0-T1** (blocked)                         |
+| Growth & Wellbeing → Student Sentiment            | **P3-T1**                                   |
+| Rating weightings 20/25/25/15/15                  | **P3-T2**                                   |
+| Inactive student summaries                        | **P4-T1**, **P4-T2**                        |
+| Incorrect completion summaries (Charlie McDonald) | **P4-T3**, **P4-T4**                        |
+| Scoring & eligibility rules                       | **P5-T1** – **P5-T4**                       |
+| Alerts & flags cleanup                            | **P6-T1** – **P6-T3**                       |
+| Follow-up logic                                   | **P7-T1** – **P7-T4**                       |
+| Security & permissions                            | **P8-T1** – **P8-T4**                       |
 | Reporting views                                   | **P9-T1** (cancelled — sidebar nav removed) |
-| Validation & testing (end-to-end)                 | **P10-T1** – **P10-T6** |
-| Final DE wording review                           | **P0-T2** (blocked)     |
+| Validation & testing (end-to-end)                 | **P10-T1** – **P10-T6**                     |
+| Final DE wording review                           | **P0-T2** (blocked)                         |
 
 
 ### How to sign off a task
@@ -1214,14 +1214,14 @@ Run **P1-T1 → P1-T4** in a single session (~15–20 min). Keep a scratch pad f
 
 **Sign-off**
 
-- [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
+- [x] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
 - [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P1–P6 data changes stable
 
 **AI Notes:** Reporting views removed from scope per product decision. DE Analytics nav item removed from sidebar; route `/de/analytics` retained but not promoted.
 
-**Human Notes:** *(empty)*
+**Human Notes:** *Removed*
 
 ---
 
@@ -1247,7 +1247,7 @@ Run after related phases are **human-verified**. AI may add/update automated tes
 **Sign-off**
 
 - [ ] **All steps pass — task verified** (set task checkbox `[x]` and Human Verified to `yes`)
-- [ ] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
+- [x] **Flag for AI review** — note issue under Human Notes; say `TASK-ID failed: …` in chat
 
 **Dependencies:** P1 human-verified
 

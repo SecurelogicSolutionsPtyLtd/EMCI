@@ -304,14 +304,16 @@ export async function toggleTeamMemberActive(
 /**
  * Permanently removes a team member.
  * Calls the `delete-user` edge function which deletes the Supabase Auth user
- * AND the `emci_user_roles` row, so a future invite is a clean fresh invite.
+ * (resolved by user_id, or by email when the row is still pending) AND the
+ * `emci_user_roles` row, so a future invite is a clean fresh invite.
  */
 export async function deleteTeamMember(
   id: string,
   userId: string | null,
+  email: string,
 ): Promise<void> {
   const { data, error } = await supabase.functions.invoke('delete-user', {
-    body: { id, userId },
+    body: { id, userId, email },
   });
   if (error) {
     const body = await (error as { context?: Response }).context?.json?.().catch(() => null) as { error?: string } | null;

@@ -5,7 +5,24 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## — 2026-06-29 (latest)
+## — 2026-06-30 (latest)
+
+### Fixed: Removing a user left an orphaned Supabase Auth account
+
+- Permanent user removal now deletes the Supabase Auth account by **email** when the role row has no linked `user_id`, in addition to the existing `user_id` path ([`supabase/functions/delete-user/index.ts`](supabase/functions/delete-user/index.ts), [`src/services/supabase.ts`](src/services/supabase.ts), [`src/components/TeamManagement.tsx`](src/components/TeamManagement.tsx)). Redeployed the edge function (version 3).
+- Root cause: the function only called `auth.admin.deleteUser` when the role row carried a `user_id`. Members still in the "pending" state (null `user_id`) had their role row deleted but their Auth login left behind — so the account remained in Supabase **Authentication → Users** and the email stayed reserved against future invites.
+- The `email` is now passed from the UI through to the function, which resolves the matching Auth user and hard-deletes it (the `ON DELETE CASCADE` on `emci_user_roles.user_id` then clears the role row).
+
+### Fixed: Invite acceptance landed on the login screen instead of password/MFA setup
+
+- Corrected the invite redirect domain from `https://acce.org.au` to the actual app origin `https://emci.acce.org.au` in the `invite-user` edge function default and `.env.example` ([`supabase/functions/invite-user/index.ts`](supabase/functions/invite-user/index.ts), [`.env.example`](.env.example)). Redeployed the edge function (version 2).
+- Root cause: invited users were sent through Supabase's default `GET /auth/v1/verify` link (confirmed in auth logs), which verifies the token server-side and redirects past the EMCI `/auth/confirm` page — so the **Create your password** and **two-factor (MFA) enrolment** screens were skipped and users landed on the sign-in screen.
+
+**Supabase Dashboard (required to complete the fix):** set **Authentication → URL Configuration → Site URL** to `https://emci.acce.org.au` and add `https://emci.acce.org.au/**` to **Redirect URLs**; re-paste the custom **Invite user** email template from [`supabase/email-templates/invite-user.html`](supabase/email-templates/invite-user.html) (the default `{{ .ConfirmationURL }}` template was still active). Also set the secret: `supabase secrets set APP_SITE_URL=https://emci.acce.org.au`.
+
+---
+
+## — 2026-06-29
 
 ### Fixed: Semgrep static analysis findings
 
