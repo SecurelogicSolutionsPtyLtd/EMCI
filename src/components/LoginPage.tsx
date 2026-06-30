@@ -40,6 +40,8 @@ export function LoginPage() {
   const [error,    setError]    = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
+  const canEmailSignIn =
+    Boolean(TURNSTILE_SITE_KEY && email.trim() && password && captchaToken && !loading);
 
   // MFA state
   const [mfaFactorId,    setMfaFactorId]    = useState<string | null>(null);
@@ -409,6 +411,7 @@ export function LoginPage() {
                     ref={turnstileRef}
                     siteKey={TURNSTILE_SITE_KEY}
                     onSuccess={setCaptchaToken}
+                    onBeforeInteractive={() => setCaptchaToken(null)}
                     onExpire={() => setCaptchaToken(null)}
                     onError={() => {
                       setCaptchaToken(null);
@@ -424,8 +427,8 @@ export function LoginPage() {
               )}
               <motion.button
                 type="submit"
-                disabled={loading || !email || !password || !captchaToken || !TURNSTILE_SITE_KEY}
-                whileHover={{ y: loading || !email || !password || !captchaToken ? 0 : -2 }}
+                disabled={!canEmailSignIn}
+                whileHover={{ y: canEmailSignIn ? -2 : 0 }}
                 whileTap={{ scale: 0.99, y: 0 }}
                 className={`${BTN_PRIMARY} mt-1`}
               >

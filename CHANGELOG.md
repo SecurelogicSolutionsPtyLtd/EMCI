@@ -16,6 +16,7 @@ Entries are ordered newest-first within each release.
 
 - School and Department of Education sign-in now shows a Cloudflare Turnstile challenge and passes the token to Supabase Auth (`signInWithPassword` with `captchaToken`), matching **Authentication → Attack Protection → Turnstile** in the Supabase dashboard ([`src/components/LoginPage.tsx`](src/components/LoginPage.tsx), [`src/services/supabase.ts`](src/services/supabase.ts)).
 - Set `VITE_TURNSTILE_SITE_KEY` in Vercel (and local `.env`) from your Turnstile widget; the secret stays in Supabase only. Add `localhost` to the widget hostnames for local testing.
+- School / DE **Sign in** stays disabled until Turnstile returns a token (`onSuccess`); it re-disables if the challenge expires, errors, or needs interaction again ([`src/components/LoginPage.tsx`](src/components/LoginPage.tsx)).
 
 ### Fixed: Invite link "invalid" on refresh/reopen instead of staying usable for the hour
 
